@@ -150,15 +150,49 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     setIsReceivingAudio(hasAudio);
   }, [audioTracks, currentLanguage, translatorIdentity]);
 
+  // Unsubscribe from translation when tab closes
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Use sendBeacon for reliable fire-and-forget during page unload
+      if (currentLanguageRef.current && currentLanguageRef.current !== "original") {
+        const body = JSON.stringify({
+          sessionId,
+          targetLanguage: currentLanguageRef.current,
+        });
+        navigator.sendBeacon(
+          "/api/translate/unsubscribe",
+          new Blob([body], { type: "application/json" })
+        );
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      // Also fire on React unmount (e.g. navigation away)
+      handleBeforeUnload();
+    };
+  }, [sessionId]);
+
   const handleLanguageChange = useCallback(
     (langCode: string, newTranslatorIdentity: string | null) => {
+      // Unsubscribe from the previous language
+      const prev = currentLanguageRef.current;
+      if (prev && prev !== "original" && prev !== langCode) {
+        fetch("/api/translate/unsubscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sessionId, targetLanguage: prev }),
+        }).catch(() => {});
+      }
+
       setCurrentLanguage(langCode);
       currentLanguageRef.current = langCode;
       setTranslatorIdentity(newTranslatorIdentity);
       // Clear transcripts when switching languages
       setTranscripts([]);
     },
-    []
+    [sessionId]
   );
 
   const isConnected = organizerParticipant !== undefined;
