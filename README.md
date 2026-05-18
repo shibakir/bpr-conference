@@ -81,6 +81,54 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Deploy to Cloud Run
+
+> **Note:** This app cannot be deployed to Vercel. The translation bridges are long-running processes (WebSocket connections to Gemini and LiveKit) that exceed Vercel's serverless function timeout limits. Cloud Run supports long-running requests and persistent containers.
+
+### Prerequisites
+
+- [Google Cloud CLI](https://cloud.google.com/sdk/docs/install) (`gcloud`)
+- A [LiveKit Cloud](https://cloud.livekit.io) account (free tier: 50 participant-hours/month)
+
+### Deploy
+
+First, create secrets in Google Secret Manager (reads values from your `.env.local`):
+
+```bash
+source <(grep -v '^#' .env.local | sed 's/^/export /')
+
+echo -n "$GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
+echo -n "$LIVEKIT_API_KEY" | gcloud secrets create livekit-api-key --data-file=-
+echo -n "$LIVEKIT_API_SECRET" | gcloud secrets create livekit-api-secret --data-file=-
+```
+
+Then deploy:
+
+```bash
+gcloud run deploy live-translate \
+  --source . \
+  --region us-central1 \
+  --allow-unauthenticated \
+  --min-instances 1 \
+  --max-instances 1 \
+  --timeout 3600 \
+  --cpu-always-allocated \
+  --set-secrets "\
+GEMINI_API_KEY=gemini-api-key:latest,\
+LIVEKIT_API_KEY=livekit-api-key:latest,\
+LIVEKIT_API_SECRET=livekit-api-secret:latest" \
+  --set-env-vars "\
+NEXT_PUBLIC_LIVEKIT_URL=wss://your-project.livekit.cloud,\
+LIVEKIT_URL=wss://your-project.livekit.cloud"
+```
+
+Key settings:
+- `--set-secrets` — injects secrets from Secret Manager at runtime (never stored in the image or Cloud Run config)
+- `--min-instances 1` — keeps the container warm so active sessions aren't killed
+- `--max-instances 1` — the `TranslationSessionManager` singleton requires a single instance
+- `--timeout 3600` — allows sessions up to 1 hour
+- `--cpu-always-allocated` — prevents CPU throttling between requests (needed for audio processing)
+
 ## Usage
 
 1. Click **Create session** — you'll be taken to the broadcast page
