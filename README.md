@@ -112,7 +112,7 @@ gcloud run deploy live-translate \
   --min-instances 1 \
   --max-instances 1 \
   --timeout 3600 \
-  --cpu-always-allocated \
+  --no-cpu-throttling \
   --set-secrets "\
 GEMINI_API_KEY=gemini-api-key:latest,\
 LIVEKIT_API_KEY=livekit-api-key:latest,\
@@ -127,7 +127,17 @@ Key settings:
 - `--min-instances 1` — keeps the container warm so active sessions aren't killed
 - `--max-instances 1` — the `TranslationSessionManager` singleton requires a single instance
 - `--timeout 3600` — allows sessions up to 1 hour
-- `--cpu-always-allocated` — prevents CPU throttling between requests (needed for audio processing)
+- `--no-cpu-throttling` — keeps CPU allocated between requests (needed for audio processing)
+
+### Authentication (optional)
+
+To restrict access to specific Google accounts, enable Identity-Aware Proxy (IAP). This adds a Google Sign-In page — only authorized users can access the app.
+
+```bash
+gcloud run services update live-translate --region us-central1 --iap
+```
+
+See [docs/authentication.md](docs/authentication.md) for full setup instructions.
 
 ## Usage
 

@@ -41,6 +41,7 @@ export async function GET(req: NextRequest) {
   });
 
   const token = await at.toJwt();
+  const serverUrl = process.env.LIVEKIT_URL || "ws://localhost:7880";
 
-  return NextResponse.json({ token });
+  return NextResponse.json({ token, serverUrl });
 }

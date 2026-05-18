@@ -313,11 +313,9 @@ export default function WatchPage({
 }) {
   const { id: sessionId } = use(params);
   const [token, setToken] = useState("");
+  const [livekitUrl, setLivekitUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
-
-  const livekitUrl =
-    process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
 
   useEffect(() => {
     async function fetchToken() {
@@ -329,6 +327,7 @@ export default function WatchPage({
         const data = await res.json();
         if (data.error) throw new Error(data.error);
         setToken(data.token);
+        setLivekitUrl(data.serverUrl);
       } catch (err) {
         setError((err as Error).message);
       }
@@ -355,7 +354,7 @@ export default function WatchPage({
     );
   }
 
-  if (!token) {
+  if (!token || !livekitUrl) {
     return (
       <div className="page">
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
