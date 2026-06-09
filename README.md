@@ -12,7 +12,7 @@ Organizer → publishes audio → LiveKit room
               TranslationBridge (per language)
               joins room as bot, subscribes to organizer audio
                                   ↓
-              Gemini Live API (streamingTranslationConfig)
+              Gemini Live API (translationConfig)
               directionalTranslation → targetLanguageCode
                                   ↓
               Translated audio published back to LiveKit
@@ -174,7 +174,7 @@ src/
 ## Key design decisions
 
 - **Audio only** — no video, keeps things simple and bandwidth-light
-- **`streamingTranslationConfig`** — uses Gemini's native directional translation, not prompt-based
+- **`translationConfig`** — uses Gemini's native directional translation, not prompt-based
 - **`@livekit/rtc-node`** — server-side bot joins the room programmatically (not a browser)
 - **Singleton per language** — `TranslationSessionManager` ensures at most one Gemini session per language per room
 - **Attendee audio switching** — client uses `setSubscribed()` to subscribe only to the selected translator bot's audio track

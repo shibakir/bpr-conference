@@ -332,7 +332,7 @@ export class TranslationBridge {
         outputAudioTranscription: {},
         generationConfig: {
           responseModalities: ["AUDIO"],
-          streamingTranslationConfig: {
+          translationConfig: {
             targetLanguageCode: this.targetLanguage,
             echoTargetLanguage: true,
           },
