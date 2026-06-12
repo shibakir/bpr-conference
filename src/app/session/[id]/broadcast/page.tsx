@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, use } from "react";
+import { useEffect, useState, useCallback, use, useRef } from "react";
 import {
   LiveKitRoom,
   useLocalParticipant,
@@ -32,7 +32,13 @@ const LANG_NAMES: Record<string, string> = {
   hi: "Hindi", ru: "Russian", tr: "Turkish", nl: "Dutch", pl: "Polish", sv: "Swedish",
 };
 
-function BroadcastControls({ sessionId }: { sessionId: string }) {
+function BroadcastControls({
+  sessionId,
+  onEndBroadcast,
+}: {
+  sessionId: string;
+  onEndBroadcast: () => void;
+}) {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
   const [translations, setTranslations] = useState<TranslationInfo[]>([]);
@@ -190,7 +196,14 @@ function BroadcastControls({ sessionId }: { sessionId: string }) {
       <div style={{ paddingTop: 28 }}>
         <button
           className="btn-danger"
-          onClick={() => {
+          onClick={async () => {
+            onEndBroadcast();
+            try {
+              // Explicitly notify server that broadcast is ended to stop all translator bots
+              await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+            } catch (err) {
+              console.error("Failed to explicitly delete session on broadcast end:", err);
+            }
             room.disconnect();
             window.location.href = "/";
           }}
@@ -212,6 +225,11 @@ export default function BroadcastPage({
   const [token, setToken] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const isEndingRef = useRef(false);
+
+  const handleEndBroadcast = useCallback(() => {
+    isEndingRef.current = true;
+  }, []);
 
   useEffect(() => {
     async function fetchToken() {
@@ -271,11 +289,13 @@ export default function BroadcastPage({
           width: "100%",
         }}
         onDisconnected={() => {
-          setError("Disconnected from LiveKit room. Please check your credentials or network connection.");
+          if (!isEndingRef.current) {
+            setError("Disconnected from LiveKit room. Please check your credentials or network connection.");
+          }
         }}
       >
 
-        <BroadcastControls sessionId={sessionId} />
+        <BroadcastControls sessionId={sessionId} onEndBroadcast={handleEndBroadcast} />
       </LiveKitRoom>
     </div>
   );
