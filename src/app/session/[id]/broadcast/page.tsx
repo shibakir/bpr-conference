@@ -110,7 +110,7 @@ function BroadcastControls({
           });
           publishedTrackPubRef.current = pub;
           localPub = pub;
-          console.log("Published mixed audio track:", pub.sid);
+          console.log("Published mixed audio track:", pub.trackSid);
         }
       } catch (err) {
         console.error("Failed to initialize client audio mixer:", err);
