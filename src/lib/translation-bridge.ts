@@ -38,6 +38,8 @@ export class TranslationBridge {
   private framesReceivedFromGemini: number = 0;
   private resumptionHandle: string | null = null;
   private isReconnecting: boolean = false;
+  private pendingInterimText: string = "";
+  private interimTimeout: NodeJS.Timeout | null = null;
 
   public readonly targetLanguage: string;
   public readonly sessionId: string;
@@ -118,6 +120,12 @@ export class TranslationBridge {
       `[TranslationBridge:${this.targetLanguage}] Stopping bridge`
     );
     this.status = "closed";
+
+    if (this.interimTimeout) {
+      clearTimeout(this.interimTimeout);
+      this.interimTimeout = null;
+    }
+    this.pendingInterimText = "";
 
     if (this.geminiWs) {
       this.geminiWs.close();
@@ -493,18 +501,36 @@ export class TranslationBridge {
 
       // Handle output transcription (separate field from modelTurn)
       if (serverContent?.outputTranscription?.text) {
-        console.log(
-          `[TranslationBridge:${this.targetLanguage}] Transcription:`,
-          serverContent.outputTranscription.text.slice(0, 100)
-        );
-        this.publishTranscriptionText(
-          serverContent.outputTranscription.text,
-          !serverContent.turnComplete
-        );
+        const text = serverContent.outputTranscription.text;
+        const isInterim = !serverContent.turnComplete;
+
+        if (isInterim) {
+          this.handleInterimTranscription(text);
+        } else {
+          if (this.interimTimeout) {
+            clearTimeout(this.interimTimeout);
+            this.interimTimeout = null;
+          }
+          const finalText = this.pendingInterimText + text;
+          this.pendingInterimText = "";
+          console.log(
+            `[TranslationBridge:${this.targetLanguage}] Final Transcription:`,
+            finalText.slice(0, 100)
+          );
+          this.publishTranscriptionText(finalText, false);
+        }
       }
 
-      // If turn is complete, advance the segment id
+      // If turn is complete, flush remaining interim buffer and advance the segment id
       if (serverContent?.turnComplete) {
+        if (this.interimTimeout) {
+          clearTimeout(this.interimTimeout);
+          this.interimTimeout = null;
+        }
+        if (this.pendingInterimText) {
+          this.publishTranscriptionText(this.pendingInterimText, false);
+          this.pendingInterimText = "";
+        }
         this.transcriptionSegmentId++;
       }
     } catch (error) {
@@ -714,10 +740,38 @@ export class TranslationBridge {
     }
   }
 
+  private handleInterimTranscription(text: string): void {
+    this.pendingInterimText += text;
+
+    if (!this.interimTimeout) {
+      this.interimTimeout = setTimeout(() => {
+        this.flushInterimTranscription();
+      }, 150); // Throttle interim text updates to 150ms
+    }
+  }
+
+  private flushInterimTranscription(): void {
+    this.interimTimeout = null;
+    if (this.pendingInterimText && this.status === "active") {
+      this.publishTranscriptionText(this.pendingInterimText, true);
+      this.pendingInterimText = "";
+    }
+  }
+
   private async publishTranscriptionText(text: string, interim: boolean): Promise<void> {
     if (!this.room || !this.room.localParticipant) return;
 
     try {
+      // Find all remote participants who have set their 'language' attribute to this.targetLanguage
+      const destinationIdentities = Array.from(this.room.remoteParticipants.values())
+        .filter((p) => p.attributes?.language === this.targetLanguage)
+        .map((p) => p.identity);
+
+      // If no one is listening to this language, skip publishing to save bandwidth
+      if (destinationIdentities.length === 0) {
+        return;
+      }
+
       const payload = JSON.stringify({
         type: "transcription",
         language: this.targetLanguage,
@@ -729,7 +783,11 @@ export class TranslationBridge {
 
       await this.room.localParticipant.publishData(
         new TextEncoder().encode(payload),
-        { reliable: true, topic: "transcription" }
+        {
+          reliable: !interim, // reliable only for final transcripts, lossy for interim
+          topic: "transcription",
+          destination_identities: destinationIdentities,
+        }
       );
     } catch (error) {
       console.error(

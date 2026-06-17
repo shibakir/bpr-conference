@@ -175,6 +175,25 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       room.off(RoomEvent.ParticipantConnected, handleUpdate);
     };
   }, [room, currentLanguage, translatorIdentity, remoteParticipants]);
+ 
+  // Update local participant attribute when language changes
+  useEffect(() => {
+    if (!room) return;
+    
+    const setLanguageAttr = () => {
+      if (room.localParticipant) {
+        room.localParticipant.setAttributes({ language: currentLanguage })
+          .catch((err) => console.error("Failed to set participant attributes:", err));
+      }
+    };
+
+    setLanguageAttr();
+    
+    room.on(RoomEvent.Connected, setLanguageAttr);
+    return () => {
+      room.off(RoomEvent.Connected, setLanguageAttr);
+    };
+  }, [room, currentLanguage]);
 
   useEffect(() => {
     const hasAudio = audioTracks.some((t) => {
