@@ -45,9 +45,11 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
 
     checkOrganizer();
 
+    room.on(RoomEvent.Connected, checkOrganizer);
     room.on(RoomEvent.ParticipantConnected, checkOrganizer);
     room.on(RoomEvent.ParticipantDisconnected, checkOrganizer);
     return () => {
+      room.off(RoomEvent.Connected, checkOrganizer);
       room.off(RoomEvent.ParticipantConnected, checkOrganizer);
       room.off(RoomEvent.ParticipantDisconnected, checkOrganizer);
     };
@@ -184,7 +186,9 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     updateSubscriptions();
 
     const handleUpdate = () => updateSubscriptions();
+    room.on(RoomEvent.Connected, handleUpdate);
     room.on(RoomEvent.TrackPublished, handleUpdate);
+    room.on(RoomEvent.TrackUnpublished, handleUpdate);
     
     // Only run update if the participant that joined is the organizer or our translator bot
     const handleParticipantConnected = (participant: any) => {
@@ -199,7 +203,9 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
 
     return () => {
+      room.off(RoomEvent.Connected, handleUpdate);
       room.off(RoomEvent.TrackPublished, handleUpdate);
+      room.off(RoomEvent.TrackUnpublished, handleUpdate);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
     };
   }, [room, currentLanguage, translatorIdentity]);
