@@ -48,6 +48,7 @@ export async function GET(req: NextRequest) {
     canPublish: isOrganizer,
     canSubscribe: true,
     canPublishData: isOrganizer,
+    canUpdateOwnMetadata: true,
   });
 
   const token = await at.toJwt();
