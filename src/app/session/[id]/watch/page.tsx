@@ -431,6 +431,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           sessionId={sessionId}
           currentLanguage={currentLanguage}
           onLanguageChange={handleLanguageChange}
+          disabled={!isConnected}
         />
       </div>
 
