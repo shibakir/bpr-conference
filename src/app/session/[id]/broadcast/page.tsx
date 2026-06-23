@@ -169,7 +169,8 @@ function BroadcastControls({
           });
           publishedTrackPubRef.current = pub;
           localPub = pub;
-          console.log("Published mixed audio track:", pub.trackSid);
+          await pub.mute();
+          console.log("Published and initially muted mixed audio track:", pub.trackSid);
         }
       } catch (err) {
         console.error("Failed to initialize client audio mixer:", err);
@@ -219,6 +220,23 @@ function BroadcastControls({
       publishedTrackPubRef.current = null;
     };
   }, [room, room?.localParticipant]);
+
+  // Synchronize muted status of the published track with active inputs
+  useEffect(() => {
+    const pub = publishedTrackPubRef.current;
+    if (!pub) return;
+
+    const hasActiveInput = isMicEnabled || isTabAudioEnabled;
+    if (hasActiveInput) {
+      pub.unmute()
+        .then(() => console.log("[BroadcastControls] Unmuted broadcast-audio track"))
+        .catch((err: any) => console.error("Failed to unmute track:", err));
+    } else {
+      pub.mute()
+        .then(() => console.log("[BroadcastControls] Muted broadcast-audio track"))
+        .catch((err: any) => console.error("Failed to mute track:", err));
+    }
+  }, [isMicEnabled, isTabAudioEnabled]);
 
   const toggleMicrophone = async () => {
     const ctx = audioContextRef.current;

@@ -10,12 +10,14 @@ interface LanguageSelectorProps {
     languageCode: string,
     translatorIdentity: string | null
   ) => void;
+  disabled?: boolean;
 }
 
 export default function LanguageSelector({
   sessionId,
   currentLanguage,
   onLanguageChange,
+  disabled = false,
 }: LanguageSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -113,8 +115,11 @@ export default function LanguageSelector({
           className="select-field"
           value={currentLanguage}
           onChange={handleChange}
-          disabled={loading}
-          style={{ opacity: loading ? 0.5 : 1 }}
+          disabled={loading || disabled}
+          style={{
+            opacity: (loading || disabled) ? 0.5 : 1,
+            cursor: (loading || disabled) ? "not-allowed" : "pointer",
+          }}
         >
           <option value="original">Original audio</option>
           <optgroup label="Translations">
