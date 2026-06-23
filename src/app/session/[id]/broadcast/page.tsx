@@ -230,11 +230,11 @@ function BroadcastControls({
     if (hasActiveInput) {
       pub.unmute()
         .then(() => console.log("[BroadcastControls] Unmuted broadcast-audio track"))
-        .catch((err) => console.error("Failed to unmute track:", err));
+        .catch((err: any) => console.error("Failed to unmute track:", err));
     } else {
       pub.mute()
         .then(() => console.log("[BroadcastControls] Muted broadcast-audio track"))
-        .catch((err) => console.error("Failed to mute track:", err));
+        .catch((err: any) => console.error("Failed to mute track:", err));
     }
   }, [isMicEnabled, isTabAudioEnabled]);
 
