@@ -62,7 +62,6 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const currentLanguageRef = useRef(currentLanguage);
   const audioTracks = useTracks([Track.Source.Microphone]);
-  const [isOrganizerConnected, setIsOrganizerConnected] = useState(false);
 
   const [fontSize, setFontSize] = useState<number>(() => {
     if (typeof window !== "undefined") {
@@ -89,28 +88,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     setFontSize((prev) => Math.max(prev - 2, 12));
   };
 
-  // Track organizer connection status to avoid useRemoteParticipants hook overhead
-  useEffect(() => {
-    if (!room) return;
 
-    const checkOrganizer = () => {
-      const present = Array.from(room.remoteParticipants.values()).some((p) =>
-        p.identity.startsWith("organizer-")
-      );
-      setIsOrganizerConnected(present);
-    };
-
-    checkOrganizer();
-
-    room.on(RoomEvent.Connected, checkOrganizer);
-    room.on(RoomEvent.ParticipantConnected, checkOrganizer);
-    room.on(RoomEvent.ParticipantDisconnected, checkOrganizer);
-    return () => {
-      room.off(RoomEvent.Connected, checkOrganizer);
-      room.off(RoomEvent.ParticipantConnected, checkOrganizer);
-      room.off(RoomEvent.ParticipantDisconnected, checkOrganizer);
-    };
-  }, [room]);
 
   const [isWakeLockActive, setIsWakeLockActive] = useState(false);
 
@@ -290,12 +268,13 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     const hasAudio = audioTracks.some((t) => {
       const pub = t.publication;
       if (currentLanguage === "original") {
-        return t.participant.identity.startsWith("organizer-") && pub.isSubscribed;
+        return t.participant.identity.startsWith("organizer-") && pub.isSubscribed && !pub.isMuted;
       } else {
         return (
           translatorIdentity &&
           t.participant.identity === translatorIdentity &&
-          pub.isSubscribed
+          pub.isSubscribed &&
+          !pub.isMuted
         );
       }
     });
@@ -347,7 +326,9 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     [sessionId]
   );
 
-  const isConnected = isOrganizerConnected;
+  const isConnected = audioTracks.some((t) =>
+    t.participant.identity.startsWith("organizer-") && !t.publication.isMuted
+  );
 
   return (
     <div className="container enter">
