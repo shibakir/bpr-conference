@@ -28,8 +28,10 @@ export default function Home() {
   const [eventId, setEventId] = useState("");
   const [error, setError] = useState<string | null>(null);
   
-  const [restrictLanguages, setRestrictLanguages] = useState(false);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [restrictLanguages, setRestrictLanguages] = useState(true);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
+    "en", "zh-Hans", "hi", "es", "fr", "ar", "bn", "pt-BR", "ru", "ur"
+  ]);
   const [langSearch, setLangSearch] = useState("");
 
   const filteredLanguages = SUPPORTED_LANGUAGES.filter(lang => 
@@ -136,7 +138,6 @@ export default function Home() {
                 checked={restrictLanguages}
                 onChange={(e) => {
                   setRestrictLanguages(e.target.checked);
-                  if (!e.target.checked) setSelectedLanguages([]);
                 }}
                 style={{ accentColor: "var(--fg)", cursor: "pointer" }}
               />
@@ -145,6 +146,46 @@ export default function Home() {
 
             {restrictLanguages && (
               <div className="enter" style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* Chip container to show selected languages at a glance */}
+                {selectedLanguages.length > 0 && (
+                  <div style={{ 
+                    display: "flex", 
+                    flexWrap: "wrap", 
+                    gap: "6px", 
+                    marginBottom: "4px",
+                    padding: "8px",
+                    border: "1px dashed var(--border)",
+                    background: "var(--bg-elevated)" 
+                  }}>
+                    {selectedLanguages.map((code) => {
+                      const lang = SUPPORTED_LANGUAGES.find((l) => l.code === code);
+                      if (!lang) return null;
+                      return (
+                        <div
+                          key={code}
+                          onClick={() => setSelectedLanguages((prev) => prev.filter((c) => c !== code))}
+                          style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            background: "var(--bg)",
+                            border: "1px solid var(--border)",
+                            padding: "3px 6px",
+                            fontSize: "11px",
+                            cursor: "pointer",
+                            transition: "all 0.15s ease",
+                          }}
+                          title="Click to remove"
+                        >
+                          <span>{lang.flag}</span>
+                          <span style={{ color: "var(--fg-secondary)" }}>{lang.name}</span>
+                          <span style={{ marginLeft: "2px", opacity: 0.5, fontWeight: "bold" }}>×</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 <input
                   type="text"
                   placeholder="Search languages..."
