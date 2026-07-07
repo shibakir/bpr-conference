@@ -27,6 +27,7 @@ interface LanguageSelectorProps {
     translatorIdentity: string | null
   ) => void;
   disabled?: boolean;
+  allowedLanguages?: string[];
 }
 
 export default function LanguageSelector({
@@ -34,6 +35,7 @@ export default function LanguageSelector({
   currentLanguage,
   onLanguageChange,
   disabled = false,
+  allowedLanguages,
 }: LanguageSelectorProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,10 @@ export default function LanguageSelector({
 
   const currentLang = getLanguageByCode(currentLanguage);
 
+  const visibleLanguages = allowedLanguages
+    ? SUPPORTED_LANGUAGES.filter((lang) => allowedLanguages.includes(lang.code))
+    : SUPPORTED_LANGUAGES;
+
   return (
     <div style={{ width: "100%" }}>
       <label htmlFor="language-select" className="label" style={{ display: "block", marginBottom: 10 }}>
@@ -139,7 +145,7 @@ export default function LanguageSelector({
         >
           <option value="original">Original audio</option>
           <optgroup label="Translations">
-            {SUPPORTED_LANGUAGES.map((lang) => (
+            {visibleLanguages.map((lang) => (
               <option key={lang.code} value={lang.code}>
                 {lang.name} {lang.flag}
               </option>

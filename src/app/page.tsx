@@ -18,6 +18,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 export default function Home() {
   const router = useRouter();
@@ -26,6 +27,15 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [eventId, setEventId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  
+  const [restrictLanguages, setRestrictLanguages] = useState(false);
+  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
+  const [langSearch, setLangSearch] = useState("");
+
+  const filteredLanguages = SUPPORTED_LANGUAGES.filter(lang => 
+    lang.name.toLowerCase().includes(langSearch.toLowerCase()) ||
+    lang.code.toLowerCase().includes(langSearch.toLowerCase())
+  );
 
   useEffect(() => {
     async function checkAuthStatus() {
@@ -47,7 +57,12 @@ export default function Home() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ organizerName: "host", password, eventId }),
+        body: JSON.stringify({ 
+          organizerName: "host", 
+          password, 
+          eventId,
+          allowedLanguages: restrictLanguages ? selectedLanguages : undefined
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -112,6 +127,89 @@ export default function Home() {
             style={{ textAlign: "center" }}
             disabled={loading}
           />
+
+          {/* Whitelisting control */}
+          <div style={{ textAlign: "left", marginTop: 8 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "13px", color: "var(--fg-secondary)" }}>
+              <input
+                type="checkbox"
+                checked={restrictLanguages}
+                onChange={(e) => {
+                  setRestrictLanguages(e.target.checked);
+                  if (!e.target.checked) setSelectedLanguages([]);
+                }}
+                style={{ accentColor: "var(--fg)", cursor: "pointer" }}
+              />
+              Restrict attendee languages
+            </label>
+
+            {restrictLanguages && (
+              <div className="enter" style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="Search languages..."
+                  className="input-field"
+                  value={langSearch}
+                  onChange={(e) => setLangSearch(e.target.value)}
+                  style={{ padding: "8px 12px", fontSize: "13px" }}
+                />
+                
+                <div style={{ 
+                  maxHeight: "130px", 
+                  overflowY: "auto", 
+                  border: "1px solid var(--border)", 
+                  padding: "8px", 
+                  background: "var(--bg-elevated)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6
+                }}>
+                  {filteredLanguages.length === 0 ? (
+                    <span style={{ fontSize: "12px", color: "var(--fg-tertiary)" }}>No languages found</span>
+                  ) : (
+                    filteredLanguages.map(lang => {
+                      const isChecked = selectedLanguages.includes(lang.code);
+                      return (
+                        <label key={lang.code} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "13px" }}>
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              setSelectedLanguages(prev => 
+                                isChecked ? prev.filter(c => c !== lang.code) : [...prev, lang.code]
+                              );
+                            }}
+                            style={{ accentColor: "var(--fg)" }}
+                          />
+                          <span>{lang.flag} {lang.name}</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--fg-tertiary)" }}>
+                  <span>{selectedLanguages.length} selected</span>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedLanguages(SUPPORTED_LANGUAGES.map(l => l.code))}
+                      style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Select all
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setSelectedLanguages([])}
+                      style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Error message */}

@@ -79,6 +79,23 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
   const currentLanguageRef = useRef(currentLanguage);
   const audioTracks = useTracks([Track.Source.Microphone]);
 
+  const [allowedLanguages, setAllowedLanguages] = useState<string[] | undefined>(undefined);
+
+  useEffect(() => {
+    async function fetchSessionDetails() {
+      try {
+        const res = await fetch(`/api/sessions/${sessionId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAllowedLanguages(data.allowedLanguages);
+        }
+      } catch (err) {
+        console.error("Failed to fetch session details:", err);
+      }
+    }
+    fetchSessionDetails();
+  }, [sessionId]);
+
   const [fontSize, setFontSize] = useState<number>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("watch_font_size");
@@ -470,6 +487,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           currentLanguage={currentLanguage}
           onLanguageChange={handleLanguageChange}
           disabled={!isConnected}
+          allowedLanguages={allowedLanguages}
         />
       </div>
 

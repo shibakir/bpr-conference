@@ -36,6 +36,7 @@ export interface SessionInfo {
   sessionId: string;
   organizerIdentity: string;
   createdAt: Date;
+  allowedLanguages?: string[];
 }
 
 const globalForSessionManager = global as unknown as {
@@ -59,14 +60,19 @@ class TranslationSessionManager {
   }
 
   // Session management
-  createSession(sessionId: string, organizerIdentity: string): SessionInfo {
+  createSession(
+    sessionId: string,
+    organizerIdentity: string,
+    allowedLanguages?: string[]
+  ): SessionInfo {
     const info: SessionInfo = {
       sessionId,
       organizerIdentity,
       createdAt: new Date(),
+      allowedLanguages,
     };
     this.sessions.set(sessionId, info);
-    console.log(`[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity}`);
+    console.log(`[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with allowed languages: ${allowedLanguages?.join(", ") || "all"}`);
     return info;
   }
 

@@ -39,6 +39,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Validate targetLanguage against allowedLanguages whitelist
+    if (
+      targetLanguage !== "original" &&
+      session.allowedLanguages &&
+      !session.allowedLanguages.includes(targetLanguage)
+    ) {
+      return NextResponse.json(
+        { error: `Language "${targetLanguage}" is not allowed for this session` },
+        { status: 400 }
+      );
+    }
+
     // Unsubscribe from the previous language if switching
     if (previousLanguage && previousLanguage !== "original") {
       await manager.unsubscribe(sessionId, previousLanguage);
