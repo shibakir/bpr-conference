@@ -25,6 +25,11 @@ export async function POST(req: NextRequest) {
     const organizerName = body.organizerName || "organizer";
     const password = body.password;
     const eventId = body.eventId;
+    
+    let allowedLanguages: string[] | undefined = undefined;
+    if (Array.isArray(body.allowedLanguages)) {
+      allowedLanguages = body.allowedLanguages.filter((l: any) => typeof l === "string");
+    }
 
     const expectedPassword = process.env.BROADCAST_PASSWORD;
     if (expectedPassword && password !== expectedPassword) {
@@ -60,7 +65,7 @@ export async function POST(req: NextRequest) {
       await manager.removeAllTranslations(sessionId);
     }
 
-    manager.createSession(sessionId, organizerIdentity);
+    manager.createSession(sessionId, organizerIdentity, allowedLanguages);
 
     // Build the attendee join URL
     const protocol = req.headers.get("x-forwarded-proto") || "http";
