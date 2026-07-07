@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate targetLanguage against allowedLanguages whitelist
+    // Validate targetLanguage against allowedLanguages allowlist
     if (
       targetLanguage !== "original" &&
       session.allowedLanguages &&

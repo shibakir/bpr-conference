@@ -130,7 +130,7 @@ export default function Home() {
             disabled={loading}
           />
 
-          {/* Whitelisting control */}
+          {/* Allowlisting control */}
           <div style={{ textAlign: "left", marginTop: 8 }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "13px", color: "var(--fg-secondary)" }}>
               <input
