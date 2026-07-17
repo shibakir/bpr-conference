@@ -384,12 +384,12 @@ export default function Home() {
           )}
         </div> */}
 
-        <p className="text-center font-mono text-3xl text-muted-foreground">
+        <p className="text-center font-mono text-xl text-muted-foreground">
           <a
             target="_blank"
             href="https://bpr.cz/"
             rel="noopener noreferrer"
-            className="text-primary underline-offset-4 hover:underline"
+            className="whitespace-nowrap text-primary underline-offset-4 hover:underline"
           >
             Powered by BPR s.r.o
           </a>
