@@ -122,6 +122,10 @@ export default function Home() {
     }
   }
 
+  const title = t("title");
+  const titleHighlight = "BPR";
+  const titleHighlightIndex = title.indexOf(titleHighlight);
+
   return (
     <main className="flex min-h-svh items-center justify-center px-4 py-10 sm:px-6">
       <section className="grid w-full max-w-xl gap-6">
@@ -152,7 +156,15 @@ export default function Home() {
             {t("liveTranslation")}
           </Badge>
           <h1 className="text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-            {t("title")}
+            {titleHighlightIndex >= 0 ? (
+              <>
+                {title.slice(0, titleHighlightIndex)}
+                <span className="text-primary">{titleHighlight}</span>
+                {title.slice(titleHighlightIndex + titleHighlight.length)}
+              </>
+            ) : (
+              title
+            )}
           </h1>
           <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
             {t("subtitle")}
@@ -338,7 +350,7 @@ export default function Home() {
                 className="w-full"
               >
                 {loading ? (
-                  <>
+                  <>j
                     <Spinner />
                     {t("creating")}
                   </>
@@ -353,7 +365,7 @@ export default function Home() {
           </CardContent>
         </Card>
 
-        <div className="grid">
+        {/* <div className="grid">
           <Separator />
           {[t("steps.speak"), t("steps.share"), t("steps.languages")].map(
             (text, index) => (
@@ -370,16 +382,16 @@ export default function Home() {
               </div>
             )
           )}
-        </div>
+        </div> */}
 
-        <p className="text-center font-mono text-xs text-muted-foreground">
+        <p className="text-center font-mono text-3xl text-muted-foreground">
           <a
             target="_blank"
             href="https://bpr.cz/"
             rel="noopener noreferrer"
-            className="underline-offset-4 hover:underline"
+            className="text-primary underline-offset-4 hover:underline"
           >
-            BPR s.r.o
+            Powered by BPR s.r.o
           </a>
         </p>
       </section>

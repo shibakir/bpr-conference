@@ -9,13 +9,13 @@ interface SessionQRCodeProps {
 
 export default function SessionQRCode({ url, size = 160 }: SessionQRCodeProps) {
   return (
-    <div className="inline-flex rounded-lg border bg-white p-3 shadow-xs">
+    <div className="inline-flex rounded-lg border bg-[#F2F0EF] p-3 shadow-xs">
       <QRCodeSVG
         value={url}
         size={size}
         level="M"
-        bgColor="#ffffff"
-        fgColor="#1A1917"
+        bgColor="#F2F0EF"
+        fgColor="#0C0C0C"
       />
     </div>
   );
