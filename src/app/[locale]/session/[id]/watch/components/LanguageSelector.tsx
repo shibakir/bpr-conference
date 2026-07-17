@@ -11,6 +11,11 @@ import {
 } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  API_ERROR_CODES,
+  getApiErrorCode,
+  type ApiErrorCode,
+} from "@/lib/api-errors";
+import {
   SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLanguageDisplayName,
@@ -65,6 +70,27 @@ export default function LanguageSelector({
     };
   }, [sessionId]);
 
+  const getTranslationRequestErrorMessage = useCallback(
+    (code: ApiErrorCode | undefined) => {
+      switch (code) {
+        case API_ERROR_CODES.SESSION_INACTIVE:
+        case API_ERROR_CODES.SESSION_NOT_FOUND:
+          return t("sessionUnavailable");
+        case API_ERROR_CODES.UNSUPPORTED_TARGET_LANGUAGE:
+          return t("unsupportedTargetLanguage");
+        case API_ERROR_CODES.TARGET_LANGUAGE_MATCHES_SOURCE:
+          return t("targetLanguageIsSource");
+        case API_ERROR_CODES.LANGUAGE_NOT_ALLOWED:
+          return t("languageNotAllowed");
+        case API_ERROR_CODES.INVALID_REQUEST:
+          return t("invalidRequest");
+        default:
+          return t("translationError");
+      }
+    },
+    [t]
+  );
+
   const handleChange = useCallback(
     async (e: React.ChangeEvent<HTMLSelectElement>) => {
       const langCode = e.target.value;
@@ -102,18 +128,19 @@ export default function LanguageSelector({
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || t("translationError"));
+          setError(getTranslationRequestErrorMessage(getApiErrorCode(data)));
+          return;
         }
 
         onLanguageChange(langCode, data.translatorIdentity);
       } catch (err) {
-        setError((err as Error).message);
+        setError(t("translationError"));
         console.error("Translation request error:", err);
       } finally {
         setLoading(false);
       }
     },
-    [sessionId, onLanguageChange, t]
+    [getTranslationRequestErrorMessage, sessionId, onLanguageChange, t]
   );
 
   const currentLang = getLanguageByCode(currentLanguage);

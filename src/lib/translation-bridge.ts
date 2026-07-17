@@ -54,6 +54,8 @@ export class TranslationBridge {
   private readonly sampleRate: number = 24000; // Gemini outputs 24kHz
   private readonly inputSampleRate: number = 48000; // LiveKit default
   private readonly channels: number = 1;
+  private readonly contextCompressionTriggerTokens: number = 25000;
+  private readonly contextCompressionTargetTokens: number = 8000;
 
   // LiveKit config
   private readonly livekitUrl: string;
@@ -426,6 +428,12 @@ export class TranslationBridge {
       sessionResumption: {
         handle?: string;
       };
+      contextWindowCompression: {
+        triggerTokens: number;
+        slidingWindow: {
+          targetTokens: number;
+        };
+      };
     } = {
       model: `models/${this.geminiModel}`,
       generationConfig: {
@@ -443,6 +451,12 @@ export class TranslationBridge {
       sessionResumption: this.resumptionHandle
         ? { handle: this.resumptionHandle }
         : {},
+      contextWindowCompression: {
+        triggerTokens: this.contextCompressionTriggerTokens,
+        slidingWindow: {
+          targetTokens: this.contextCompressionTargetTokens,
+        },
+      },
     };
 
     if (this.enableTranscription) {

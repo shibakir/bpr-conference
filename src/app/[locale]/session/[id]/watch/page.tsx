@@ -25,6 +25,7 @@ import {
   RefreshCwIcon,
   Volume2Icon,
 } from "lucide-react";
+import SessionCountdown from "@/components/SessionCountdown";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -37,6 +38,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  API_ERROR_CODES,
+  getApiErrorCode,
+  type ApiErrorCode,
+} from "@/lib/api-errors";
 import { cn } from "@/lib/utils";
 import LanguageSelector from "./components/LanguageSelector";
 
@@ -52,6 +58,11 @@ type NavigatorWithWakeLock = Navigator & {
   wakeLock: {
     request: (type: "screen") => Promise<WakeLockSentinel>;
   };
+};
+
+type WatchError = {
+  kind: "ended" | "inactive" | "generic";
+  message: string;
 };
 
 function splitIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] {
@@ -85,7 +96,15 @@ function splitIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] 
   return paragraphs;
 }
 
-function AttendeeView({ sessionId }: { sessionId: string }) {
+function AttendeeView({
+  sessionId,
+  expiresAt,
+  onSessionExpired,
+}: {
+  sessionId: string;
+  expiresAt: string | null;
+  onSessionExpired: () => void;
+}) {
   const t = useTranslations("Watch");
   const room = useRoomContext();
   const [currentLanguage, setCurrentLanguage] = useState("original");
@@ -467,6 +486,13 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
               {t("screenAwake")}
             </Badge>
           )}
+
+          <SessionCountdown
+            expiresAt={expiresAt}
+            timeRemainingLabel={t("timeRemaining")}
+            endedLabel={t("sessionEnded")}
+            onExpire={onSessionExpired}
+          />
         </div>
       </section>
 
@@ -591,8 +617,30 @@ export default function WatchPage({
   const { id: sessionId } = use(params);
   const [token, setToken] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
+  const [error, setError] = useState<WatchError | null>(null);
   const [started, setStarted] = useState(false);
+
+  const handleSessionExpired = useCallback(() => {
+    setError({ kind: "ended", message: t("sessionEnded") });
+  }, [t]);
+
+  const getJoinError = useCallback(
+    (code: ApiErrorCode | undefined): WatchError => {
+      switch (code) {
+        case API_ERROR_CODES.SESSION_INACTIVE:
+        case API_ERROR_CODES.SESSION_NOT_FOUND:
+          return { kind: "inactive", message: t("sessionInactive") };
+        case API_ERROR_CODES.LIVEKIT_NOT_CONFIGURED:
+          return { kind: "generic", message: t("livekitNotConfigured") };
+        case API_ERROR_CODES.INVALID_REQUEST:
+          return { kind: "generic", message: t("invalidRequest") };
+        default:
+          return { kind: "generic", message: t("joinError") };
+      }
+    },
+    [t]
+  );
 
   useEffect(() => {
     async function fetchToken() {
@@ -602,30 +650,39 @@ export default function WatchPage({
           `/api/token?room=${sessionId}&identity=${identity}&role=attendee`
         );
         const data = await res.json();
-        if (data.error) throw new Error(data.error);
+        if (!res.ok || data.error) {
+          setError(getJoinError(getApiErrorCode(data)));
+          return;
+        }
         setToken(data.token);
         setLivekitUrl(data.serverUrl);
+        setSessionExpiresAt(
+          typeof data.expiresAt === "string" ? data.expiresAt : null
+        );
       } catch (err) {
-        setError((err as Error).message);
+        console.error("Failed to fetch attendee token:", err);
+        setError({ kind: "generic", message: t("joinError") });
       }
     }
     fetchToken();
-  }, [sessionId]);
+  }, [getJoinError, sessionId, t]);
 
   if (error) {
-    const isInactiveSession =
-      error.includes("not started yet") || error.includes("not found");
+    const isEndedSession = error.kind === "ended";
+    const isInactiveSession = error.kind === "inactive";
     return (
       <main className="flex min-h-svh items-center justify-center px-4 py-10">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="flex items-center justify-center gap-2">
               <AlertTriangleIcon className="size-4 text-destructive" />
-              {isInactiveSession
-                ? t("broadcastNotStarted")
-                : t("somethingWentWrong")}
+              {isEndedSession
+                ? t("sessionEnded")
+                : isInactiveSession
+                  ? t("broadcastNotStarted")
+                  : t("somethingWentWrong")}
             </CardTitle>
-            <CardDescription>{error}</CardDescription>
+            <CardDescription>{error.message}</CardDescription>
           </CardHeader>
           <CardContent>
             <Button
@@ -662,6 +719,13 @@ export default function WatchPage({
             <CardDescription>{t("readyCopy")}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
+            <SessionCountdown
+              expiresAt={sessionExpiresAt}
+              timeRemainingLabel={t("timeRemaining")}
+              endedLabel={t("sessionEnded")}
+              className="mx-auto"
+              onExpire={handleSessionExpired}
+            />
             <Button onClick={() => setStarted(true)} className="w-full">
               <Volume2Icon />
               {t("startListening")}
@@ -687,7 +751,11 @@ export default function WatchPage({
         className="flex w-full flex-col items-center"
       >
         <RoomAudioRenderer />
-        <AttendeeView sessionId={sessionId} />
+        <AttendeeView
+          sessionId={sessionId}
+          expiresAt={sessionExpiresAt}
+          onSessionExpired={handleSessionExpired}
+        />
       </LiveKitRoom>
     </main>
   );

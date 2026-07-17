@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 // GET /api/sessions/:sessionId — Get session info
@@ -11,7 +12,10 @@ export async function GET(
   const session = manager.getSession(sessionId);
 
   if (!session) {
-    return NextResponse.json({ error: "Session not found" }, { status: 404 });
+    return NextResponse.json(
+      apiError(API_ERROR_CODES.SESSION_NOT_FOUND, "Session not found"),
+      { status: 404 }
+    );
   }
 
   const translations = manager.getActiveTranslations(sessionId);

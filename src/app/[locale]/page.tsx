@@ -2,7 +2,13 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { LanguagesIcon, RadioTowerIcon, SearchIcon, XIcon } from "lucide-react";
+import {
+  ClockIcon,
+  LanguagesIcon,
+  RadioTowerIcon,
+  SearchIcon,
+  XIcon,
+} from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,10 +24,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
+import {
+  API_ERROR_CODES,
+  getApiErrorCode,
+  type ApiErrorCode,
+} from "@/lib/api-errors";
 import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
+import {
+  DEFAULT_SESSION_DURATION_MINUTES,
+  MAX_SESSION_DURATION_MINUTES,
+  MIN_SESSION_DURATION_MINUTES,
+} from "@/lib/session-duration";
 
 const DEFAULT_LANGUAGES = [
   "en",
@@ -43,9 +60,11 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState("");
-  const [eventId, setEventId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sourceLanguage, setSourceLanguage] = useState(DEFAULT_SOURCE_LANGUAGE);
+  const [durationMinutes, setDurationMinutes] = useState(
+    DEFAULT_SESSION_DURATION_MINUTES
+  );
   const [enableTranscription, setEnableTranscription] = useState(false);
   const [restrictLanguages, setRestrictLanguages] = useState(true);
   const [selectedLanguages, setSelectedLanguages] =
@@ -105,6 +124,22 @@ export default function Home() {
     checkAuthStatus();
   }, []);
 
+  function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
+    switch (code) {
+      case API_ERROR_CODES.INCORRECT_PASSWORD:
+        return t("incorrectPassword");
+      case API_ERROR_CODES.INVALID_SESSION_DURATION:
+        return t("invalidSessionDuration");
+      case API_ERROR_CODES.INVALID_LOCALE:
+      case API_ERROR_CODES.INVALID_REQUEST:
+      case API_ERROR_CODES.INVALID_SOURCE_LANGUAGE:
+      case API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE:
+        return t("invalidSessionSettings");
+      default:
+        return t("createError");
+    }
+  }
+
   async function createSession() {
     setLoading(true);
     setError(null);
@@ -115,10 +150,10 @@ export default function Home() {
         body: JSON.stringify({
           organizerName: "host",
           password,
-          eventId,
           locale,
           sourceLanguage,
           enableTranscription,
+          durationMinutes,
           allowedLanguages: restrictLanguages
             ? selectedTranslationLanguages
             : undefined,
@@ -126,7 +161,9 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || t("createError"));
+        setError(getCreateSessionErrorMessage(getApiErrorCode(data)));
+        setLoading(false);
+        return;
       }
       if (passwordRequired) {
         sessionStorage.setItem("broadcast_password", password);
@@ -134,7 +171,7 @@ export default function Home() {
       router.push(`/session/${data.sessionId}/broadcast`);
     } catch (err) {
       console.error("Failed to create session:", err);
-      setError((err as Error).message);
+      setError(t("createError"));
       setLoading(false);
     }
   }
@@ -210,6 +247,7 @@ export default function Home() {
                   <Input
                     id="broadcast-password"
                     type="password"
+                    autoComplete="new-password"
                     placeholder={t("passwordPlaceholder")}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -218,16 +256,38 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <Label htmlFor="event-id">{t("eventPlaceholder")}</Label>
-                <Input
-                  id="event-id"
-                  type="text"
-                  placeholder={t("eventPlaceholder")}
-                  value={eventId}
-                  onChange={(e) => setEventId(e.target.value)}
+              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Label
+                    htmlFor="session-duration"
+                    className="flex items-center gap-2"
+                  >
+                    <ClockIcon className="size-4 text-muted-foreground" />
+                    {t("duration")}
+                  </Label>
+                  <Badge variant="secondary" className="font-mono tabular-nums">
+                    {t("durationValue", { count: durationMinutes })}
+                  </Badge>
+                </div>
+                <Slider
+                  id="session-duration"
+                  aria-label={t("duration")}
+                  value={[durationMinutes]}
+                  min={MIN_SESSION_DURATION_MINUTES}
+                  max={MAX_SESSION_DURATION_MINUTES}
+                  step={1}
+                  onValueChange={(value) =>
+                    setDurationMinutes(
+                      value[0] ?? DEFAULT_SESSION_DURATION_MINUTES
+                    )
+                  }
                   disabled={loading}
                 />
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {t("durationDescription", {
+                    max: MAX_SESSION_DURATION_MINUTES,
+                  })}
+                </p>
               </div>
 
               <div className="grid gap-2">

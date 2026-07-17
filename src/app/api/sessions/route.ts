@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { isLocale, routing, type Locale } from "@/i18n/routing";
+import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
 import { getLanguageByCode } from "@/lib/languages";
+import {
+  MAX_SESSION_DURATION_MINUTES,
+  MIN_SESSION_DURATION_MINUTES,
+  parseSessionDurationMinutes,
+} from "@/lib/session-duration";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
@@ -12,6 +18,7 @@ interface CreateSessionRequest {
   allowedLanguages?: unknown;
   sourceLanguage?: unknown;
   enableTranscription?: unknown;
+  durationMinutes?: unknown;
 }
 
 function getSessionPath(locale: Locale, sessionId: string, mode: "watch" | "broadcast") {
@@ -26,11 +33,26 @@ export async function POST(req: NextRequest) {
     const password = body.password;
     const eventId = body.eventId;
     let locale: Locale = routing.defaultLocale;
+    const durationMinutes = parseSessionDurationMinutes(body.durationMinutes);
+
+    if (durationMinutes === undefined) {
+      return NextResponse.json(
+        apiError(
+          API_ERROR_CODES.INVALID_SESSION_DURATION,
+          `Session duration must be between ${MIN_SESSION_DURATION_MINUTES} and ${MAX_SESSION_DURATION_MINUTES} minutes`,
+          {
+            min: MIN_SESSION_DURATION_MINUTES,
+            max: MAX_SESSION_DURATION_MINUTES,
+          }
+        ),
+        { status: 400 }
+      );
+    }
 
     if (body.locale !== undefined) {
       if (typeof body.locale !== "string" || !isLocale(body.locale)) {
         return NextResponse.json(
-          { error: "Invalid locale" },
+          apiError(API_ERROR_CODES.INVALID_LOCALE, "Invalid locale"),
           { status: 400 }
         );
       }
@@ -42,7 +64,10 @@ export async function POST(req: NextRequest) {
     if (body.sourceLanguage !== undefined) {
       if (typeof body.sourceLanguage !== "string") {
         return NextResponse.json(
-          { error: "Invalid source language" },
+          apiError(
+            API_ERROR_CODES.INVALID_SOURCE_LANGUAGE,
+            "Invalid source language"
+          ),
           { status: 400 }
         );
       }
@@ -50,7 +75,10 @@ export async function POST(req: NextRequest) {
       const source = getLanguageByCode(body.sourceLanguage);
       if (!source) {
         return NextResponse.json(
-          { error: "Unsupported source language" },
+          apiError(
+            API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE,
+            "Unsupported source language"
+          ),
           { status: 400 }
         );
       }
@@ -76,7 +104,7 @@ export async function POST(req: NextRequest) {
     const expectedPassword = process.env.BROADCAST_PASSWORD;
     if (expectedPassword && password !== expectedPassword) {
       return NextResponse.json(
-        { error: "Incorrect password" },
+        apiError(API_ERROR_CODES.INCORRECT_PASSWORD, "Incorrect password"),
         { status: 401 }
       );
     }
@@ -102,7 +130,7 @@ export async function POST(req: NextRequest) {
     const manager = TranslationSessionManager.getInstance();
 
     // Clean up any stale translations/livekit rooms or translator bots from previous sessions under the same ID
-    if (manager.getSession(sessionId)) {
+    if (manager.hasSession(sessionId)) {
       console.log(`[SessionsAPI] Overwriting existing session ${sessionId}. Tearing down previous bridges...`);
       await manager.removeAllTranslations(sessionId);
     }
@@ -111,7 +139,9 @@ export async function POST(req: NextRequest) {
       sourceLanguage,
       enableTranscription,
       allowedLanguages,
+      durationMinutes,
     });
+    const session = manager.getSession(sessionId);
 
     // Build the attendee join URL
     const protocol = req.headers.get("x-forwarded-proto") || "http";
@@ -125,13 +155,15 @@ export async function POST(req: NextRequest) {
       locale,
       sourceLanguage,
       enableTranscription,
+      durationMinutes,
+      expiresAt: session?.expiresAt.toISOString(),
       joinUrl,
       broadcastUrl: `${origin}${getSessionPath(locale, sessionId, "broadcast")}`,
     });
   } catch (error) {
     console.error("Error creating session:", error);
     return NextResponse.json(
-      { error: "Failed to create session" },
+      apiError(API_ERROR_CODES.CREATE_SESSION_FAILED, "Failed to create session"),
       { status: 500 }
     );
   }

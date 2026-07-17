@@ -25,6 +25,7 @@ import {
   ScreenShareIcon,
   UsersIcon,
 } from "lucide-react";
+import SessionCountdown from "@/components/SessionCountdown";
 import SessionQRCode from "@/components/SessionQRCode";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
@@ -55,6 +56,11 @@ import { Separator } from "@/components/ui/separator";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { getPathname, useRouter } from "@/i18n/navigation";
+import {
+  API_ERROR_CODES,
+  getApiErrorCode,
+  type ApiErrorCode,
+} from "@/lib/api-errors";
 import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
 import { cn } from "@/lib/utils";
 
@@ -82,6 +88,10 @@ type NavigatorWithWakeLock = Navigator & {
     request: (type: "screen") => Promise<WakeLockSentinel>;
   };
 };
+
+type FetchTokenResult =
+  | { ok: true }
+  | { ok: false; reason: "password" | "error" };
 
 type WindowWithWebkitAudioContext = Window &
   typeof globalThis & {
@@ -152,10 +162,14 @@ function AudioInputCard({
 
 function BroadcastControls({
   sessionId,
+  expiresAt,
   onEndBroadcast,
+  onSessionExpired,
 }: {
   sessionId: string;
+  expiresAt: string | null;
   onEndBroadcast: () => void;
+  onSessionExpired: () => void;
 }) {
   const t = useTranslations("Broadcast");
   const locale = useLocale();
@@ -582,6 +596,13 @@ function BroadcastControls({
               {t("screenAwake")}
             </Badge>
           )}
+
+          <SessionCountdown
+            expiresAt={expiresAt}
+            timeRemainingLabel={t("timeRemaining")}
+            endedLabel={t("sessionEnded")}
+            onExpire={onSessionExpired}
+          />
         </div>
 
         <Badge variant="outline" className="gap-1">
@@ -729,6 +750,7 @@ export default function BroadcastPage({
   const { id: sessionId } = use(params);
   const [token, setToken] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
+  const [sessionExpiresAt, setSessionExpiresAt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [passwordPromptRequired, setPasswordPromptRequired] = useState(false);
   const [localPassword, setLocalPassword] = useState("");
@@ -740,8 +762,29 @@ export default function BroadcastPage({
     isEndingRef.current = true;
   }, []);
 
+  const handleSessionExpired = useCallback(() => {
+    isEndingRef.current = true;
+    setError(t("sessionEnded"));
+  }, [t]);
+
+  const getTokenErrorMessage = useCallback(
+    (code: ApiErrorCode | undefined) => {
+      switch (code) {
+        case API_ERROR_CODES.SESSION_INACTIVE:
+          return t("sessionInactive");
+        case API_ERROR_CODES.LIVEKIT_NOT_CONFIGURED:
+          return t("livekitNotConfigured");
+        case API_ERROR_CODES.INVALID_REQUEST:
+          return t("invalidRequest");
+        default:
+          return t("fetchTokenError");
+      }
+    },
+    [t]
+  );
+
   const fetchToken = useCallback(
-    async (pass: string) => {
+    async (pass: string): Promise<FetchTokenResult> => {
       try {
         const identity = "organizer-host";
         const passwordParam = pass
@@ -753,11 +796,13 @@ export default function BroadcastPage({
 
         if (res.status === 401) {
           setPasswordPromptRequired(true);
-          return false;
+          setError(null);
+          return { ok: false, reason: "password" };
         }
 
         if (!res.ok || data.error) {
-          throw new Error(data.error || t("fetchTokenError"));
+          setError(getTokenErrorMessage(getApiErrorCode(data)));
+          return { ok: false, reason: "error" };
         }
 
         if (pass) {
@@ -765,14 +810,18 @@ export default function BroadcastPage({
         }
         setToken(data.token);
         setLivekitUrl(data.serverUrl);
+        setSessionExpiresAt(
+          typeof data.expiresAt === "string" ? data.expiresAt : null
+        );
         setPasswordPromptRequired(false);
-        return true;
+        return { ok: true };
       } catch (err) {
-        setError((err as Error).message);
-        return false;
+        console.error("Failed to fetch organizer token:", err);
+        setError(t("fetchTokenError"));
+        return { ok: false, reason: "error" };
       }
     },
-    [sessionId, t]
+    [getTokenErrorMessage, sessionId, t]
   );
 
   useEffect(() => {
@@ -787,9 +836,9 @@ export default function BroadcastPage({
     e.preventDefault();
     setVerifying(true);
     setPasswordError(null);
-    const success = await fetchToken(localPassword);
+    const result = await fetchToken(localPassword);
     setVerifying(false);
-    if (!success && !error) {
+    if (!result.ok && result.reason === "password") {
       setPasswordError(t("incorrectPassword"));
     }
   };
@@ -814,6 +863,7 @@ export default function BroadcastPage({
                 <Input
                   id="broadcast-password"
                   type="password"
+                  autoComplete="new-password"
                   placeholder={t("passwordPlaceholder")}
                   value={localPassword}
                   onChange={(e) => setLocalPassword(e.target.value)}
@@ -906,7 +956,9 @@ export default function BroadcastPage({
       >
         <BroadcastControls
           sessionId={sessionId}
+          expiresAt={sessionExpiresAt}
           onEndBroadcast={handleEndBroadcast}
+          onSessionExpired={handleSessionExpired}
         />
       </LiveKitRoom>
     </main>

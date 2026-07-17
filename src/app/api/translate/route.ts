@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
 import { getLanguageByCode } from "@/lib/languages";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
@@ -9,7 +10,10 @@ export async function POST(req: NextRequest) {
 
     if (!sessionId || !targetLanguage) {
       return NextResponse.json(
-        { error: "Missing sessionId or targetLanguage" },
+        apiError(
+          API_ERROR_CODES.INVALID_REQUEST,
+          "Missing sessionId or targetLanguage"
+        ),
         { status: 400 }
       );
     }
@@ -19,7 +23,7 @@ export async function POST(req: NextRequest) {
 
     if (!session) {
       return NextResponse.json(
-        { error: "Session not found" },
+        apiError(API_ERROR_CODES.SESSION_NOT_FOUND, "Session not found"),
         { status: 404 }
       );
     }
@@ -31,7 +35,11 @@ export async function POST(req: NextRequest) {
 
     if (!normalizedTargetLanguage) {
       return NextResponse.json(
-        { error: `Unsupported target language "${targetLanguage}"` },
+        apiError(
+          API_ERROR_CODES.UNSUPPORTED_TARGET_LANGUAGE,
+          `Unsupported target language "${targetLanguage}"`,
+          { targetLanguage }
+        ),
         { status: 400 }
       );
     }
@@ -42,7 +50,10 @@ export async function POST(req: NextRequest) {
       normalizedTargetLanguage === session.sourceLanguage
     ) {
       return NextResponse.json(
-        { error: "Target language matches the original audio language" },
+        apiError(
+          API_ERROR_CODES.TARGET_LANGUAGE_MATCHES_SOURCE,
+          "Target language matches the original audio language"
+        ),
         { status: 400 }
       );
     }
@@ -53,7 +64,11 @@ export async function POST(req: NextRequest) {
       !session.allowedLanguages.includes(normalizedTargetLanguage)
     ) {
       return NextResponse.json(
-        { error: `Language "${normalizedTargetLanguage}" is not allowed for this session` },
+        apiError(
+          API_ERROR_CODES.LANGUAGE_NOT_ALLOWED,
+          `Language "${normalizedTargetLanguage}" is not allowed for this session`,
+          { language: normalizedTargetLanguage }
+        ),
         { status: 400 }
       );
     }
@@ -91,8 +106,19 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error("Error requesting translation:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "Session has ended") {
+      return NextResponse.json(
+        apiError(API_ERROR_CODES.SESSION_INACTIVE, "Session has ended"),
+        { status: 410 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Failed to start translation: " + (error as Error).message },
+      apiError(
+        API_ERROR_CODES.TRANSLATION_START_FAILED,
+        "Failed to start translation"
+      ),
       { status: 500 }
     );
   }
@@ -105,7 +131,10 @@ export async function DELETE(req: NextRequest) {
 
     if (!sessionId || !targetLanguage) {
       return NextResponse.json(
-        { error: "Missing sessionId or targetLanguage" },
+        apiError(
+          API_ERROR_CODES.INVALID_REQUEST,
+          "Missing sessionId or targetLanguage"
+        ),
         { status: 400 }
       );
     }
@@ -117,7 +146,7 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     console.error("Error unsubscribing:", error);
     return NextResponse.json(
-      { error: "Failed to unsubscribe" },
+      apiError(API_ERROR_CODES.UNSUBSCRIBE_FAILED, "Failed to unsubscribe"),
       { status: 500 }
     );
   }
