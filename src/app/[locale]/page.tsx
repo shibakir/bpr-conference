@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { LanguagesIcon, RadioTowerIcon, SearchIcon, XIcon } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -16,8 +16,8 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
@@ -26,15 +26,15 @@ import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
 const DEFAULT_LANGUAGES = [
   "en",
   "zh-Hans",
-  "hi",
-  "es",
   "fr",
+  "de",
+  "it",
   "ar",
-  "bn",
-  "pt-BR",
   "ru",
-  "ur",
+  "vi",
 ];
+
+const DEFAULT_SOURCE_LANGUAGE = "cs";
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -45,6 +45,8 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [eventId, setEventId] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [sourceLanguage, setSourceLanguage] = useState(DEFAULT_SOURCE_LANGUAGE);
+  const [enableTranscription, setEnableTranscription] = useState(false);
   const [restrictLanguages, setRestrictLanguages] = useState(true);
   const [selectedLanguages, setSelectedLanguages] =
     useState<string[]>(DEFAULT_LANGUAGES);
@@ -63,7 +65,17 @@ export default function Home() {
     [locale]
   );
 
-  const filteredLanguages = languageOptions.filter((lang) => {
+  const translationLanguageOptions = useMemo(
+    () => languageOptions.filter((lang) => lang.code !== sourceLanguage),
+    [languageOptions, sourceLanguage]
+  );
+
+  const selectedTranslationLanguages = useMemo(
+    () => selectedLanguages.filter((code) => code !== sourceLanguage),
+    [selectedLanguages, sourceLanguage]
+  );
+
+  const filteredLanguages = translationLanguageOptions.filter((lang) => {
     const query = langSearch.trim().toLocaleLowerCase(locale);
     return (
       lang.displayName.toLocaleLowerCase(locale).includes(query) ||
@@ -71,6 +83,14 @@ export default function Home() {
       lang.code.toLowerCase().includes(query.toLowerCase())
     );
   });
+
+  function handleSourceLanguageChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextSourceLanguage = event.target.value;
+    setSourceLanguage(nextSourceLanguage);
+    setSelectedLanguages((prev) =>
+      prev.filter((code) => code !== nextSourceLanguage)
+    );
+  }
 
   useEffect(() => {
     async function checkAuthStatus() {
@@ -97,7 +117,11 @@ export default function Home() {
           password,
           eventId,
           locale,
-          allowedLanguages: restrictLanguages ? selectedLanguages : undefined,
+          sourceLanguage,
+          enableTranscription,
+          allowedLanguages: restrictLanguages
+            ? selectedTranslationLanguages
+            : undefined,
         }),
       });
       const data = await res.json();
@@ -206,6 +230,40 @@ export default function Home() {
                 />
               </div>
 
+              <div className="grid gap-2">
+                <Label htmlFor="source-language">{t("sourceLanguage")}</Label>
+                <NativeSelect
+                  id="source-language"
+                  className="w-full"
+                  value={sourceLanguage}
+                  onChange={handleSourceLanguageChange}
+                  disabled={loading}
+                >
+                  {languageOptions.map((lang) => (
+                    <NativeSelectOption key={lang.code} value={lang.code}>
+                      {lang.displayName} {lang.flag}
+                    </NativeSelectOption>
+                  ))}
+                </NativeSelect>
+              </div>
+
+              <Label className="items-start gap-3 rounded-lg border bg-muted/30 p-3">
+                <Checkbox
+                  checked={enableTranscription}
+                  onCheckedChange={(checked) =>
+                    setEnableTranscription(checked === true)
+                  }
+                  disabled={loading}
+                  className="mt-0.5"
+                />
+                <span className="grid gap-1">
+                  <span>{t("enableTranscription")}</span>
+                  <span className="text-xs font-normal leading-5 text-muted-foreground">
+                    {t("enableTranscriptionDescription")}
+                  </span>
+                </span>
+              </Label>
+
               <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
                 <Label className="items-start gap-3">
                   <Checkbox
@@ -219,16 +277,18 @@ export default function Home() {
                   <span className="grid gap-1">
                     <span>{t("restrictLanguages")}</span>
                     <span className="text-xs font-normal leading-5 text-muted-foreground">
-                      {t("selectedCount", { count: selectedLanguages.length })}
+                      {t("selectedCount", {
+                        count: selectedTranslationLanguages.length,
+                      })}
                     </span>
                   </span>
                 </Label>
 
                 {restrictLanguages && (
                   <div className="grid gap-3">
-                    {selectedLanguages.length > 0 && (
+                    {selectedTranslationLanguages.length > 0 && (
                       <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-dashed bg-background p-2 pr-1 [scrollbar-gutter:stable]">
-                        {selectedLanguages.map((code) => {
+                        {selectedTranslationLanguages.map((code) => {
                           const lang = languageOptions.find(
                             (item) => item.code === code
                           );
@@ -308,7 +368,9 @@ export default function Home() {
 
                     <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                       <span>
-                        {t("selectedCount", { count: selectedLanguages.length })}
+                        {t("selectedCount", {
+                          count: selectedTranslationLanguages.length,
+                        })}
                       </span>
                       <div className="flex gap-1">
                         <Button
@@ -317,7 +379,7 @@ export default function Home() {
                           size="xs"
                           onClick={() =>
                             setSelectedLanguages(
-                              SUPPORTED_LANGUAGES.map((lang) => lang.code)
+                              translationLanguageOptions.map((lang) => lang.code)
                             )
                           }
                         >
@@ -350,7 +412,7 @@ export default function Home() {
                 className="w-full"
               >
                 {loading ? (
-                  <>j
+                  <>
                     <Spinner />
                     {t("creating")}
                   </>

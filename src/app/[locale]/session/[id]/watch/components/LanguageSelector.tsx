@@ -25,6 +25,7 @@ interface LanguageSelectorProps {
   ) => void;
   disabled?: boolean;
   allowedLanguages?: string[];
+  sourceLanguage?: string;
 }
 
 export default function LanguageSelector({
@@ -33,6 +34,7 @@ export default function LanguageSelector({
   onLanguageChange,
   disabled = false,
   allowedLanguages,
+  sourceLanguage,
 }: LanguageSelectorProps) {
   const t = useTranslations("LanguageSelector");
   const locale = useLocale();
@@ -127,6 +129,7 @@ export default function LanguageSelector({
           )
         : SUPPORTED_LANGUAGES
       )
+        .filter((lang) => lang.code !== sourceLanguage)
         .map((lang) => ({
           ...lang,
           displayName: getLanguageDisplayName(lang, locale),
@@ -136,7 +139,7 @@ export default function LanguageSelector({
             sensitivity: "base",
           })
         ),
-    [allowedLanguages, locale]
+    [allowedLanguages, locale, sourceLanguage]
   );
 
   return (

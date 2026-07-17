@@ -59,6 +59,7 @@ export class TranslationBridge {
   private readonly livekitUrl: string;
   private readonly livekitApiKey: string;
   private readonly livekitApiSecret: string;
+  private readonly enableTranscription: boolean;
 
   private geminiSetupComplete: boolean = false;
   private organizerIdentity: string;
@@ -74,6 +75,7 @@ export class TranslationBridge {
       livekitUrl: string;
       livekitApiKey: string;
       livekitApiSecret: string;
+      enableTranscription?: boolean;
     }
   ) {
     this.sessionId = sessionId;
@@ -84,6 +86,7 @@ export class TranslationBridge {
     this.livekitUrl = config.livekitUrl;
     this.livekitApiKey = config.livekitApiKey;
     this.livekitApiSecret = config.livekitApiSecret;
+    this.enableTranscription = config.enableTranscription === true;
   }
 
   async start(): Promise<void> {
@@ -405,27 +408,48 @@ export class TranslationBridge {
   }
 
   private sendGeminiSetup(ws: WebSocket = this.geminiWs!): void {
-    const setupMessage = {
-      setup: {
-        model: `models/${this.geminiModel}`,
-        outputAudioTranscription: {},
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          translationConfig: {
-            targetLanguageCode: this.targetLanguage,
-            echoTargetLanguage: true,
-          },
+    const setup: {
+      model: string;
+      outputAudioTranscription?: Record<string, never>;
+      generationConfig: {
+        responseModalities: string[];
+        translationConfig: {
+          targetLanguageCode: string;
+          echoTargetLanguage: boolean;
+        };
+      };
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: boolean;
+        };
+      };
+      sessionResumption: {
+        handle?: string;
+      };
+    } = {
+      model: `models/${this.geminiModel}`,
+      generationConfig: {
+        responseModalities: ["AUDIO"],
+        translationConfig: {
+          targetLanguageCode: this.targetLanguage,
+          echoTargetLanguage: true,
         },
-        realtimeInputConfig: {
-          automaticActivityDetection: {
-            disabled: false,
-          },
-        },
-        sessionResumption: this.resumptionHandle
-          ? { handle: this.resumptionHandle }
-          : {},
       },
+      realtimeInputConfig: {
+        automaticActivityDetection: {
+          disabled: false,
+        },
+      },
+      sessionResumption: this.resumptionHandle
+        ? { handle: this.resumptionHandle }
+        : {},
     };
+
+    if (this.enableTranscription) {
+      setup.outputAudioTranscription = {};
+    }
+
+    const setupMessage = { setup };
 
     console.log(
       `[TranslationBridge:${this.targetLanguage}] Sending Gemini setup (resuming: ${!!this.resumptionHandle}):`,
@@ -500,7 +524,7 @@ export class TranslationBridge {
       }
 
       // Handle output transcription (separate field from modelTurn)
-      if (serverContent?.outputTranscription?.text) {
+      if (this.enableTranscription && serverContent?.outputTranscription?.text) {
         const text = serverContent.outputTranscription.text;
         const isInterim = !serverContent.turnComplete;
 
@@ -522,7 +546,7 @@ export class TranslationBridge {
       }
 
       // If turn is complete, flush remaining interim buffer and advance the segment id
-      if (serverContent?.turnComplete) {
+      if (this.enableTranscription && serverContent?.turnComplete) {
         if (this.interimTimeout) {
           clearTimeout(this.interimTimeout);
           this.interimTimeout = null;
@@ -741,6 +765,8 @@ export class TranslationBridge {
   }
 
   private handleInterimTranscription(text: string): void {
+    if (!this.enableTranscription) return;
+
     this.pendingInterimText += text;
 
     if (!this.interimTimeout) {
@@ -752,13 +778,14 @@ export class TranslationBridge {
 
   private flushInterimTranscription(): void {
     this.interimTimeout = null;
-    if (this.pendingInterimText && this.status === "active") {
+    if (this.enableTranscription && this.pendingInterimText && this.status === "active") {
       this.publishTranscriptionText(this.pendingInterimText, true);
       this.pendingInterimText = "";
     }
   }
 
   private async publishTranscriptionText(text: string, interim: boolean): Promise<void> {
+    if (!this.enableTranscription) return;
     if (!this.room || !this.room.localParticipant) return;
 
     try {

@@ -87,6 +87,14 @@ export const SUPPORTED_LANGUAGES: Language[] = [
 
 const displayNamesByLocale = new Map<string, Intl.DisplayNames>();
 
+export function normalizeLanguageCode(code: string): string {
+  return code === "nb" ? "no" :
+    code === "iw" ? "he" :
+      code === "zh" ? "zh-Hans" :
+        code === "pt" ? "pt-BR" :
+          code;
+}
+
 function getLanguageDisplayNames(displayLocale: string) {
   try {
     const cached = displayNamesByLocale.get(displayLocale);
@@ -124,11 +132,6 @@ export function getLanguageDisplayName(
 }
 
 export function getLanguageByCode(code: string): Language | undefined {
-  const normalized =
-    code === "nb" ? "no" :
-      code === "iw" ? "he" :
-        code === "zh" ? "zh-Hans" :
-          code === "pt" ? "pt-BR" :
-            code;
+  const normalized = normalizeLanguageCode(code);
   return SUPPORTED_LANGUAGES.find((lang) => lang.code === normalized);
 }

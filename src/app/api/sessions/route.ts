@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { isLocale, routing, type Locale } from "@/i18n/routing";
+import { getLanguageByCode } from "@/lib/languages";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
@@ -9,6 +10,8 @@ interface CreateSessionRequest {
   eventId?: unknown;
   locale?: unknown;
   allowedLanguages?: unknown;
+  sourceLanguage?: unknown;
+  enableTranscription?: unknown;
 }
 
 function getSessionPath(locale: Locale, sessionId: string, mode: "watch" | "broadcast") {
@@ -35,11 +38,39 @@ export async function POST(req: NextRequest) {
       locale = body.locale;
     }
 
+    let sourceLanguage: string = routing.defaultLocale;
+    if (body.sourceLanguage !== undefined) {
+      if (typeof body.sourceLanguage !== "string") {
+        return NextResponse.json(
+          { error: "Invalid source language" },
+          { status: 400 }
+        );
+      }
+
+      const source = getLanguageByCode(body.sourceLanguage);
+      if (!source) {
+        return NextResponse.json(
+          { error: "Unsupported source language" },
+          { status: 400 }
+        );
+      }
+
+      sourceLanguage = source.code;
+    }
+
+    const enableTranscription = body.enableTranscription === true;
+
     let allowedLanguages: string[] | undefined = undefined;
     if (Array.isArray(body.allowedLanguages)) {
-      allowedLanguages = body.allowedLanguages.filter(
-        (language): language is string => typeof language === "string"
-      );
+      const normalizedAllowedLanguages = body.allowedLanguages
+        .filter((language): language is string => typeof language === "string")
+        .map((language) => getLanguageByCode(language)?.code)
+        .filter(
+          (language): language is string =>
+            typeof language === "string" && language !== sourceLanguage
+        );
+
+      allowedLanguages = Array.from(new Set(normalizedAllowedLanguages));
     }
 
     const expectedPassword = process.env.BROADCAST_PASSWORD;
@@ -76,7 +107,11 @@ export async function POST(req: NextRequest) {
       await manager.removeAllTranslations(sessionId);
     }
 
-    manager.createSession(sessionId, organizerIdentity, allowedLanguages);
+    manager.createSession(sessionId, organizerIdentity, {
+      sourceLanguage,
+      enableTranscription,
+      allowedLanguages,
+    });
 
     // Build the attendee join URL
     const protocol = req.headers.get("x-forwarded-proto") || "http";
@@ -88,6 +123,8 @@ export async function POST(req: NextRequest) {
       sessionId,
       organizerIdentity,
       locale,
+      sourceLanguage,
+      enableTranscription,
       joinUrl,
       broadcastUrl: `${origin}${getSessionPath(locale, sessionId, "broadcast")}`,
     });

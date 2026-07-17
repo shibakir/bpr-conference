@@ -117,6 +117,11 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
   const [allowedLanguages, setAllowedLanguages] = useState<
     string[] | undefined
   >(undefined);
+  const [sourceLanguage, setSourceLanguage] = useState<string | undefined>(
+    undefined
+  );
+  const [enableTranscription, setEnableTranscription] = useState(false);
+  const [sessionDetailsLoaded, setSessionDetailsLoaded] = useState(false);
 
   useEffect(() => {
     async function fetchSessionDetails() {
@@ -125,9 +130,17 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
         if (res.ok) {
           const data = await res.json();
           setAllowedLanguages(data.allowedLanguages);
+          setSourceLanguage(
+            typeof data.sourceLanguage === "string"
+              ? data.sourceLanguage
+              : undefined
+          );
+          setEnableTranscription(data.enableTranscription === true);
         }
       } catch (err) {
         console.error("Failed to fetch session details:", err);
+      } finally {
+        setSessionDetailsLoaded(true);
       }
     }
     fetchSessionDetails();
@@ -203,7 +216,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
   }, []);
 
   useEffect(() => {
-    if (!room) return;
+    if (!room || !enableTranscription) return;
 
     const handleData = (
       payload: Uint8Array,
@@ -252,7 +265,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     return () => {
       room.off(RoomEvent.DataReceived, handleData);
     };
-  }, [room]);
+  }, [room, enableTranscription]);
 
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -464,85 +477,90 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           sessionId={sessionId}
           currentLanguage={currentLanguage}
           onLanguageChange={handleLanguageChange}
-          disabled={!isConnected}
+          disabled={!isConnected || !sessionDetailsLoaded}
           allowedLanguages={allowedLanguages}
+          sourceLanguage={sourceLanguage}
         />
       </section>
 
-      <Separator />
+      {enableTranscription && (
+        <>
+          <Separator />
 
-      <section className="space-y-4" style={transcriptStyle}>
-        <div className="flex items-center justify-between gap-3">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {t("transcription")}
-          </span>
-          <div className="flex items-center gap-1">
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={decreaseFontSize}
-              disabled={fontSize <= 12}
-              title={t("decreaseFontSize")}
-              aria-label={t("decreaseFontSize")}
-            >
-              <MinusIcon className="size-3" />
-              A
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="xs"
-              onClick={increaseFontSize}
-              disabled={fontSize >= 28}
-              title={t("increaseFontSize")}
-              aria-label={t("increaseFontSize")}
-            >
-              <PlusIcon className="size-3" />
-              A
-            </Button>
-          </div>
-        </div>
-
-        <ScrollArea className="h-80 rounded-lg border bg-card">
-          <div className="p-4">
-            {transcripts.length === 0 ? (
-              <p className="text-sm italic text-muted-foreground">
-                {currentLanguage === "original"
-                  ? t("selectLanguageForTranscription")
-                  : t("waitingForSpeech")}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-4">
-                {transcripts.map((entry, i) => {
-                  const paragraphs = splitIntoParagraphs(entry.text, 2);
-                  return (
-                    <div
-                      key={`${entry.id}-${i}`}
-                      className="flex flex-col gap-2"
-                    >
-                      {paragraphs.map((para, paraIdx) => (
-                        <p
-                          key={paraIdx}
-                          className={cn(
-                            "font-sans text-[length:var(--transcript-font-size)] leading-7 transition-colors",
-                            entry.final
-                              ? "text-foreground"
-                              : "text-muted-foreground"
-                          )}
-                        >
-                          {para}
-                        </p>
-                      ))}
-                    </div>
-                  );
-                })}
-                <div ref={transcriptEndRef} />
+          <section className="space-y-4" style={transcriptStyle}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                {t("transcription")}
+              </span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={decreaseFontSize}
+                  disabled={fontSize <= 12}
+                  title={t("decreaseFontSize")}
+                  aria-label={t("decreaseFontSize")}
+                >
+                  <MinusIcon className="size-3" />
+                  A
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="xs"
+                  onClick={increaseFontSize}
+                  disabled={fontSize >= 28}
+                  title={t("increaseFontSize")}
+                  aria-label={t("increaseFontSize")}
+                >
+                  <PlusIcon className="size-3" />
+                  A
+                </Button>
               </div>
-            )}
-          </div>
-        </ScrollArea>
-      </section>
+            </div>
+
+            <ScrollArea className="h-80 rounded-lg border bg-card">
+              <div className="p-4">
+                {transcripts.length === 0 ? (
+                  <p className="text-sm italic text-muted-foreground">
+                    {currentLanguage === "original"
+                      ? t("selectLanguageForTranscription")
+                      : t("waitingForSpeech")}
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-4">
+                    {transcripts.map((entry, i) => {
+                      const paragraphs = splitIntoParagraphs(entry.text, 2);
+                      return (
+                        <div
+                          key={`${entry.id}-${i}`}
+                          className="flex flex-col gap-2"
+                        >
+                          {paragraphs.map((para, paraIdx) => (
+                            <p
+                              key={paraIdx}
+                              className={cn(
+                                "font-sans text-[length:var(--transcript-font-size)] leading-7 transition-colors",
+                                entry.final
+                                  ? "text-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {para}
+                            </p>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    <div ref={transcriptEndRef} />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </section>
+        </>
+      )}
 
       <Separator />
 

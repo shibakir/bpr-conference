@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getLanguageByCode } from "@/lib/languages";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 // POST /api/translate — Request a translation stream for a language
@@ -23,25 +24,49 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate targetLanguage against allowedLanguages allowlist
+    const normalizedTargetLanguage =
+      targetLanguage === "original"
+        ? "original"
+        : getLanguageByCode(targetLanguage)?.code;
+
+    if (!normalizedTargetLanguage) {
+      return NextResponse.json(
+        { error: `Unsupported target language "${targetLanguage}"` },
+        { status: 400 }
+      );
+    }
+
+    // Validate targetLanguage against source language and allowedLanguages allowlist
     if (
-      targetLanguage !== "original" &&
-      session.allowedLanguages &&
-      !session.allowedLanguages.includes(targetLanguage)
+      normalizedTargetLanguage !== "original" &&
+      normalizedTargetLanguage === session.sourceLanguage
     ) {
       return NextResponse.json(
-        { error: `Language "${targetLanguage}" is not allowed for this session` },
+        { error: "Target language matches the original audio language" },
+        { status: 400 }
+      );
+    }
+
+    if (
+      normalizedTargetLanguage !== "original" &&
+      session.allowedLanguages &&
+      !session.allowedLanguages.includes(normalizedTargetLanguage)
+    ) {
+      return NextResponse.json(
+        { error: `Language "${normalizedTargetLanguage}" is not allowed for this session` },
         { status: 400 }
       );
     }
 
     // Unsubscribe from the previous language if switching
     if (previousLanguage && previousLanguage !== "original") {
-      await manager.unsubscribe(sessionId, previousLanguage);
+      const normalizedPreviousLanguage =
+        getLanguageByCode(previousLanguage)?.code ?? previousLanguage;
+      await manager.unsubscribe(sessionId, normalizedPreviousLanguage);
     }
 
     // Skip translation for the original language (no bridge needed)
-    if (targetLanguage === "original") {
+    if (normalizedTargetLanguage === "original") {
       return NextResponse.json({
         translatorIdentity: null,
         status: "original",
@@ -52,8 +77,11 @@ export async function POST(req: NextRequest) {
     // Get or create the translation bridge
     const bridge = await manager.getOrCreate(
       sessionId,
-      targetLanguage,
-      session.organizerIdentity
+      normalizedTargetLanguage,
+      session.organizerIdentity,
+      {
+        enableTranscription: session.enableTranscription,
+      }
     );
 
     return NextResponse.json({

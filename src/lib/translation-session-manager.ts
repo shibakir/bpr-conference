@@ -20,6 +20,8 @@ export interface SessionInfo {
   sessionId: string;
   organizerIdentity: string;
   createdAt: Date;
+  sourceLanguage: string;
+  enableTranscription: boolean;
   allowedLanguages?: string[];
 }
 
@@ -47,16 +49,24 @@ class TranslationSessionManager {
   createSession(
     sessionId: string,
     organizerIdentity: string,
-    allowedLanguages?: string[]
+    options: {
+      sourceLanguage: string;
+      enableTranscription: boolean;
+      allowedLanguages?: string[];
+    }
   ): SessionInfo {
     const info: SessionInfo = {
       sessionId,
       organizerIdentity,
       createdAt: new Date(),
-      allowedLanguages,
+      sourceLanguage: options.sourceLanguage,
+      enableTranscription: options.enableTranscription,
+      allowedLanguages: options.allowedLanguages,
     };
     this.sessions.set(sessionId, info);
-    console.log(`[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with allowed languages: ${allowedLanguages?.join(", ") || "all"}`);
+    console.log(
+      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with source language ${options.sourceLanguage}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
+    );
     return info;
   }
 
@@ -68,7 +78,10 @@ class TranslationSessionManager {
   async getOrCreate(
     sessionId: string,
     targetLanguage: string,
-    organizerIdentity: string
+    organizerIdentity: string,
+    options: {
+      enableTranscription?: boolean;
+    } = {}
   ): Promise<TranslationBridge> {
     // Check if we already have a bridge for this language
     let languageMap = this.translations.get(sessionId);
@@ -101,6 +114,7 @@ class TranslationSessionManager {
       livekitUrl: process.env.LIVEKIT_URL || "ws://localhost:7880",
       livekitApiKey: process.env.LIVEKIT_API_KEY!,
       livekitApiSecret: process.env.LIVEKIT_API_SECRET!,
+      enableTranscription: options.enableTranscription === true,
     };
 
     const bridge = new TranslationBridge(
