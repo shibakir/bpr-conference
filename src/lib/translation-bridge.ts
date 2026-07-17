@@ -30,6 +30,22 @@ type QueuedTranslatedAudioFrame = {
   durationMs: number;
 };
 
+function getPositiveIntegerEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  return fallback;
+}
+
 export type BridgeStatus = "starting" | "active" | "error" | "closed";
 
 export class TranslationBridge {
@@ -41,6 +57,7 @@ export class TranslationBridge {
   private transcriptionSegmentId: number = 0;
   private framesSentToGemini: number = 0;
   private framesReceivedFromGemini: number = 0;
+  private framesPublishedToLiveKit: number = 0;
   private resumptionHandle: string | null = null;
   private isReconnecting: boolean = false;
   private pendingInterimText: string = "";
@@ -61,11 +78,24 @@ export class TranslationBridge {
   private readonly channels: number = 1;
   private readonly contextCompressionTriggerTokens: number = 25000;
   private readonly contextCompressionTargetTokens: number = 8000;
-  private readonly outputAudioSourceQueueMs: number = 300;
-  private readonly maxOutputBacklogMs: number = 1000;
-  private readonly targetOutputBacklogMs: number = 500;
+  private readonly outputAudioSourceQueueMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_OUTPUT_QUEUE_MS",
+    700
+  );
+  private readonly maxOutputBacklogMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_MAX_OUTPUT_BACKLOG_MS",
+    3000
+  );
+  private readonly targetOutputBacklogMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_TARGET_OUTPUT_BACKLOG_MS",
+    1500
+  );
   private readonly outputBacklogLogIntervalMs: number = 5000;
   private readonly outputBacklogInfoThresholdMs: number = 500;
+  private readonly dropStaleOutputAudio: boolean = getBooleanEnv(
+    "TRANSLATION_DROP_STALE_AUDIO",
+    true
+  );
 
   // LiveKit config
   private readonly livekitUrl: string;
@@ -231,6 +261,10 @@ export class TranslationBridge {
       this.channels,
       this.outputAudioSourceQueueMs
     );
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Output audio config: sourceQueue=${this.outputAudioSourceQueueMs}ms, maxBacklog=${this.maxOutputBacklogMs}ms, targetBacklog=${this.targetOutputBacklogMs}ms, dropStale=${this.dropStaleOutputAudio}`
+    );
+
     this.localTrack = LocalAudioTrack.createAudioTrack(
       `translated-audio-${this.targetLanguage}`,
       this.audioSource
@@ -625,7 +659,6 @@ export class TranslationBridge {
       this.pendingTranslatedAudioFrames.push({ pcmBuffer, durationMs });
       this.pendingTranslatedAudioDurationMs += durationMs;
 
-      this.trimTranslatedAudioBacklog("enqueue", false);
       this.maybeLogOutputBacklog();
 
       if (!this.isPublishingTranslatedAudio) {
@@ -696,6 +729,15 @@ export class TranslationBridge {
 
       const frame = new AudioFrame(int16, this.sampleRate, this.channels, int16.length);
       await this.audioSource.captureFrame(frame);
+      this.framesPublishedToLiveKit++;
+
+      if (this.framesPublishedToLiveKit <= 3 || this.framesPublishedToLiveKit % 100 === 0) {
+        console.log(
+          `[TranslationBridge:${this.targetLanguage}] Published translated audio frame #${this.framesPublishedToLiveKit} to LiveKit (${Math.round(
+            queuedFrame.durationMs
+          )}ms)`
+        );
+      }
 
       const now = Date.now();
       if (this.lastAudioFrameTime && now - this.lastAudioFrameTime > 2000) {
@@ -738,6 +780,8 @@ export class TranslationBridge {
     reason: "enqueue" | "drain",
     allowNativeClear: boolean
   ): void {
+    if (!this.dropStaleOutputAudio) return;
+
     const source = this.audioSource;
     let nativeQueuedMs = this.getNativeOutputQueueMs();
     const totalBeforeMs = nativeQueuedMs + this.pendingTranslatedAudioDurationMs;
@@ -758,9 +802,14 @@ export class TranslationBridge {
       nativeQueuedMs = 0;
     }
 
+    const targetBacklogMs = Math.min(
+      this.targetOutputBacklogMs,
+      this.maxOutputBacklogMs
+    );
+
     while (
       nativeQueuedMs + this.pendingTranslatedAudioDurationMs >
-        this.targetOutputBacklogMs &&
+        targetBacklogMs &&
       this.pendingTranslatedAudioFrames.length > 1
     ) {
       const dropped = this.pendingTranslatedAudioFrames.shift();
