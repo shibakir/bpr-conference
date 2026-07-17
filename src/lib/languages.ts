@@ -85,6 +85,44 @@ export const SUPPORTED_LANGUAGES: Language[] = [
   { code: "zu", name: "Zulu", flag: "🇿🇦" },
 ];
 
+const displayNamesByLocale = new Map<string, Intl.DisplayNames>();
+
+function getLanguageDisplayNames(displayLocale: string) {
+  try {
+    const cached = displayNamesByLocale.get(displayLocale);
+    if (cached) return cached;
+
+    const displayNames = new Intl.DisplayNames([displayLocale], {
+      type: "language",
+    });
+    displayNamesByLocale.set(displayLocale, displayNames);
+    return displayNames;
+  } catch {
+    return null;
+  }
+}
+
+function capitalizeDisplayName(name: string, displayLocale: string) {
+  const [first = "", ...rest] = Array.from(name);
+  return `${first.toLocaleUpperCase(displayLocale)}${rest.join("")}`;
+}
+
+export function getLanguageDisplayName(
+  language: Language,
+  displayLocale: string
+) {
+  const displayNames = getLanguageDisplayNames(displayLocale);
+
+  try {
+    return capitalizeDisplayName(
+      displayNames?.of(language.code) ?? language.name,
+      displayLocale
+    );
+  } catch {
+    return capitalizeDisplayName(language.name, displayLocale);
+  }
+}
+
 export function getLanguageByCode(code: string): Language | undefined {
   const normalized =
     code === "nb" ? "no" :

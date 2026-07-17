@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
-import { SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -22,10 +22,27 @@ export default function Home() {
   ]);
   const [langSearch, setLangSearch] = useState("");
 
-  const filteredLanguages = SUPPORTED_LANGUAGES.filter(lang => 
-    lang.name.toLowerCase().includes(langSearch.toLowerCase()) ||
-    lang.code.toLowerCase().includes(langSearch.toLowerCase())
+  const languageOptions = useMemo(
+    () =>
+      SUPPORTED_LANGUAGES.map((lang) => ({
+        ...lang,
+        displayName: getLanguageDisplayName(lang, locale),
+      })).sort((a, b) =>
+        a.displayName.localeCompare(b.displayName, locale, {
+          sensitivity: "base",
+        })
+      ),
+    [locale]
   );
+
+  const filteredLanguages = languageOptions.filter((lang) => {
+    const query = langSearch.trim().toLocaleLowerCase(locale);
+    return (
+      lang.displayName.toLocaleLowerCase(locale).includes(query) ||
+      lang.name.toLowerCase().includes(query.toLowerCase()) ||
+      lang.code.toLowerCase().includes(query.toLowerCase())
+    );
+  });
 
   useEffect(() => {
     async function checkAuthStatus() {
@@ -171,7 +188,7 @@ export default function Home() {
                     background: "var(--bg-elevated)" 
                   }}>
                     {selectedLanguages.map((code) => {
-                      const lang = SUPPORTED_LANGUAGES.find((l) => l.code === code);
+                      const lang = languageOptions.find((l) => l.code === code);
                       if (!lang) return null;
                       return (
                         <div
@@ -191,7 +208,7 @@ export default function Home() {
                           title={t("removeLanguage")}
                         >
                           <span>{lang.flag}</span>
-                          <span style={{ color: "var(--fg-secondary)" }}>{lang.name}</span>
+                          <span style={{ color: "var(--fg-secondary)" }}>{lang.displayName}</span>
                           <span style={{ marginLeft: "2px", opacity: 0.5, fontWeight: "bold" }}>×</span>
                         </div>
                       );
@@ -235,7 +252,7 @@ export default function Home() {
                             }}
                             style={{ accentColor: "var(--fg)" }}
                           />
-                          <span>{lang.flag} {lang.name}</span>
+                          <span>{lang.flag} {lang.displayName}</span>
                         </label>
                       );
                     })

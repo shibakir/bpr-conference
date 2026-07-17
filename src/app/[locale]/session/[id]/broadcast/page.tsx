@@ -22,7 +22,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import SessionQRCode from "@/components/SessionQRCode";
 import { getPathname, useRouter } from "@/i18n/navigation";
-import { getLanguageByCode } from "@/lib/languages";
+import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
 
 interface TranslationInfo {
   language: string;
@@ -624,12 +624,15 @@ function BroadcastControls({
         ) : (
           translations.map((translation) => {
             const lang = getLanguageByCode(translation.language);
+            const languageName = lang
+              ? getLanguageDisplayName(lang, locale)
+              : translation.language.toUpperCase();
             return (
               <div key={translation.language} className="lang-row">
                 <div className="lang-row-left">
                   <span className="lang-flag">{lang?.flag || "🌐"}</span>
                   <span className="lang-name">
-                    {lang?.name || translation.language.toUpperCase()}
+                    {languageName}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>

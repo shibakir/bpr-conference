@@ -11,5 +11,5 @@ export function isLocale(value: string): value is Locale {
 export const routing = defineRouting({
   locales,
   defaultLocale: "cs",
-  localePrefix: "as-needed",
+  localePrefix: "always",
 });

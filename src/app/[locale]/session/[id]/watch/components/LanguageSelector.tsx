@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
-import { useTranslations } from "next-intl";
-import { SUPPORTED_LANGUAGES, getLanguageByCode } from "@/lib/languages";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import {
+  SUPPORTED_LANGUAGES,
+  getLanguageByCode,
+  getLanguageDisplayName,
+} from "@/lib/languages";
 
 interface LanguageSelectorProps {
   sessionId: string;
@@ -23,6 +27,7 @@ export default function LanguageSelector({
   allowedLanguages,
 }: LanguageSelectorProps) {
   const t = useTranslations("LanguageSelector");
+  const locale = useLocale();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeLanguageRef = useRef(currentLanguage);
@@ -106,10 +111,25 @@ export default function LanguageSelector({
   );
 
   const currentLang = getLanguageByCode(currentLanguage);
+  const currentLangName = currentLang
+    ? getLanguageDisplayName(currentLang, locale)
+    : currentLanguage.toUpperCase();
 
-  const visibleLanguages = allowedLanguages
-    ? SUPPORTED_LANGUAGES.filter((lang) => allowedLanguages.includes(lang.code))
-    : SUPPORTED_LANGUAGES;
+  const visibleLanguages = useMemo(
+    () =>
+      (allowedLanguages
+        ? SUPPORTED_LANGUAGES.filter((lang) => allowedLanguages.includes(lang.code))
+        : SUPPORTED_LANGUAGES
+      ).map((lang) => ({
+        ...lang,
+        displayName: getLanguageDisplayName(lang, locale),
+      })).sort((a, b) =>
+        a.displayName.localeCompare(b.displayName, locale, {
+          sensitivity: "base",
+        })
+      ),
+    [allowedLanguages, locale]
+  );
 
   return (
     <div style={{ width: "100%" }}>
@@ -133,7 +153,7 @@ export default function LanguageSelector({
           <optgroup label={t("translations")}>
             {visibleLanguages.map((lang) => (
               <option key={lang.code} value={lang.code}>
-                {lang.name} {lang.flag}
+                {lang.displayName} {lang.flag}
               </option>
             ))}
           </optgroup>
@@ -151,7 +171,7 @@ export default function LanguageSelector({
         {currentLanguage !== "original" && currentLang && !loading && (
           <span className="status status--active">
             <span className="status-dot pulse" />
-            {t("translatingTo", { language: currentLang.name })}
+            {t("translatingTo", { language: currentLangName })}
           </span>
         )}
 
