@@ -1,5 +1,5 @@
 export const MIN_SESSION_DURATION_MINUTES = 1;
-export const MAX_SESSION_DURATION_MINUTES = 10;
+export const MAX_SESSION_DURATION_MINUTES = 5;
 export const DEFAULT_SESSION_DURATION_MINUTES = MAX_SESSION_DURATION_MINUTES;
 
 export function parseSessionDurationMinutes(

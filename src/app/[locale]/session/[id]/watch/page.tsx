@@ -588,7 +588,7 @@ function AttendeeView({
         </>
       )}
 
-      <Separator />
+      {/* <Separator />
 
       <p className="text-sm leading-6 text-muted-foreground">
         {t.rich("generatedBy", {
@@ -603,7 +603,7 @@ function AttendeeView({
             </a>
           ),
         })}
-      </p>
+      </p> */}
     </div>
   );
 }

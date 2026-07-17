@@ -560,9 +560,8 @@ function BroadcastControls({
     <div className="w-full max-w-xl space-y-6">
       <header className="space-y-1">
         <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-          {t("title")}
+          {t("title")} {sessionId}
         </h1>
-        <p className="font-mono text-xs text-muted-foreground">{sessionId}</p>
       </header>
 
       <section className="flex flex-wrap items-center justify-between gap-3">
