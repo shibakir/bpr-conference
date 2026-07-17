@@ -11,7 +11,7 @@
     "eventPlaceholder": "ID události (volitelné, např. weekly-sync)",
     "duration": "Délka session",
     "durationValue": "{count, plural, one {# minuta} few {# minuty} other {# minut}}",
-    "durationDescription": "Konference se ukončí automaticky. Maximální délka je {max} minut.",
+    "durationDescription": "Konference se ukončí automaticky.",
     "sourceLanguage": "Jazyk původního zvuku",
     "enableTranscription": "Zapnout titulky překladu",
     "enableTranscriptionDescription": "Titulky přidávají náklady na textový výstup Gemini. Nechte vypnuto, pokud účastníkům stačí zvuk.",

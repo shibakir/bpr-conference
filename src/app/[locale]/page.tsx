@@ -284,9 +284,7 @@ export default function Home() {
                   disabled={loading}
                 />
                 <p className="text-xs leading-5 text-muted-foreground">
-                  {t("durationDescription", {
-                    max: MAX_SESSION_DURATION_MINUTES,
-                  })}
+                  {t("durationDescription")}
                 </p>
               </div>
 

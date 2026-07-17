@@ -11,7 +11,7 @@
     "eventPlaceholder": "Event ID (optional, e.g. weekly-sync)",
     "duration": "Session duration",
     "durationValue": "{count, plural, one {# minute} other {# minutes}}",
-    "durationDescription": "The conference ends automatically. Maximum duration is {max} minutes.",
+    "durationDescription": "The conference ends automatically.",
     "sourceLanguage": "Original audio language",
     "enableTranscription": "Enable translated captions",
     "enableTranscriptionDescription": "Captions add Gemini text output costs. Leave off when attendees only need audio.",
