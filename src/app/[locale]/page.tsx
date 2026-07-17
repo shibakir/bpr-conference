@@ -1,26 +1,14 @@
-/**
- * Copyright 2026 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useLocale, useTranslations } from "next-intl";
+import { Link, useRouter } from "@/i18n/navigation";
+import { locales } from "@/i18n/routing";
 import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 export default function Home() {
+  const t = useTranslations("Home");
+  const locale = useLocale();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [passwordRequired, setPasswordRequired] = useState(false);
@@ -68,7 +56,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create session");
+        throw new Error(data.error || t("createError"));
       }
       if (passwordRequired) {
         sessionStorage.setItem("broadcast_password", password);
@@ -84,9 +72,35 @@ export default function Home() {
   return (
     <div className="page">
       <div className="container" style={{ textAlign: "center" }}>
+        <div
+          className="enter"
+          style={{
+            display: "flex",
+            justifyContent: "center",
+            gap: 8,
+            marginBottom: 24,
+          }}
+        >
+          {locales.map((item) => (
+            <Link
+              key={item}
+              href="/"
+              locale={item}
+              aria-label={t("switchLocale", { locale: item.toUpperCase() })}
+              className="mono"
+              style={{
+                color: item === locale ? "var(--fg)" : "var(--fg-tertiary)",
+                textDecoration: item === locale ? "underline" : "none",
+              }}
+            >
+              {item.toUpperCase()}
+            </Link>
+          ))}
+        </div>
+
         {/* Title */}
-        <h1 className="display display-xl enter" style={{ marginBottom: 24 }}>
-          <em>Live</em> Translate
+        <h1 className="display display-lg enter" style={{ marginBottom: 24 }}>
+          {t("title")}
         </h1>
 
         {/* Subtitle */}
@@ -94,8 +108,7 @@ export default function Home() {
           className="body enter-d1"
           style={{ maxWidth: 340, margin: "0 auto 48px" }}
         >
-          Broadcast your voice. Attendees choose their language.
-          Translation spins up on demand.
+          {t("subtitle")}
         </p>
 
         {/* Inputs */}
@@ -113,7 +126,7 @@ export default function Home() {
             <input
               type="password"
               className="input-field"
-              placeholder="Enter broadcast password"
+              placeholder={t("passwordPlaceholder")}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               style={{ textAlign: "center" }}
@@ -123,7 +136,7 @@ export default function Home() {
           <input
             type="text"
             className="input-field"
-            placeholder="Event ID (optional, e.g. weekly-sync)"
+            placeholder={t("eventPlaceholder")}
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
             style={{ textAlign: "center" }}
@@ -141,7 +154,7 @@ export default function Home() {
                 }}
                 style={{ accentColor: "var(--fg)", cursor: "pointer" }}
               />
-              Restrict attendee languages
+              {t("restrictLanguages")}
             </label>
 
             {restrictLanguages && (
@@ -175,7 +188,7 @@ export default function Home() {
                             cursor: "pointer",
                             transition: "all 0.15s ease",
                           }}
-                          title="Click to remove"
+                          title={t("removeLanguage")}
                         >
                           <span>{lang.flag}</span>
                           <span style={{ color: "var(--fg-secondary)" }}>{lang.name}</span>
@@ -188,7 +201,7 @@ export default function Home() {
 
                 <input
                   type="text"
-                  placeholder="Search languages..."
+                  placeholder={t("searchLanguages")}
                   className="input-field"
                   value={langSearch}
                   onChange={(e) => setLangSearch(e.target.value)}
@@ -206,7 +219,7 @@ export default function Home() {
                   gap: 6
                 }}>
                   {filteredLanguages.length === 0 ? (
-                    <span style={{ fontSize: "12px", color: "var(--fg-tertiary)" }}>No languages found</span>
+                    <span style={{ fontSize: "12px", color: "var(--fg-tertiary)" }}>{t("noLanguagesFound")}</span>
                   ) : (
                     filteredLanguages.map(lang => {
                       const isChecked = selectedLanguages.includes(lang.code);
@@ -230,21 +243,21 @@ export default function Home() {
                 </div>
                 
                 <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--fg-tertiary)" }}>
-                  <span>{selectedLanguages.length} selected</span>
+                  <span>{t("selectedCount", { count: selectedLanguages.length })}</span>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button 
                       type="button" 
                       onClick={() => setSelectedLanguages(SUPPORTED_LANGUAGES.map(l => l.code))}
                       style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
                     >
-                      Select all
+                      {t("selectAll")}
                     </button>
                     <button 
                       type="button" 
                       onClick={() => setSelectedLanguages([])}
                       style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
                     >
-                      Clear
+                      {t("clear")}
                     </button>
                   </div>
                 </div>
@@ -270,10 +283,10 @@ export default function Home() {
           >
             {loading ? (
               <>
-                <span className="spinner" /> Creating…
+                <span className="spinner" /> {t("creating")}
               </>
             ) : (
-              "Create session"
+              t("createSession")
             )}
           </button>
         </div>
@@ -291,9 +304,9 @@ export default function Home() {
         >
           <hr className="rule" />
           {[
-            "Speak into your microphone — your audio goes live",
-            "Share the QR code with your audience",
-            "Each language picked spins up one Gemini session",
+            t("steps.speak"),
+            t("steps.share"),
+            t("steps.languages"),
           ].map((text, i) => (
             <div key={i}>
               <div
@@ -318,7 +331,7 @@ export default function Home() {
 
         {/* Footer */}
         <p className="mono enter-d4" style={{ marginTop: 48 }}>
-          Powered by Gemini Live API + LiveKit
+          <a target="_blank" href="https://bpr.cz/" rel="noopener noreferrer">BPR s.r.o</a>
         </p>
       </div>
     </div>

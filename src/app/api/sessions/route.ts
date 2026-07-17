@@ -1,34 +1,27 @@
-/**
- * Copyright 2026 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
+interface CreateSessionRequest {
+  organizerName?: unknown;
+  password?: unknown;
+  eventId?: unknown;
+  allowedLanguages?: unknown;
+}
+
 // POST /api/sessions — Create a new broadcast session
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const organizerName = body.organizerName || "organizer";
+    const body = await req.json().catch(() => ({})) as CreateSessionRequest;
+    const organizerName = typeof body.organizerName === "string" ? body.organizerName : "organizer";
     const password = body.password;
     const eventId = body.eventId;
-    
+
     let allowedLanguages: string[] | undefined = undefined;
     if (Array.isArray(body.allowedLanguages)) {
-      allowedLanguages = body.allowedLanguages.filter((l: any) => typeof l === "string");
+      allowedLanguages = body.allowedLanguages.filter(
+        (language): language is string => typeof language === "string"
+      );
     }
 
     const expectedPassword = process.env.BROADCAST_PASSWORD;
@@ -58,7 +51,7 @@ export async function POST(req: NextRequest) {
     const organizerIdentity = `organizer-${organizerName}`;
 
     const manager = TranslationSessionManager.getInstance();
-    
+
     // Clean up any stale translations/livekit rooms or translator bots from previous sessions under the same ID
     if (manager.getSession(sessionId)) {
       console.log(`[SessionsAPI] Overwriting existing session ${sessionId}. Tearing down previous bridges...`);

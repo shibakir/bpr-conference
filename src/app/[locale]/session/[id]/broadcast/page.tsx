@@ -1,30 +1,27 @@
-/**
- * Copyright 2026 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 "use client";
 
-import { useEffect, useState, useCallback, use, useRef, FormEvent } from "react";
+import {
+  useEffect,
+  useState,
+  useCallback,
+  use,
+  useRef,
+  useSyncExternalStore,
+  FormEvent,
+} from "react";
 import {
   LiveKitRoom,
-  useLocalParticipant,
   useRoomContext,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { Track, RoomEvent } from "livekit-client";
+import {
+  Track,
+  RoomEvent,
+  type LocalTrackPublication,
+} from "livekit-client";
+import { useLocale, useTranslations } from "next-intl";
 import SessionQRCode from "@/components/SessionQRCode";
+import { getPathname, useRouter } from "@/i18n/navigation";
 import { getLanguageByCode } from "@/lib/languages";
 
 interface TranslationInfo {
@@ -34,6 +31,29 @@ interface TranslationInfo {
   subscriberCount: number;
 }
 
+function subscribeToOrigin() {
+  return () => {};
+}
+
+function getClientOrigin() {
+  return window.location.origin;
+}
+
+function getServerOrigin() {
+  return "";
+}
+
+type NavigatorWithWakeLock = Navigator & {
+  wakeLock: {
+    request: (type: "screen") => Promise<WakeLockSentinel>;
+  };
+};
+
+type WindowWithWebkitAudioContext = Window &
+  typeof globalThis & {
+    webkitAudioContext?: typeof AudioContext;
+  };
+
 function BroadcastControls({
   sessionId,
   onEndBroadcast,
@@ -41,10 +61,17 @@ function BroadcastControls({
   sessionId: string;
   onEndBroadcast: () => void;
 }) {
+  const t = useTranslations("Broadcast");
+  const locale = useLocale();
+  const router = useRouter();
   const room = useRoomContext();
-  const { localParticipant } = useLocalParticipant();
   const [translations, setTranslations] = useState<TranslationInfo[]>([]);
   const [listenerCount, setListenerCount] = useState(0);
+  const origin = useSyncExternalStore(
+    subscribeToOrigin,
+    getClientOrigin,
+    getServerOrigin
+  );
 
   // Track active attendees count without useRemoteParticipants hook overhead
   useEffect(() => {
@@ -80,11 +107,11 @@ function BroadcastControls({
       return;
     }
 
-    let wakeLock: any = null;
+    let wakeLock: WakeLockSentinel | null = null;
 
     async function requestWakeLock() {
       try {
-        wakeLock = await (navigator as any).wakeLock.request("screen");
+        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request("screen");
         setIsWakeLockActive(true);
         
         wakeLock.addEventListener("release", () => {
@@ -108,7 +135,7 @@ function BroadcastControls({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (wakeLock) {
-        wakeLock.release().catch((err: any) => {
+        wakeLock.release().catch((err: unknown) => {
           console.error("Failed to release Screen Wake Lock:", err);
         });
       }
@@ -124,14 +151,15 @@ function BroadcastControls({
   const tabStreamRef = useRef<MediaStream | null>(null);
   const tabSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const tabGainNodeRef = useRef<GainNode | null>(null);
-  const publishedTrackPubRef = useRef<any>(null);
+  const publishedTrackPubRef = useRef<LocalTrackPublication | null>(null);
 
-
+  const joinPath = getPathname({
+    href: `/session/${sessionId}/watch`,
+    locale,
+  });
 
   const joinUrl =
-    typeof window !== "undefined"
-      ? `${window.location.origin}/session/${sessionId}/watch`
-      : "";
+    origin ? `${origin}${joinPath}` : joinPath;
 
   const fetchTranslations = useCallback(async () => {
     try {
@@ -144,9 +172,12 @@ function BroadcastControls({
   }, [sessionId]);
 
   useEffect(() => {
-    fetchTranslations();
+    const initialFetch = window.setTimeout(fetchTranslations, 0);
     const interval = setInterval(fetchTranslations, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(initialFetch);
+      clearInterval(interval);
+    };
   }, [fetchTranslations]);
 
   // Main AudioContext and track publishing lifecycle
@@ -154,11 +185,18 @@ function BroadcastControls({
     if (!room || !room.localParticipant) return;
 
     let active = true;
-    let localPub: any = null;
+    let localPub: LocalTrackPublication | null = null;
 
     async function initAudio() {
       try {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+        const AudioContextClass =
+          window.AudioContext ||
+          (window as WindowWithWebkitAudioContext).webkitAudioContext;
+
+        if (!AudioContextClass) {
+          throw new Error("Web Audio API is not supported in this browser.");
+        }
+
         const ctx = new AudioContextClass();
         audioContextRef.current = ctx;
 
@@ -186,7 +224,7 @@ function BroadcastControls({
 
     return () => {
       active = false;
-      if (localPub && room.localParticipant) {
+      if (localPub?.track && room.localParticipant) {
         room.localParticipant.unpublishTrack(localPub.track).catch((err) => {
           console.error("Failed to unpublish mixed track:", err);
         });
@@ -235,11 +273,11 @@ function BroadcastControls({
     if (hasActiveInput) {
       pub.unmute()
         .then(() => console.log("[BroadcastControls] Unmuted broadcast-audio track"))
-        .catch((err: any) => console.error("Failed to unmute track:", err));
+        .catch((err: unknown) => console.error("Failed to unmute track:", err));
     } else {
       pub.mute()
         .then(() => console.log("[BroadcastControls] Muted broadcast-audio track"))
-        .catch((err: any) => console.error("Failed to mute track:", err));
+        .catch((err: unknown) => console.error("Failed to mute track:", err));
     }
   }, [isMicEnabled, isTabAudioEnabled]);
 
@@ -281,7 +319,7 @@ function BroadcastControls({
         setIsMicEnabled(true);
       } catch (err) {
         console.error("Failed to access microphone:", err);
-        alert("Could not access microphone: " + (err as Error).message);
+        alert(t("micAccessError", { message: (err as Error).message }));
       }
     }
   };
@@ -316,7 +354,7 @@ function BroadcastControls({
         const audioTracks = stream.getAudioTracks();
         if (audioTracks.length === 0) {
           stream.getTracks().forEach((track) => track.stop());
-          alert("No audio track selected. Make sure to check the 'Share tab audio' checkbox in the system sharing prompt.");
+          alert(t("noTabAudio"));
           return;
         }
 
@@ -356,7 +394,7 @@ function BroadcastControls({
       } catch (err) {
         console.error("Failed to capture tab audio:", err);
         if ((err as Error).name !== "NotAllowedError") {
-          alert("Could not capture tab audio: " + (err as Error).message);
+          alert(t("tabAudioError", { message: (err as Error).message }));
         }
       }
     }
@@ -377,13 +415,13 @@ function BroadcastControls({
   };
 
   const isAudioActive = isMicEnabled || isTabAudioEnabled;
-  let statusText = "Muted";
+  let statusText = t("muted");
   if (isMicEnabled && isTabAudioEnabled) {
-    statusText = "Live (Mic + Tab)";
+    statusText = t("liveMicTab");
   } else if (isMicEnabled) {
-    statusText = "Live (Mic)";
+    statusText = t("liveMic");
   } else if (isTabAudioEnabled) {
-    statusText = "Live (Tab)";
+    statusText = t("liveTab");
   }
 
   return (
@@ -391,7 +429,7 @@ function BroadcastControls({
       {/* Header */}
       <div style={{ marginBottom: 48 }}>
         <h1 className="display display-lg" style={{ marginBottom: 8 }}>
-          Broadcasting
+          {t("title")}
         </h1>
         <p className="mono">{sessionId}</p>
       </div>
@@ -447,13 +485,13 @@ function BroadcastControls({
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                Screen Awake
+                {t("screenAwake")}
               </span>
             )}
           </div>
 
           <span className="mono">
-            {listenerCount} listener{listenerCount !== 1 ? "s" : ""}
+            {t("listenerCount", { count: listenerCount })}
           </span>
         </div>
 
@@ -470,7 +508,7 @@ function BroadcastControls({
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 500, fontSize: "14px" }}>Microphone</span>
+              <span style={{ fontWeight: 500, fontSize: "14px" }}>{t("microphone")}</span>
               <button
                 onClick={toggleMicrophone}
                 className="btn"
@@ -483,12 +521,12 @@ function BroadcastControls({
                   cursor: "pointer",
                 }}
               >
-                {isMicEnabled ? "Disable" : "Enable"}
+                {isMicEnabled ? t("disable") : t("enable")}
               </button>
             </div>
             {isMicEnabled && (
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>Vol</span>
+                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>{t("volume")}</span>
                 <input
                   type="range"
                   min="0"
@@ -516,7 +554,7 @@ function BroadcastControls({
             }}
           >
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 500, fontSize: "14px" }}>Browser Tab Audio</span>
+              <span style={{ fontWeight: 500, fontSize: "14px" }}>{t("browserTabAudio")}</span>
               <button
                 onClick={toggleTabAudio}
                 className="btn"
@@ -529,12 +567,12 @@ function BroadcastControls({
                   cursor: "pointer",
                 }}
               >
-                {isTabAudioEnabled ? "Stop Sharing" : "Share Tab"}
+                {isTabAudioEnabled ? t("stopSharing") : t("shareTab")}
               </button>
             </div>
             {isTabAudioEnabled && (
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>Vol</span>
+                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>{t("volume")}</span>
                 <input
                   type="range"
                   min="0"
@@ -564,8 +602,8 @@ function BroadcastControls({
           gap: 16,
         }}
       >
-        <span className="label">Share with attendees</span>
-        <SessionQRCode url={joinUrl} size={140} />
+        <span className="label">{t("shareWithAttendees")}</span>
+        <SessionQRCode url={joinUrl || joinPath} size={140} />
         <p className="mono" style={{ wordBreak: "break-all", textAlign: "center" }}>
           {joinUrl}
         </p>
@@ -576,31 +614,31 @@ function BroadcastControls({
       {/* Active translations */}
       <div style={{ padding: "28px 0" }}>
         <span className="label" style={{ marginBottom: 16, display: "block" }}>
-          Translations · {translations.length}
+          {t("translationsCount", { count: translations.length })}
         </span>
 
         {translations.length === 0 ? (
           <p className="body-sm italic">
-            None yet — attendees can request them
+            {t("noTranslations")}
           </p>
         ) : (
-          translations.map((t) => {
-            const lang = getLanguageByCode(t.language);
+          translations.map((translation) => {
+            const lang = getLanguageByCode(translation.language);
             return (
-              <div key={t.language} className="lang-row">
+              <div key={translation.language} className="lang-row">
                 <div className="lang-row-left">
                   <span className="lang-flag">{lang?.flag || "🌐"}</span>
                   <span className="lang-name">
-                    {lang?.name || t.language.toUpperCase()}
+                    {lang?.name || translation.language.toUpperCase()}
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <span className="lang-meta">
-                    {t.subscriberCount} listener{t.subscriberCount !== 1 ? "s" : ""}
+                    {t("listenerCount", { count: translation.subscriberCount })}
                   </span>
-                  <span className={`status status--${t.status === "active" ? "active" : "waiting"}`}>
+                  <span className={`status status--${translation.status === "active" ? "active" : "waiting"}`}>
                     <span className="status-dot pulse" />
-                    {t.status}
+                    {translation.status}
                   </span>
                 </div>
               </div>
@@ -624,11 +662,11 @@ function BroadcastControls({
               console.error("Failed to explicitly delete session on broadcast end:", err);
             }
             room.disconnect();
-            window.location.href = "/";
+            router.push("/");
           }}
           style={{ width: "100%" }}
         >
-          End broadcast
+          {t("endBroadcast")}
         </button>
       </div>
     </div>
@@ -638,8 +676,10 @@ function BroadcastControls({
 export default function BroadcastPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }) {
+  const t = useTranslations("Broadcast");
+  const router = useRouter();
   const { id: sessionId } = use(params);
   const [token, setToken] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
@@ -667,7 +707,7 @@ export default function BroadcastPage({
       }
       
       if (!res.ok || data.error) {
-        throw new Error(data.error || "Failed to fetch token");
+        throw new Error(data.error || t("fetchTokenError"));
       }
       
       if (pass) {
@@ -681,11 +721,14 @@ export default function BroadcastPage({
       setError((err as Error).message);
       return false;
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   useEffect(() => {
     const cachedPass = sessionStorage.getItem("broadcast_password") || "";
-    fetchToken(cachedPass);
+    const initialFetch = window.setTimeout(() => {
+      fetchToken(cachedPass);
+    }, 0);
+    return () => clearTimeout(initialFetch);
   }, [fetchToken]);
 
   const handlePasswordSubmit = async (e: FormEvent) => {
@@ -695,7 +738,7 @@ export default function BroadcastPage({
     const success = await fetchToken(localPassword);
     setVerifying(false);
     if (!success && !error) {
-      setPasswordError("Incorrect password");
+      setPasswordError(t("incorrectPassword"));
     }
   };
 
@@ -704,17 +747,17 @@ export default function BroadcastPage({
       <div className="page enter">
         <div className="container" style={{ textAlign: "center" }}>
           <h1 className="display display-md" style={{ marginBottom: 12 }}>
-            <em>Password</em> Required
+            <em>{t("password")}</em> {t("required")}
           </h1>
           <p className="body-sm" style={{ marginBottom: 32 }}>
-            This broadcast session is password-protected.
+            {t("passwordProtected")}
           </p>
           <form onSubmit={handlePasswordSubmit}>
             <div style={{ marginBottom: 20 }}>
               <input
                 type="password"
                 className="input-field"
-                placeholder="Enter password"
+                placeholder={t("passwordPlaceholder")}
                 value={localPassword}
                 onChange={(e) => setLocalPassword(e.target.value)}
                 style={{ textAlign: "center" }}
@@ -733,15 +776,15 @@ export default function BroadcastPage({
               style={{ width: "100%" }}
               disabled={verifying}
             >
-              {verifying ? "Verifying…" : "Submit"}
+              {verifying ? t("verifying") : t("submit")}
             </button>
           </form>
           <button
             className="btn btn-ghost"
-            onClick={() => (window.location.href = "/")}
+            onClick={() => router.push("/")}
             style={{ marginTop: 16 }}
           >
-            Cancel
+            {t("cancel")}
           </button>
         </div>
       </div>
@@ -753,11 +796,11 @@ export default function BroadcastPage({
       <div className="page">
         <div className="container" style={{ textAlign: "center" }}>
           <p className="display display-md" style={{ marginBottom: 16 }}>
-            Something went wrong
+            {t("somethingWentWrong")}
           </p>
           <p className="body-sm" style={{ marginBottom: 32 }}>{error}</p>
-          <button className="btn btn-outline" onClick={() => (window.location.href = "/")}>
-            Go home
+          <button className="btn btn-outline" onClick={() => router.push("/")}>
+            {t("goHome")}
           </button>
         </div>
       </div>
@@ -790,7 +833,7 @@ export default function BroadcastPage({
         }}
         onDisconnected={() => {
           if (!isEndingRef.current) {
-            setError("Disconnected from LiveKit room. Please check your credentials or network connection.");
+            setError(t("disconnectError"));
           }
         }}
       >

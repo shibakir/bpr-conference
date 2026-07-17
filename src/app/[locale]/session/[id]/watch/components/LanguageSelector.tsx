@@ -1,22 +1,7 @@
-/**
- * Copyright 2026 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useTranslations } from "next-intl";
 import { SUPPORTED_LANGUAGES, getLanguageByCode } from "@/lib/languages";
 
 interface LanguageSelectorProps {
@@ -37,6 +22,7 @@ export default function LanguageSelector({
   disabled = false,
   allowedLanguages,
 }: LanguageSelectorProps) {
+  const t = useTranslations("LanguageSelector");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const activeLanguageRef = useRef(currentLanguage);
@@ -105,7 +91,7 @@ export default function LanguageSelector({
         const data = await res.json();
 
         if (!res.ok) {
-          throw new Error(data.error || "Translation request failed");
+          throw new Error(data.error || t("translationError"));
         }
 
         onLanguageChange(langCode, data.translatorIdentity);
@@ -116,7 +102,7 @@ export default function LanguageSelector({
         setLoading(false);
       }
     },
-    [sessionId, onLanguageChange]
+    [sessionId, onLanguageChange, t]
   );
 
   const currentLang = getLanguageByCode(currentLanguage);
@@ -128,7 +114,7 @@ export default function LanguageSelector({
   return (
     <div style={{ width: "100%" }}>
       <label htmlFor="language-select" className="label" style={{ display: "block", marginBottom: 10 }}>
-        Language
+        {t("language")}
       </label>
 
       <div style={{ position: "relative" }}>
@@ -143,8 +129,8 @@ export default function LanguageSelector({
             cursor: (loading || disabled) ? "not-allowed" : "pointer",
           }}
         >
-          <option value="original">Original audio</option>
-          <optgroup label="Translations">
+          <option value="original">{t("originalAudio")}</option>
+          <optgroup label={t("translations")}>
             {visibleLanguages.map((lang) => (
               <option key={lang.code} value={lang.code}>
                 {lang.name} {lang.flag}
@@ -165,14 +151,14 @@ export default function LanguageSelector({
         {currentLanguage !== "original" && currentLang && !loading && (
           <span className="status status--active">
             <span className="status-dot pulse" />
-            Translating to {currentLang.name}
+            {t("translatingTo", { language: currentLang.name })}
           </span>
         )}
 
         {loading && (
           <span className="status status--waiting">
             <span className="status-dot pulse" />
-            Starting translation…
+            {t("startingTranslation")}
           </span>
         )}
 

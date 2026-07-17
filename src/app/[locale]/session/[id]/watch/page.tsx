@@ -1,19 +1,3 @@
-/**
- * Copyright 2026 Google LLC
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 "use client";
 
 import { useEffect, useState, useCallback, useRef, use } from "react";
@@ -24,7 +8,8 @@ import {
   useTracks,
 } from "@livekit/components-react";
 import "@livekit/components-styles";
-import { Track, RoomEvent } from "livekit-client";
+import { Track, RoomEvent, type RemoteParticipant } from "livekit-client";
+import { useTranslations } from "next-intl";
 import LanguageSelector from "./components/LanguageSelector";
 
 interface TranscriptEntry {
@@ -34,6 +19,12 @@ interface TranscriptEntry {
   final: boolean;
   timestamp: number;
 }
+
+type NavigatorWithWakeLock = Navigator & {
+  wakeLock: {
+    request: (type: "screen") => Promise<WakeLockSentinel>;
+  };
+};
 
 function splitIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] {
   // A sentence ends with a punctuation mark (. ? !) followed by space or end of string.
@@ -68,16 +59,29 @@ function splitIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] 
 }
 
 function AttendeeView({ sessionId }: { sessionId: string }) {
+  const t = useTranslations("Watch");
   const room = useRoomContext();
   const [currentLanguage, setCurrentLanguage] = useState("original");
   const [translatorIdentity, setTranslatorIdentity] = useState<string | null>(
     null
   );
-  const [isReceivingAudio, setIsReceivingAudio] = useState(false);
   const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
   const currentLanguageRef = useRef(currentLanguage);
   const audioTracks = useTracks([Track.Source.Microphone]);
+  const isReceivingAudio = audioTracks.some((trackRef) => {
+    const pub = trackRef.publication;
+    if (currentLanguage === "original") {
+      return trackRef.participant.identity.startsWith("organizer-") && pub.isSubscribed && !pub.isMuted;
+    }
+
+    return (
+      translatorIdentity &&
+      trackRef.participant.identity === translatorIdentity &&
+      pub.isSubscribed &&
+      !pub.isMuted
+    );
+  });
 
   const [allowedLanguages, setAllowedLanguages] = useState<string[] | undefined>(undefined);
 
@@ -131,11 +135,11 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       return;
     }
 
-    let wakeLock: any = null;
+    let wakeLock: WakeLockSentinel | null = null;
 
     async function requestWakeLock() {
       try {
-        wakeLock = await (navigator as any).wakeLock.request("screen");
+        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request("screen");
         setIsWakeLockActive(true);
         
         wakeLock.addEventListener("release", () => {
@@ -159,7 +163,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       if (wakeLock) {
-        wakeLock.release().catch((err: any) => {
+        wakeLock.release().catch((err: unknown) => {
           console.error("Failed to release Screen Wake Lock:", err);
         });
       }
@@ -259,7 +263,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     room.on(RoomEvent.TrackUnpublished, handleUpdate);
     
     // Only run update if the participant that joined is the organizer or our translator bot
-    const handleParticipantConnected = (participant: any) => {
+    const handleParticipantConnected = (participant: RemoteParticipant) => {
       const isOrganizer = participant.identity.startsWith("organizer-");
       const isSelectedTranslator =
         translatorIdentity && participant.identity === translatorIdentity;
@@ -296,23 +300,6 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       room.off(RoomEvent.Connected, setLanguageAttr);
     };
   }, [room, currentLanguage]);
-
-  useEffect(() => {
-    const hasAudio = audioTracks.some((t) => {
-      const pub = t.publication;
-      if (currentLanguage === "original") {
-        return t.participant.identity.startsWith("organizer-") && pub.isSubscribed && !pub.isMuted;
-      } else {
-        return (
-          translatorIdentity &&
-          t.participant.identity === translatorIdentity &&
-          pub.isSubscribed &&
-          !pub.isMuted
-        );
-      }
-    });
-    setIsReceivingAudio(hasAudio);
-  }, [audioTracks, currentLanguage, translatorIdentity]);
 
   // Unsubscribe from translation when tab closes
   useEffect(() => {
@@ -409,7 +396,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       {/* Header */}
       <div style={{ marginBottom: 40 }}>
         <h1 className="display display-lg" style={{ marginBottom: 8 }}>
-          <em>Listening</em>
+          <em>{t("title")}</em>
         </h1>
         <p className="mono">{sessionId}</p>
       </div>
@@ -434,13 +421,13 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
               <span className="status status--active">
                 <span className="status-dot pulse" />
                 {currentLanguage === "original"
-                  ? "Original"
+                  ? t("original")
                   : currentLanguage.toUpperCase()}
               </span>
             ) : (
               <span className="status status--waiting">
                 <span className="status-dot pulse" />
-                Waiting for broadcast
+                {t("waitingForBroadcast")}
               </span>
             )}
 
@@ -471,7 +458,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
                   <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                 </svg>
-                Screen Awake
+                {t("screenAwake")}
               </span>
             )}
           </div>
@@ -503,7 +490,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
             marginBottom: 16,
           }}
         >
-          <span className="label">Transcription</span>
+          <span className="label">{t("transcription")}</span>
           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               onClick={decreaseFontSize}
@@ -519,7 +506,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
                 opacity: fontSize <= 12 ? 0.4 : 1,
                 transition: "all 0.2s ease",
               }}
-              title="Decrease font size"
+              title={t("decreaseFontSize")}
             >
               A-
             </button>
@@ -537,7 +524,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
                 opacity: fontSize >= 28 ? 0.4 : 1,
                 transition: "all 0.2s ease",
               }}
-              title="Increase font size"
+              title={t("increaseFontSize")}
             >
               A+
             </button>
@@ -554,8 +541,8 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           {transcripts.length === 0 ? (
             <p className="body-sm italic">
               {currentLanguage === "original"
-                ? "Select a language to see transcription"
-                : "Waiting for translated speech…"}
+                ? t("selectLanguageForTranscription")
+                : t("waitingForSpeech")}
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -589,7 +576,18 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       <hr className="rule" />
 
       <p className="body-sm" style={{ paddingTop: 28 }}>
-        Translation generated by <a href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-live-3-5-translate/" target="_blank" rel="noopener noreferrer" style={{ textDecoration: "underline", color: "inherit" }}>Gemini 3.5 Live Translate</a> in real-time.
+        {t.rich("generatedBy", {
+          link: (chunks) => (
+            <a
+              href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-live-3-5-translate/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{ textDecoration: "underline", color: "inherit" }}
+            >
+              {chunks}
+            </a>
+          ),
+        })}
       </p>
     </div>
   );
@@ -599,8 +597,9 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
 export default function WatchPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }) {
+  const t = useTranslations("Watch");
   const { id: sessionId } = use(params);
   const [token, setToken] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
@@ -631,14 +630,14 @@ export default function WatchPage({
       <div className="page">
         <div className="container" style={{ textAlign: "center" }}>
           <p className="display display-md" style={{ marginBottom: 16 }}>
-            {isInactiveSession ? "Broadcast Not Started" : "Something went wrong"}
+            {isInactiveSession ? t("broadcastNotStarted") : t("somethingWentWrong")}
           </p>
           <p className="body-sm" style={{ marginBottom: 32 }}>{error}</p>
           <button
             className="btn btn-outline"
             onClick={() => window.location.reload()}
           >
-            {isInactiveSession ? "Check Again" : "Retry"}
+            {isInactiveSession ? t("checkAgain") : t("retry")}
           </button>
         </div>
       </div>
@@ -650,7 +649,7 @@ export default function WatchPage({
       <div className="page">
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
           <div className="spinner" />
-          <p className="mono">Joining…</p>
+          <p className="mono">{t("joining")}</p>
         </div>
       </div>
     );
@@ -661,19 +660,19 @@ export default function WatchPage({
       <div className="page">
         <div className="container enter" style={{ textAlign: "center" }}>
           <h1 className="display display-lg" style={{ marginBottom: 12 }}>
-            <em>Ready</em>
+            <em>{t("ready")}</em>
           </h1>
           <p className="body-sm" style={{ marginBottom: 40 }}>
-            Tap below to join the broadcast and enable audio.
+            {t("readyCopy")}
           </p>
           <button
             className="btn"
             onClick={() => setStarted(true)}
           >
-            Start listening
+            {t("startListening")}
           </button>
           <p className="mono" style={{ marginTop: 32, fontSize: 12 }}>
-            Session {sessionId}
+            {t("session", { sessionId })}
           </p>
         </div>
       </div>
