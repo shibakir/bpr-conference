@@ -1,28 +1,62 @@
 "use client";
 
 import {
-  useEffect,
-  useState,
-  useCallback,
-  use,
-  useRef,
-  useSyncExternalStore,
   FormEvent,
+  ReactNode,
+  use,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
 } from "react";
-import {
-  LiveKitRoom,
-  useRoomContext,
-} from "@livekit/components-react";
+import { LiveKitRoom, useRoomContext } from "@livekit/components-react";
 import "@livekit/components-styles";
-import {
-  Track,
-  RoomEvent,
-  type LocalTrackPublication,
-} from "livekit-client";
+import { Track, RoomEvent, type LocalTrackPublication } from "livekit-client";
 import { useLocale, useTranslations } from "next-intl";
+import {
+  AlertTriangleIcon,
+  HomeIcon,
+  LockKeyholeIcon,
+  LogInIcon,
+  MicIcon,
+  PowerIcon,
+  QrCodeIcon,
+  ScreenShareIcon,
+  UsersIcon,
+} from "lucide-react";
 import SessionQRCode from "@/components/SessionQRCode";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { Spinner } from "@/components/ui/spinner";
 import { getPathname, useRouter } from "@/i18n/navigation";
 import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
+import { cn } from "@/lib/utils";
 
 interface TranslationInfo {
   language: string;
@@ -54,6 +88,68 @@ type WindowWithWebkitAudioContext = Window &
     webkitAudioContext?: typeof AudioContext;
   };
 
+function AudioInputCard({
+  title,
+  enabled,
+  volume,
+  actionLabel,
+  stopLabel,
+  icon,
+  onToggle,
+  onVolumeChange,
+}: {
+  title: string;
+  enabled: boolean;
+  volume: number;
+  actionLabel: string;
+  stopLabel: string;
+  icon: ReactNode;
+  onToggle: () => void;
+  onVolumeChange: (value: number) => void;
+}) {
+  const t = useTranslations("Broadcast");
+
+  return (
+    <Card size="sm">
+      <CardHeader className="items-center">
+        <CardTitle className="flex items-center gap-2">
+          {icon}
+          {title}
+        </CardTitle>
+        <CardAction>
+          <Button
+            type="button"
+            variant={enabled ? "destructive" : "default"}
+            size="sm"
+            onClick={onToggle}
+          >
+            {enabled ? stopLabel : actionLabel}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      {enabled && (
+        <CardContent>
+          <div className="grid grid-cols-[2.5rem_1fr_3rem] items-center gap-3">
+            <span className="font-mono text-xs text-muted-foreground">
+              {t("volume")}
+            </span>
+            <Slider
+              value={[volume]}
+              min={0}
+              max={100}
+              step={1}
+              onValueChange={(value) => onVolumeChange(value[0] ?? 0)}
+            />
+            <span className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+              {volume}%
+            </span>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
 function BroadcastControls({
   sessionId,
   onEndBroadcast,
@@ -73,13 +169,12 @@ function BroadcastControls({
     getServerOrigin
   );
 
-  // Track active attendees count without useRemoteParticipants hook overhead
   useEffect(() => {
     if (!room) return;
 
     const updateCount = () => {
       const count = Array.from(room.remoteParticipants.values()).filter(
-        (p) => !p.identity.startsWith("translator-")
+        (participant) => !participant.identity.startsWith("translator-")
       ).length;
       setListenerCount(count);
     };
@@ -94,14 +189,12 @@ function BroadcastControls({
     };
   }, [room]);
 
-  // Custom audio mixer states
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isTabAudioEnabled, setIsTabAudioEnabled] = useState(false);
   const [micVolume, setMicVolume] = useState(100);
   const [tabVolume, setTabVolume] = useState(100);
   const [isWakeLockActive, setIsWakeLockActive] = useState(false);
 
-  // Manage Screen Wake Lock to prevent the phone/device from sleeping during broadcast
   useEffect(() => {
     if (typeof window === "undefined" || !("wakeLock" in navigator)) {
       return;
@@ -111,9 +204,11 @@ function BroadcastControls({
 
     async function requestWakeLock() {
       try {
-        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request("screen");
+        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request(
+          "screen"
+        );
         setIsWakeLockActive(true);
-        
+
         wakeLock.addEventListener("release", () => {
           setIsWakeLockActive(false);
         });
@@ -142,7 +237,6 @@ function BroadcastControls({
     };
   }, []);
 
-  // References to keep Web Audio API elements alive
   const audioContextRef = useRef<AudioContext | null>(null);
   const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const micStreamRef = useRef<MediaStream | null>(null);
@@ -158,8 +252,7 @@ function BroadcastControls({
     locale,
   });
 
-  const joinUrl =
-    origin ? `${origin}${joinPath}` : joinPath;
+  const joinUrl = origin ? `${origin}${joinPath}` : joinPath;
 
   const fetchTranslations = useCallback(async () => {
     try {
@@ -180,7 +273,6 @@ function BroadcastControls({
     };
   }, [fetchTranslations]);
 
-  // Main AudioContext and track publishing lifecycle
   useEffect(() => {
     if (!room || !room.localParticipant) return;
 
@@ -213,7 +305,10 @@ function BroadcastControls({
           publishedTrackPubRef.current = pub;
           localPub = pub;
           await pub.mute();
-          console.log("Published and initially muted mixed audio track:", pub.trackSid);
+          console.log(
+            "Published and initially muted mixed audio track:",
+            pub.trackSid
+          );
         }
       } catch (err) {
         console.error("Failed to initialize client audio mixer:", err);
@@ -229,8 +324,7 @@ function BroadcastControls({
           console.error("Failed to unpublish mixed track:", err);
         });
       }
-      
-      // Stop all streams and close AudioContext
+
       if (micStreamRef.current) {
         micStreamRef.current.getTracks().forEach((track) => track.stop());
         micStreamRef.current = null;
@@ -264,19 +358,24 @@ function BroadcastControls({
     };
   }, [room, room?.localParticipant]);
 
-  // Synchronize muted status of the published track with active inputs
   useEffect(() => {
     const pub = publishedTrackPubRef.current;
     if (!pub) return;
 
     const hasActiveInput = isMicEnabled || isTabAudioEnabled;
     if (hasActiveInput) {
-      pub.unmute()
-        .then(() => console.log("[BroadcastControls] Unmuted broadcast-audio track"))
+      pub
+        .unmute()
+        .then(() =>
+          console.log("[BroadcastControls] Unmuted broadcast-audio track")
+        )
         .catch((err: unknown) => console.error("Failed to unmute track:", err));
     } else {
-      pub.mute()
-        .then(() => console.log("[BroadcastControls] Muted broadcast-audio track"))
+      pub
+        .mute()
+        .then(() =>
+          console.log("[BroadcastControls] Muted broadcast-audio track")
+        )
         .catch((err: unknown) => console.error("Failed to mute track:", err));
     }
   }, [isMicEnabled, isTabAudioEnabled]);
@@ -303,7 +402,9 @@ function BroadcastControls({
     } else {
       try {
         await ctx.resume();
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+        });
         micStreamRef.current = stream;
 
         const source = ctx.createMediaStreamSource(stream);
@@ -403,15 +504,32 @@ function BroadcastControls({
   const handleMicVolumeChange = (vol: number) => {
     setMicVolume(vol);
     if (micGainNodeRef.current && audioContextRef.current) {
-      micGainNodeRef.current.gain.setValueAtTime(vol / 100, audioContextRef.current.currentTime);
+      micGainNodeRef.current.gain.setValueAtTime(
+        vol / 100,
+        audioContextRef.current.currentTime
+      );
     }
   };
 
   const handleTabVolumeChange = (vol: number) => {
     setTabVolume(vol);
     if (tabGainNodeRef.current && audioContextRef.current) {
-      tabGainNodeRef.current.gain.setValueAtTime(vol / 100, audioContextRef.current.currentTime);
+      tabGainNodeRef.current.gain.setValueAtTime(
+        vol / 100,
+        audioContextRef.current.currentTime
+      );
     }
+  };
+
+  const endBroadcast = async () => {
+    onEndBroadcast();
+    try {
+      await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+    } catch (err) {
+      console.error("Failed to explicitly delete session on broadcast end:", err);
+    }
+    room.disconnect();
+    router.push("/");
   };
 
   const isAudioActive = isMicEnabled || isTabAudioEnabled;
@@ -425,253 +543,178 @@ function BroadcastControls({
   }
 
   return (
-    <div className="container enter">
-      {/* Header */}
-      <div style={{ marginBottom: 48 }}>
-        <h1 className="display display-lg" style={{ marginBottom: 8 }}>
+    <div className="w-full max-w-xl space-y-6">
+      <header className="space-y-1">
+        <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
           {t("title")}
         </h1>
-        <p className="mono">{sessionId}</p>
+        <p className="font-mono text-xs text-muted-foreground">{sessionId}</p>
+      </header>
+
+      <section className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className={`waveform ${isAudioActive ? "active" : "idle"}`}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="waveform-bar" />
+            ))}
+          </div>
+          <Badge
+            variant="outline"
+            className={cn(
+              "gap-1",
+              isAudioActive
+                ? "border-success/30 text-success"
+                : "text-muted-foreground"
+            )}
+          >
+            <span
+              className={cn(
+                "size-1.5 rounded-full bg-current",
+                isAudioActive && "animate-pulse"
+              )}
+            />
+            {statusText}
+          </Badge>
+
+          {isWakeLockActive && (
+            <Badge variant="secondary" className="gap-1">
+              <LockKeyholeIcon className="size-3" />
+              {t("screenAwake")}
+            </Badge>
+          )}
+        </div>
+
+        <Badge variant="outline" className="gap-1">
+          <UsersIcon className="size-3" />
+          {t("listenerCount", { count: listenerCount })}
+        </Badge>
+      </section>
+
+      <div className="grid gap-3">
+        <AudioInputCard
+          title={t("microphone")}
+          enabled={isMicEnabled}
+          volume={micVolume}
+          actionLabel={t("enable")}
+          stopLabel={t("disable")}
+          icon={<MicIcon className="size-4 text-muted-foreground" />}
+          onToggle={toggleMicrophone}
+          onVolumeChange={handleMicVolumeChange}
+        />
+        <AudioInputCard
+          title={t("browserTabAudio")}
+          enabled={isTabAudioEnabled}
+          volume={tabVolume}
+          actionLabel={t("shareTab")}
+          stopLabel={t("stopSharing")}
+          icon={<ScreenShareIcon className="size-4 text-muted-foreground" />}
+          onToggle={toggleTabAudio}
+          onVolumeChange={handleTabVolumeChange}
+        />
       </div>
 
-      {/* Audio Inputs */}
-      <div style={{ marginBottom: 40 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 20,
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div className={`waveform ${isAudioActive ? "active" : "idle"}`}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="waveform-bar" />
-              ))}
-            </div>
-            <span
-              className="status"
-              style={{ color: isAudioActive ? "var(--success)" : "var(--fg-ghost)" }}
-            >
-              <span className={`status-dot ${isAudioActive ? "pulse" : ""}`} />
-              {statusText}
-            </span>
+      <Separator />
 
-            {isWakeLockActive && (
-              <span
-                className="status status--active"
-                style={{
-                  marginLeft: 12,
-                  padding: "4px 8px",
-                  background: "var(--success-soft)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "4px",
-                  fontSize: "11px",
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ marginRight: 4, verticalAlign: "middle" }}
-                >
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                {t("screenAwake")}
-              </span>
-            )}
-          </div>
+      <section className="flex flex-col items-center gap-4 text-center">
+        <Badge variant="outline" className="gap-1">
+          <QrCodeIcon className="size-3" />
+          {t("shareWithAttendees")}
+        </Badge>
+        <SessionQRCode url={joinUrl || joinPath} size={140} />
+        <p className="break-all font-mono text-xs leading-5 text-muted-foreground">
+          {joinUrl}
+        </p>
+      </section>
 
-          <span className="mono">
-            {t("listenerCount", { count: listenerCount })}
+      <Separator />
+
+      <section className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t("translationsCount", { count: translations.length })}
           </span>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-          {/* Microphone Box */}
-          <div
-            style={{
-              padding: "16px",
-              border: "1px solid var(--border)",
-              background: "var(--bg-elevated)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 500, fontSize: "14px" }}>{t("microphone")}</span>
-              <button
-                onClick={toggleMicrophone}
-                className="btn"
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "12px",
-                  border: isMicEnabled ? "1px solid var(--error)" : "none",
-                  background: isMicEnabled ? "transparent" : "var(--fg)",
-                  color: isMicEnabled ? "var(--error)" : "var(--bg)",
-                  cursor: "pointer",
-                }}
-              >
-                {isMicEnabled ? t("disable") : t("enable")}
-              </button>
-            </div>
-            {isMicEnabled && (
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>{t("volume")}</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={micVolume}
-                  onChange={(e) => handleMicVolumeChange(Number(e.target.value))}
-                  style={{ flexGrow: 1, accentColor: "var(--fg)", cursor: "pointer" }}
-                />
-                <span className="mono" style={{ width: "40px", textAlign: "right", fontSize: "11px" }}>
-                  {micVolume}%
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Browser Tab Audio Box */}
-          <div
-            style={{
-              padding: "16px",
-              border: "1px solid var(--border)",
-              background: "var(--bg-elevated)",
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 500, fontSize: "14px" }}>{t("browserTabAudio")}</span>
-              <button
-                onClick={toggleTabAudio}
-                className="btn"
-                style={{
-                  padding: "8px 16px",
-                  fontSize: "12px",
-                  border: isTabAudioEnabled ? "1px solid var(--error)" : "none",
-                  background: isTabAudioEnabled ? "transparent" : "var(--fg)",
-                  color: isTabAudioEnabled ? "var(--error)" : "var(--bg)",
-                  cursor: "pointer",
-                }}
-              >
-                {isTabAudioEnabled ? t("stopSharing") : t("shareTab")}
-              </button>
-            </div>
-            {isTabAudioEnabled && (
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span className="mono" style={{ width: "32px", fontSize: "11px" }}>{t("volume")}</span>
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={tabVolume}
-                  onChange={(e) => handleTabVolumeChange(Number(e.target.value))}
-                  style={{ flexGrow: 1, accentColor: "var(--fg)", cursor: "pointer" }}
-                />
-                <span className="mono" style={{ width: "40px", textAlign: "right", fontSize: "11px" }}>
-                  {tabVolume}%
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <hr className="rule" />
-
-      {/* QR code */}
-      <div
-        style={{
-          padding: "32px 0",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 16,
-        }}
-      >
-        <span className="label">{t("shareWithAttendees")}</span>
-        <SessionQRCode url={joinUrl || joinPath} size={140} />
-        <p className="mono" style={{ wordBreak: "break-all", textAlign: "center" }}>
-          {joinUrl}
-        </p>
-      </div>
-
-      <hr className="rule" />
-
-      {/* Active translations */}
-      <div style={{ padding: "28px 0" }}>
-        <span className="label" style={{ marginBottom: 16, display: "block" }}>
-          {t("translationsCount", { count: translations.length })}
-        </span>
-
         {translations.length === 0 ? (
-          <p className="body-sm italic">
+          <p className="text-sm italic text-muted-foreground">
             {t("noTranslations")}
           </p>
         ) : (
-          translations.map((translation) => {
-            const lang = getLanguageByCode(translation.language);
-            const languageName = lang
-              ? getLanguageDisplayName(lang, locale)
-              : translation.language.toUpperCase();
-            return (
-              <div key={translation.language} className="lang-row">
-                <div className="lang-row-left">
-                  <span className="lang-flag">{lang?.flag || "🌐"}</span>
-                  <span className="lang-name">
-                    {languageName}
-                  </span>
+          <div className="rounded-lg border bg-card">
+            {translations.map((translation, index) => {
+              const lang = getLanguageByCode(translation.language);
+              const languageName = lang
+                ? getLanguageDisplayName(lang, locale)
+                : translation.language.toUpperCase();
+              const active = translation.status === "active";
+
+              return (
+                <div
+                  key={translation.language}
+                  className={cn(
+                    "flex items-center justify-between gap-3 p-3",
+                    index !== translations.length - 1 && "border-b"
+                  )}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    {lang?.flag && <span className="text-base">{lang.flag}</span>}
+                    <span className="truncate text-sm font-medium">
+                      {languageName}
+                    </span>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {t("listenerCount", {
+                        count: translation.subscriberCount,
+                      })}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={cn(
+                        "gap-1",
+                        active
+                          ? "border-success/30 text-success"
+                          : "border-warning/30 text-warning"
+                      )}
+                    >
+                      <span className="size-1.5 rounded-full bg-current animate-pulse" />
+                      {translation.status}
+                    </Badge>
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span className="lang-meta">
-                    {t("listenerCount", { count: translation.subscriberCount })}
-                  </span>
-                  <span className={`status status--${translation.status === "active" ? "active" : "waiting"}`}>
-                    <span className="status-dot pulse" />
-                    {translation.status}
-                  </span>
-                </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
-      </div>
+      </section>
 
-      <hr className="rule" />
+      <Separator />
 
-      {/* End */}
-      <div style={{ paddingTop: 28 }}>
-        <button
-          className="btn-danger"
-          onClick={async () => {
-            onEndBroadcast();
-            try {
-              // Explicitly notify server that broadcast is ended to stop all translator bots
-              await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
-            } catch (err) {
-              console.error("Failed to explicitly delete session on broadcast end:", err);
-            }
-            room.disconnect();
-            router.push("/");
-          }}
-          style={{ width: "100%" }}
-        >
-          {t("endBroadcast")}
-        </button>
-      </div>
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" className="w-full">
+            <PowerIcon />
+            {t("endBroadcast")}
+          </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogMedia>
+              <PowerIcon />
+            </AlertDialogMedia>
+            <AlertDialogTitle>{t("confirmEndTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("confirmEndDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={endBroadcast}>
+              {t("endBroadcast")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -697,34 +740,40 @@ export default function BroadcastPage({
     isEndingRef.current = true;
   }, []);
 
-  const fetchToken = useCallback(async (pass: string) => {
-    try {
-      const identity = `organizer-host`;
-      const url = `/api/token?room=${sessionId}&identity=${identity}&role=organizer${pass ? `&password=${encodeURIComponent(pass)}` : ""}`;
-      const res = await fetch(url);
-      const data = await res.json();
-      
-      if (res.status === 401) {
-        setPasswordPromptRequired(true);
+  const fetchToken = useCallback(
+    async (pass: string) => {
+      try {
+        const identity = "organizer-host";
+        const passwordParam = pass
+          ? `&password=${encodeURIComponent(pass)}`
+          : "";
+        const url = `/api/token?room=${sessionId}&identity=${identity}&role=organizer${passwordParam}`;
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (res.status === 401) {
+          setPasswordPromptRequired(true);
+          return false;
+        }
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || t("fetchTokenError"));
+        }
+
+        if (pass) {
+          sessionStorage.setItem("broadcast_password", pass);
+        }
+        setToken(data.token);
+        setLivekitUrl(data.serverUrl);
+        setPasswordPromptRequired(false);
+        return true;
+      } catch (err) {
+        setError((err as Error).message);
         return false;
       }
-      
-      if (!res.ok || data.error) {
-        throw new Error(data.error || t("fetchTokenError"));
-      }
-      
-      if (pass) {
-        sessionStorage.setItem("broadcast_password", pass);
-      }
-      setToken(data.token);
-      setLivekitUrl(data.serverUrl);
-      setPasswordPromptRequired(false);
-      return true;
-    } catch (err) {
-      setError((err as Error).message);
-      return false;
-    }
-  }, [sessionId, t]);
+    },
+    [sessionId, t]
+  );
 
   useEffect(() => {
     const cachedPass = sessionStorage.getItem("broadcast_password") || "";
@@ -747,101 +796,119 @@ export default function BroadcastPage({
 
   if (passwordPromptRequired) {
     return (
-      <div className="page enter">
-        <div className="container" style={{ textAlign: "center" }}>
-          <h1 className="display display-md" style={{ marginBottom: 12 }}>
-            <em>{t("password")}</em> {t("required")}
-          </h1>
-          <p className="body-sm" style={{ marginBottom: 32 }}>
-            {t("passwordProtected")}
-          </p>
-          <form onSubmit={handlePasswordSubmit}>
-            <div style={{ marginBottom: 20 }}>
-              <input
-                type="password"
-                className="input-field"
-                placeholder={t("passwordPlaceholder")}
-                value={localPassword}
-                onChange={(e) => setLocalPassword(e.target.value)}
-                style={{ textAlign: "center" }}
-                disabled={verifying}
-                required
-              />
-            </div>
-            {passwordError && (
-              <p className="body-sm" style={{ color: "var(--error)", marginBottom: 20 }}>
-                {passwordError}
-              </p>
-            )}
-            <button
-              type="submit"
-              className="btn btn-dark"
-              style={{ width: "100%" }}
-              disabled={verifying}
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center gap-2 text-3xl">
+              <LockKeyholeIcon className="size-5" />
+              {t("password")} {t("required")}
+            </CardTitle>
+            <CardDescription>{t("passwordProtected")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4" onSubmit={handlePasswordSubmit}>
+              <div className="grid gap-2">
+                <Label htmlFor="broadcast-password">
+                  {t("passwordPlaceholder")}
+                </Label>
+                <Input
+                  id="broadcast-password"
+                  type="password"
+                  placeholder={t("passwordPlaceholder")}
+                  value={localPassword}
+                  onChange={(e) => setLocalPassword(e.target.value)}
+                  disabled={verifying}
+                  required
+                />
+              </div>
+
+              {passwordError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{passwordError}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" disabled={verifying} className="w-full">
+                {verifying ? (
+                  <>
+                    <Spinner />
+                    {t("verifying")}
+                  </>
+                ) : (
+                  <>
+                    <LogInIcon />
+                    {t("submit")}
+                  </>
+                )}
+              </Button>
+            </form>
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/")}
+              className="mt-2 w-full"
             >
-              {verifying ? t("verifying") : t("submit")}
-            </button>
-          </form>
-          <button
-            className="btn btn-ghost"
-            onClick={() => router.push("/")}
-            style={{ marginTop: 16 }}
-          >
-            {t("cancel")}
-          </button>
-        </div>
-      </div>
+              {t("cancel")}
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   if (error) {
     return (
-      <div className="page">
-        <div className="container" style={{ textAlign: "center" }}>
-          <p className="display display-md" style={{ marginBottom: 16 }}>
-            {t("somethingWentWrong")}
-          </p>
-          <p className="body-sm" style={{ marginBottom: 32 }}>{error}</p>
-          <button className="btn btn-outline" onClick={() => router.push("/")}>
-            {t("goHome")}
-          </button>
-        </div>
-      </div>
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-center gap-2">
+              <AlertTriangleIcon className="size-4 text-destructive" />
+              {t("somethingWentWrong")}
+            </CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => router.push("/")}
+              className="w-full"
+            >
+              <HomeIcon />
+              {t("goHome")}
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   if (!token || !livekitUrl) {
     return (
-      <div className="page">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div className="spinner" />
-        </div>
-      </div>
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <Spinner className="size-5 text-muted-foreground" />
+      </main>
     );
   }
 
   return (
-    <div className="page page-top">
+    <main className="min-h-svh px-4 py-10 sm:px-6">
       <LiveKitRoom
         video={false}
         audio={false}
         token={token}
         serverUrl={livekitUrl}
         options={{ disconnectOnPageLeave: false }}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-        }}
+        className="flex w-full flex-col items-center"
         onDisconnected={() => {
           if (!isEndingRef.current) {
             setError(t("disconnectError"));
           }
         }}
       >
-        <BroadcastControls sessionId={sessionId} onEndBroadcast={handleEndBroadcast} />
+        <BroadcastControls
+          sessionId={sessionId}
+          onEndBroadcast={handleEndBroadcast}
+        />
       </LiveKitRoom>
-    </div>
+    </main>
   );
 }

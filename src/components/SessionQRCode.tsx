@@ -9,7 +9,7 @@ interface SessionQRCodeProps {
 
 export default function SessionQRCode({ url, size = 160 }: SessionQRCodeProps) {
   return (
-    <div className="qr-wrap">
+    <div className="inline-flex rounded-lg border bg-white p-3 shadow-xs">
       <QRCodeSVG
         value={url}
         size={size}

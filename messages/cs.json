@@ -5,6 +5,7 @@
   },
   "Home": {
     "title": "BPR Conference",
+    "liveTranslation": "Živý překlad",
     "subtitle": "Vysílejte svůj hlas. Účastníci si vyberou jazyk. Překlad se spustí podle potřeby.",
     "passwordPlaceholder": "Zadejte heslo pro vysílání",
     "eventPlaceholder": "ID události (volitelné, např. weekly-sync)",
@@ -44,6 +45,8 @@
     "translationsCount": "Překlady · {count}",
     "noTranslations": "Zatím žádné - účastníci si je mohou vyžádat",
     "endBroadcast": "Ukončit vysílání",
+    "confirmEndTitle": "Ukončit toto vysílání?",
+    "confirmEndDescription": "Tím se odpojí místnost a zastaví aktivní překladové session pro účastníky.",
     "password": "Heslo",
     "required": "vyžadováno",
     "passwordProtected": "Tato vysílací session je chráněna heslem.",

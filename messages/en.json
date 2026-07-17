@@ -5,6 +5,7 @@
   },
   "Home": {
     "title": "BPR Conference",
+    "liveTranslation": "Live translation",
     "subtitle": "Broadcast your voice. Attendees choose their language. Translation spins up on demand.",
     "passwordPlaceholder": "Enter broadcast password",
     "eventPlaceholder": "Event ID (optional, e.g. weekly-sync)",
@@ -44,6 +45,8 @@
     "translationsCount": "Translations · {count}",
     "noTranslations": "None yet - attendees can request them",
     "endBroadcast": "End broadcast",
+    "confirmEndTitle": "End this broadcast?",
+    "confirmEndDescription": "This will disconnect the room and stop active translator sessions for attendees.",
     "password": "Password",
     "required": "Required",
     "passwordProtected": "This broadcast session is password-protected.",

@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, use } from "react";
+import {
+  CSSProperties,
+  use,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -10,6 +17,27 @@ import {
 import "@livekit/components-styles";
 import { Track, RoomEvent, type RemoteParticipant } from "livekit-client";
 import { useTranslations } from "next-intl";
+import {
+  AlertTriangleIcon,
+  LockKeyholeIcon,
+  MinusIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  Volume2Icon,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import LanguageSelector from "./components/LanguageSelector";
 
 interface TranscriptEntry {
@@ -27,7 +55,6 @@ type NavigatorWithWakeLock = Navigator & {
 };
 
 function splitIntoParagraphs(text: string, sentencesPerParagraph = 2): string[] {
-  // A sentence ends with a punctuation mark (. ? !) followed by space or end of string.
   const sentenceRegex = /[^.!?]+[.!?]+(?:\s+|$)/g;
   const matches = text.match(sentenceRegex);
 
@@ -72,7 +99,11 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
   const isReceivingAudio = audioTracks.some((trackRef) => {
     const pub = trackRef.publication;
     if (currentLanguage === "original") {
-      return trackRef.participant.identity.startsWith("organizer-") && pub.isSubscribed && !pub.isMuted;
+      return (
+        trackRef.participant.identity.startsWith("organizer-") &&
+        pub.isSubscribed &&
+        !pub.isMuted
+      );
     }
 
     return (
@@ -83,7 +114,9 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     );
   });
 
-  const [allowedLanguages, setAllowedLanguages] = useState<string[] | undefined>(undefined);
+  const [allowedLanguages, setAllowedLanguages] = useState<
+    string[] | undefined
+  >(undefined);
 
   useEffect(() => {
     async function fetchSessionDetails() {
@@ -125,11 +158,8 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     setFontSize((prev) => Math.max(prev - 2, 12));
   };
 
-
-
   const [isWakeLockActive, setIsWakeLockActive] = useState(false);
 
-  // Manage Screen Wake Lock to prevent the phone/device from sleeping
   useEffect(() => {
     if (typeof window === "undefined" || !("wakeLock" in navigator)) {
       return;
@@ -139,9 +169,11 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
 
     async function requestWakeLock() {
       try {
-        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request("screen");
+        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request(
+          "screen"
+        );
         setIsWakeLockActive(true);
-        
+
         wakeLock.addEventListener("release", () => {
           setIsWakeLockActive(false);
         });
@@ -170,9 +202,6 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     };
   }, []);
 
-
-
-  // Listen for transcription data from translator bots
   useEffect(() => {
     if (!room) return;
 
@@ -180,20 +209,19 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       payload: Uint8Array,
       participant: unknown,
       kind: unknown,
-      topic: string | undefined,
+      topic: string | undefined
     ) => {
-      // Only handle transcription topic
+      void participant;
+      void kind;
       if (topic !== "transcription") return;
 
       try {
         const data = JSON.parse(new TextDecoder().decode(payload));
         if (data.type !== "transcription") return;
-
-        // Only show transcriptions for the currently selected language
         if (data.language !== currentLanguageRef.current) return;
 
         setTranscripts((prev) => {
-          const existing = prev.findIndex((t) => t.id === data.segmentId);
+          const existing = prev.findIndex((entry) => entry.id === data.segmentId);
           const entry: TranscriptEntry = {
             id: data.segmentId,
             text: data.text,
@@ -216,7 +244,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           return next.slice(-50);
         });
       } catch {
-        // Not a JSON transcription message
+        // Ignore non-transcription data messages.
       }
     };
 
@@ -226,14 +254,10 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     };
   }, [room]);
 
-  // Auto-scroll transcript
   useEffect(() => {
     transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [transcripts]);
 
-  // Manage which audio tracks are subscribed based on selected language
-  // autoSubscribe: false means nothing plays by default
-  // We explicitly subscribe only to the selected language's track
   useEffect(() => {
     if (!room) return;
 
@@ -261,8 +285,7 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     room.on(RoomEvent.Connected, handleUpdate);
     room.on(RoomEvent.TrackPublished, handleUpdate);
     room.on(RoomEvent.TrackUnpublished, handleUpdate);
-    
-    // Only run update if the participant that joined is the organizer or our translator bot
+
     const handleParticipantConnected = (participant: RemoteParticipant) => {
       const isOrganizer = participant.identity.startsWith("organizer-");
       const isSelectedTranslator =
@@ -281,30 +304,30 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
     };
   }, [room, currentLanguage, translatorIdentity]);
- 
-  // Update local participant attribute when language changes
+
   useEffect(() => {
     if (!room) return;
-    
+
     const setLanguageAttr = () => {
       if (room.localParticipant) {
-        room.localParticipant.setAttributes({ language: currentLanguage })
-          .catch((err) => console.error("Failed to set participant attributes:", err));
+        room.localParticipant
+          .setAttributes({ language: currentLanguage })
+          .catch((err) =>
+            console.error("Failed to set participant attributes:", err)
+          );
       }
     };
 
     setLanguageAttr();
-    
+
     room.on(RoomEvent.Connected, setLanguageAttr);
     return () => {
       room.off(RoomEvent.Connected, setLanguageAttr);
     };
   }, [room, currentLanguage]);
 
-  // Unsubscribe from translation when tab closes
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Use sendBeacon for reliable fire-and-forget during page unload
       if (currentLanguageRef.current && currentLanguageRef.current !== "original") {
         const body = JSON.stringify({
           sessionId,
@@ -320,14 +343,12 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      // Also fire on React unmount (e.g. navigation away)
       handleBeforeUnload();
     };
   }, [sessionId]);
 
   const handleLanguageChange = useCallback(
     (langCode: string, newTranslatorIdentity: string | null) => {
-      // Unsubscribe from the previous language
       const prev = currentLanguageRef.current;
       if (prev && prev !== "original" && prev !== langCode) {
         fetch("/api/translate/unsubscribe", {
@@ -340,7 +361,6 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
       setCurrentLanguage(langCode);
       currentLanguageRef.current = langCode;
       setTranslatorIdentity(newTranslatorIdentity);
-      // Clear transcripts when switching languages
       setTranscripts([]);
     },
     [sessionId]
@@ -352,12 +372,14 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     if (!room) return;
 
     const checkConnected = () => {
-      const hasOrganizer = Array.from(room.remoteParticipants.values()).some((p) => {
-        if (!p.identity.startsWith("organizer-")) return false;
-        return Array.from(p.trackPublications.values()).some(
-          (pub) => pub.kind === Track.Kind.Audio && !pub.isMuted
-        );
-      });
+      const hasOrganizer = Array.from(room.remoteParticipants.values()).some(
+        (participant) => {
+          if (!participant.identity.startsWith("organizer-")) return false;
+          return Array.from(participant.trackPublications.values()).some(
+            (pub) => pub.kind === Track.Kind.Audio && !pub.isMuted
+          );
+        }
+      );
       setIsConnected(hasOrganizer);
     };
 
@@ -391,84 +413,53 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     };
   }, [room]);
 
+  const transcriptStyle = {
+    "--transcript-font-size": `${fontSize}px`,
+  } as CSSProperties;
+
   return (
-    <div className="container enter">
-      {/* Header */}
-      <div style={{ marginBottom: 40 }}>
-        <h1 className="display display-lg" style={{ marginBottom: 8 }}>
-          <em>{t("title")}</em>
+    <div className="w-full max-w-xl space-y-6">
+      <header className="space-y-1">
+        <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+          {t("title")}
         </h1>
-        <p className="mono">{sessionId}</p>
-      </div>
+        <p className="font-mono text-xs text-muted-foreground">{sessionId}</p>
+      </header>
 
-      {/* Status */}
-      <div style={{ marginBottom: 32 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div className={`waveform ${isReceivingAudio ? "active" : "idle"}`}>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="waveform-bar" />
-              ))}
-            </div>
-
-            {isConnected ? (
-              <span className="status status--active">
-                <span className="status-dot pulse" />
-                {currentLanguage === "original"
-                  ? t("original")
-                  : currentLanguage.toUpperCase()}
-              </span>
-            ) : (
-              <span className="status status--waiting">
-                <span className="status-dot pulse" />
-                {t("waitingForBroadcast")}
-              </span>
-            )}
-
-            {isWakeLockActive && (
-              <span
-                className="status status--active"
-                style={{
-                  marginLeft: 12,
-                  padding: "4px 8px",
-                  background: "var(--success-soft)",
-                  border: "1px solid var(--border)",
-                  borderRadius: "4px",
-                  fontSize: "11px",
-                }}
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  style={{ marginRight: 4, verticalAlign: "middle" }}
-                >
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                </svg>
-                {t("screenAwake")}
-              </span>
-            )}
+      <section className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
+          <div className={`waveform ${isReceivingAudio ? "active" : "idle"}`}>
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="waveform-bar" />
+            ))}
           </div>
+
+          {isConnected ? (
+            <Badge variant="outline" className="gap-1 border-success/30 text-success">
+              <span className="size-1.5 rounded-full bg-current animate-pulse" />
+              {currentLanguage === "original"
+                ? t("original")
+                : currentLanguage.toUpperCase()}
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="gap-1 border-warning/30 text-warning">
+              <span className="size-1.5 rounded-full bg-current animate-pulse" />
+              {t("waitingForBroadcast")}
+            </Badge>
+          )}
+
+          {isWakeLockActive && (
+            <Badge variant="secondary" className="gap-1">
+              <LockKeyholeIcon className="size-3" />
+              {t("screenAwake")}
+            </Badge>
+          )}
         </div>
-      </div>
+      </section>
 
-      <hr className="rule" />
+      <Separator />
 
-      {/* Language selector */}
-      <div style={{ padding: "28px 0" }}>
+      <section className="py-1">
         <LanguageSelector
           sessionId={sessionId}
           currentLanguage={currentLanguage}
@@ -476,113 +467,93 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
           disabled={!isConnected}
           allowedLanguages={allowedLanguages}
         />
-      </div>
+      </section>
 
-      <hr className="rule" />
+      <Separator />
 
-      {/* Transcription output */}
-      <div style={{ padding: "28px 0" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginBottom: 16,
-          }}
-        >
-          <span className="label">{t("transcription")}</span>
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <button
+      <section className="space-y-4" style={transcriptStyle}>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {t("transcription")}
+          </span>
+          <div className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={decreaseFontSize}
               disabled={fontSize <= 12}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border)",
-                color: "var(--fg-secondary)",
-                padding: "4px 10px",
-                fontSize: "12px",
-                fontFamily: "var(--font-mono)",
-                cursor: fontSize <= 12 ? "not-allowed" : "pointer",
-                opacity: fontSize <= 12 ? 0.4 : 1,
-                transition: "all 0.2s ease",
-              }}
               title={t("decreaseFontSize")}
+              aria-label={t("decreaseFontSize")}
             >
-              A-
-            </button>
-            <button
+              <MinusIcon className="size-3" />
+              A
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="xs"
               onClick={increaseFontSize}
               disabled={fontSize >= 28}
-              style={{
-                background: "transparent",
-                border: "1px solid var(--border)",
-                color: "var(--fg-secondary)",
-                padding: "4px 10px",
-                fontSize: "12px",
-                fontFamily: "var(--font-mono)",
-                cursor: fontSize >= 28 ? "not-allowed" : "pointer",
-                opacity: fontSize >= 28 ? 0.4 : 1,
-                transition: "all 0.2s ease",
-              }}
               title={t("increaseFontSize")}
+              aria-label={t("increaseFontSize")}
             >
-              A+
-            </button>
+              <PlusIcon className="size-3" />
+              A
+            </Button>
           </div>
         </div>
 
-        <div
-          style={{
-            maxHeight: 320,
-            overflowY: "auto",
-            paddingRight: 8,
-          }}
-        >
-          {transcripts.length === 0 ? (
-            <p className="body-sm italic">
-              {currentLanguage === "original"
-                ? t("selectLanguageForTranscription")
-                : t("waitingForSpeech")}
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {transcripts.map((t, i) => {
-                const paragraphs = splitIntoParagraphs(t.text, 2);
-                return (
-                  <div key={`${t.id}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {paragraphs.map((para, paraIdx) => (
-                      <p
-                        key={paraIdx}
-                        style={{
-                          fontFamily: "var(--font-body)",
-                          fontSize: `${fontSize}px`,
-                          lineHeight: 1.6,
-                          color: t.final ? "var(--fg)" : "var(--fg-secondary)",
-                          transition: "color 0.3s ease, font-size 0.2s ease",
-                        }}
-                      >
-                        {para}
-                      </p>
-                    ))}
-                  </div>
-                );
-              })}
-              <div ref={transcriptEndRef} />
-            </div>
-          )}
-        </div>
-      </div>
+        <ScrollArea className="h-80 rounded-lg border bg-card">
+          <div className="p-4">
+            {transcripts.length === 0 ? (
+              <p className="text-sm italic text-muted-foreground">
+                {currentLanguage === "original"
+                  ? t("selectLanguageForTranscription")
+                  : t("waitingForSpeech")}
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4">
+                {transcripts.map((entry, i) => {
+                  const paragraphs = splitIntoParagraphs(entry.text, 2);
+                  return (
+                    <div
+                      key={`${entry.id}-${i}`}
+                      className="flex flex-col gap-2"
+                    >
+                      {paragraphs.map((para, paraIdx) => (
+                        <p
+                          key={paraIdx}
+                          className={cn(
+                            "font-sans text-[length:var(--transcript-font-size)] leading-7 transition-colors",
+                            entry.final
+                              ? "text-foreground"
+                              : "text-muted-foreground"
+                          )}
+                        >
+                          {para}
+                        </p>
+                      ))}
+                    </div>
+                  );
+                })}
+                <div ref={transcriptEndRef} />
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </section>
 
-      <hr className="rule" />
+      <Separator />
 
-      <p className="body-sm" style={{ paddingTop: 28 }}>
+      <p className="text-sm leading-6 text-muted-foreground">
         {t.rich("generatedBy", {
           link: (chunks) => (
             <a
               href="https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-live-3-5-translate/"
               target="_blank"
               rel="noopener noreferrer"
-              style={{ textDecoration: "underline", color: "inherit" }}
+              className="underline underline-offset-4 hover:text-foreground"
             >
               {chunks}
             </a>
@@ -592,7 +563,6 @@ function AttendeeView({ sessionId }: { sessionId: string }) {
     </div>
   );
 }
-
 
 export default function WatchPage({
   params,
@@ -625,62 +595,70 @@ export default function WatchPage({
   }, [sessionId]);
 
   if (error) {
-    const isInactiveSession = error.includes("not started yet") || error.includes("not found");
+    const isInactiveSession =
+      error.includes("not started yet") || error.includes("not found");
     return (
-      <div className="page">
-        <div className="container" style={{ textAlign: "center" }}>
-          <p className="display display-md" style={{ marginBottom: 16 }}>
-            {isInactiveSession ? t("broadcastNotStarted") : t("somethingWentWrong")}
-          </p>
-          <p className="body-sm" style={{ marginBottom: 32 }}>{error}</p>
-          <button
-            className="btn btn-outline"
-            onClick={() => window.location.reload()}
-          >
-            {isInactiveSession ? t("checkAgain") : t("retry")}
-          </button>
-        </div>
-      </div>
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-center gap-2">
+              <AlertTriangleIcon className="size-4 text-destructive" />
+              {isInactiveSession
+                ? t("broadcastNotStarted")
+                : t("somethingWentWrong")}
+            </CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button
+              variant="outline"
+              onClick={() => window.location.reload()}
+              className="w-full"
+            >
+              <RefreshCwIcon />
+              {isInactiveSession ? t("checkAgain") : t("retry")}
+            </Button>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   if (!token || !livekitUrl) {
     return (
-      <div className="page">
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-          <div className="spinner" />
-          <p className="mono">{t("joining")}</p>
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <div className="flex flex-col items-center gap-3 text-muted-foreground">
+          <Spinner className="size-5" />
+          <p className="font-mono text-xs">{t("joining")}</p>
         </div>
-      </div>
+      </main>
     );
   }
 
   if (!started) {
     return (
-      <div className="page">
-        <div className="container enter" style={{ textAlign: "center" }}>
-          <h1 className="display display-lg" style={{ marginBottom: 12 }}>
-            <em>{t("ready")}</em>
-          </h1>
-          <p className="body-sm" style={{ marginBottom: 40 }}>
-            {t("readyCopy")}
-          </p>
-          <button
-            className="btn"
-            onClick={() => setStarted(true)}
-          >
-            {t("startListening")}
-          </button>
-          <p className="mono" style={{ marginTop: 32, fontSize: 12 }}>
-            {t("session", { sessionId })}
-          </p>
-        </div>
-      </div>
+      <main className="flex min-h-svh items-center justify-center px-4 py-10">
+        <Card className="w-full max-w-md text-center">
+          <CardHeader>
+            <CardTitle className="text-3xl">{t("ready")}</CardTitle>
+            <CardDescription>{t("readyCopy")}</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4">
+            <Button onClick={() => setStarted(true)} className="w-full">
+              <Volume2Icon />
+              {t("startListening")}
+            </Button>
+            <p className="font-mono text-xs text-muted-foreground">
+              {t("session", { sessionId })}
+            </p>
+          </CardContent>
+        </Card>
+      </main>
     );
   }
 
   return (
-    <div className="page page-top">
+    <main className="min-h-svh px-4 py-10 sm:px-6">
       <LiveKitRoom
         video={false}
         audio={false}
@@ -688,16 +666,11 @@ export default function WatchPage({
         serverUrl={livekitUrl}
         connectOptions={{ autoSubscribe: false }}
         options={{ disconnectOnPageLeave: false }}
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-        }}
+        className="flex w-full flex-col items-center"
       >
         <RoomAudioRenderer />
         <AttendeeView sessionId={sessionId} />
       </LiveKitRoom>
-    </div>
+    </main>
   );
 }

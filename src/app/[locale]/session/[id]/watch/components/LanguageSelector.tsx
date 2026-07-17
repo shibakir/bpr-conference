@@ -2,6 +2,14 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import {
+  NativeSelect,
+  NativeSelectOptGroup,
+  NativeSelectOption,
+} from "@/components/ui/native-select";
+import { Spinner } from "@/components/ui/spinner";
 import {
   SUPPORTED_LANGUAGES,
   getLanguageByCode,
@@ -32,19 +40,16 @@ export default function LanguageSelector({
   const [error, setError] = useState<string | null>(null);
   const activeLanguageRef = useRef(currentLanguage);
 
-  // Keep ref in sync with current language
   useEffect(() => {
     activeLanguageRef.current = currentLanguage;
   }, [currentLanguage]);
 
-  // Unsubscribe on unmount (attendee disconnects)
   useEffect(() => {
     return () => {
       const lang = activeLanguageRef.current;
       if (lang && lang !== "original") {
         const payload = JSON.stringify({ sessionId, targetLanguage: lang });
         const blob = new Blob([payload], { type: "application/json" });
-        // sendBeacon is reliable during page unload
         const sent = navigator.sendBeacon?.("/api/translate/unsubscribe", blob);
         if (!sent) {
           fetch("/api/translate/unsubscribe", {
@@ -52,7 +57,7 @@ export default function LanguageSelector({
             headers: { "Content-Type": "application/json" },
             body: payload,
             keepalive: true,
-          }).catch(() => { });
+          }).catch(() => {});
         }
       }
     };
@@ -65,7 +70,6 @@ export default function LanguageSelector({
       setError(null);
 
       if (langCode === "original") {
-        // Unsubscribe from the current translation
         if (previousLanguage && previousLanguage !== "original") {
           fetch("/api/translate", {
             method: "DELETE",
@@ -74,7 +78,7 @@ export default function LanguageSelector({
               sessionId,
               targetLanguage: previousLanguage,
             }),
-          }).catch(() => { });
+          }).catch(() => {});
         }
         onLanguageChange("original", null);
         return;
@@ -118,74 +122,75 @@ export default function LanguageSelector({
   const visibleLanguages = useMemo(
     () =>
       (allowedLanguages
-        ? SUPPORTED_LANGUAGES.filter((lang) => allowedLanguages.includes(lang.code))
+        ? SUPPORTED_LANGUAGES.filter((lang) =>
+            allowedLanguages.includes(lang.code)
+          )
         : SUPPORTED_LANGUAGES
-      ).map((lang) => ({
-        ...lang,
-        displayName: getLanguageDisplayName(lang, locale),
-      })).sort((a, b) =>
-        a.displayName.localeCompare(b.displayName, locale, {
-          sensitivity: "base",
-        })
-      ),
+      )
+        .map((lang) => ({
+          ...lang,
+          displayName: getLanguageDisplayName(lang, locale),
+        }))
+        .sort((a, b) =>
+          a.displayName.localeCompare(b.displayName, locale, {
+            sensitivity: "base",
+          })
+        ),
     [allowedLanguages, locale]
   );
 
   return (
-    <div style={{ width: "100%" }}>
-      <label htmlFor="language-select" className="label" style={{ display: "block", marginBottom: 10 }}>
+    <div className="grid gap-2">
+      <Label htmlFor="language-select" className="text-xs uppercase tracking-wide text-muted-foreground">
         {t("language")}
-      </label>
+      </Label>
 
-      <div style={{ position: "relative" }}>
-        <select
+      <div className="relative">
+        <NativeSelect
           id="language-select"
-          className="select-field"
+          className="w-full"
           value={currentLanguage}
           onChange={handleChange}
           disabled={loading || disabled}
-          style={{
-            opacity: (loading || disabled) ? 0.5 : 1,
-            cursor: (loading || disabled) ? "not-allowed" : "pointer",
-          }}
         >
-          <option value="original">{t("originalAudio")}</option>
-          <optgroup label={t("translations")}>
+          <NativeSelectOption value="original">
+            {t("originalAudio")}
+          </NativeSelectOption>
+          <NativeSelectOptGroup label={t("translations")}>
             {visibleLanguages.map((lang) => (
-              <option key={lang.code} value={lang.code}>
+              <NativeSelectOption key={lang.code} value={lang.code}>
                 {lang.displayName} {lang.flag}
-              </option>
+              </NativeSelectOption>
             ))}
-          </optgroup>
-        </select>
+          </NativeSelectOptGroup>
+        </NativeSelect>
 
         {loading && (
-          <div style={{ position: "absolute", right: 40, top: "50%", transform: "translateY(-50%)" }}>
-            <span className="spinner" />
+          <div className="absolute right-9 top-1/2 -translate-y-1/2">
+            <Spinner className="size-3.5 text-muted-foreground" />
           </div>
         )}
       </div>
 
-      {/* State feedback */}
-      <div style={{ marginTop: 10, minHeight: 20 }}>
+      <div className="min-h-5">
         {currentLanguage !== "original" && currentLang && !loading && (
-          <span className="status status--active">
-            <span className="status-dot pulse" />
+          <Badge variant="outline" className="gap-1 border-success/30 text-success">
+            <span className="size-1.5 rounded-full bg-current animate-pulse" />
             {t("translatingTo", { language: currentLangName })}
-          </span>
+          </Badge>
         )}
 
         {loading && (
-          <span className="status status--waiting">
-            <span className="status-dot pulse" />
+          <Badge variant="outline" className="gap-1 border-warning/30 text-warning">
+            <span className="size-1.5 rounded-full bg-current animate-pulse" />
             {t("startingTranslation")}
-          </span>
+          </Badge>
         )}
 
         {error && (
-          <span className="status status--error">
+          <Badge variant="destructive" className="max-w-full whitespace-normal">
             {error}
-          </span>
+          </Badge>
         )}
       </div>
     </div>

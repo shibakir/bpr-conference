@@ -1,10 +1,40 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { LanguagesIcon, RadioTowerIcon, SearchIcon, XIcon } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
 import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
+
+const DEFAULT_LANGUAGES = [
+  "en",
+  "zh-Hans",
+  "hi",
+  "es",
+  "fr",
+  "ar",
+  "bn",
+  "pt-BR",
+  "ru",
+  "ur",
+];
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -15,11 +45,9 @@ export default function Home() {
   const [password, setPassword] = useState("");
   const [eventId, setEventId] = useState("");
   const [error, setError] = useState<string | null>(null);
-  
   const [restrictLanguages, setRestrictLanguages] = useState(true);
-  const [selectedLanguages, setSelectedLanguages] = useState<string[]>([
-    "en", "zh-Hans", "hi", "es", "fr", "ar", "bn", "pt-BR", "ru", "ur"
-  ]);
+  const [selectedLanguages, setSelectedLanguages] =
+    useState<string[]>(DEFAULT_LANGUAGES);
   const [langSearch, setLangSearch] = useState("");
 
   const languageOptions = useMemo(
@@ -64,12 +92,12 @@ export default function Home() {
       const res = await fetch("/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          organizerName: "host", 
-          password, 
+        body: JSON.stringify({
+          organizerName: "host",
+          password,
           eventId,
           locale,
-          allowedLanguages: restrictLanguages ? selectedLanguages : undefined
+          allowedLanguages: restrictLanguages ? selectedLanguages : undefined,
         }),
       });
       const data = await res.json();
@@ -87,271 +115,274 @@ export default function Home() {
     }
   }
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!loading) {
+      createSession();
+    }
+  }
+
   return (
-    <div className="page">
-      <div className="container" style={{ textAlign: "center" }}>
-        <div
-          className="enter"
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            gap: 8,
-            marginBottom: 24,
-          }}
-        >
+    <main className="flex min-h-svh items-center justify-center px-4 py-10 sm:px-6">
+      <section className="grid w-full max-w-xl gap-6">
+        <nav className="flex justify-center gap-1" aria-label="Language">
           {locales.map((item) => (
-            <Link
+            <Button
               key={item}
-              href="/"
-              locale={item}
-              aria-label={t("switchLocale", { locale: item.toUpperCase() })}
-              className="mono"
-              style={{
-                color: item === locale ? "var(--fg)" : "var(--fg-tertiary)",
-                textDecoration: item === locale ? "underline" : "none",
-              }}
+              asChild
+              variant={item === locale ? "secondary" : "ghost"}
+              size="xs"
             >
-              {item.toUpperCase()}
-            </Link>
+              <Link
+                href="/"
+                locale={item}
+                aria-label={t("switchLocale", {
+                  locale: item.toUpperCase(),
+                })}
+              >
+                {item.toUpperCase()}
+              </Link>
+            </Button>
           ))}
+        </nav>
+
+        <div className="space-y-3 text-center">
+          <Badge variant="outline" className="mx-auto gap-1.5">
+            <LanguagesIcon className="size-3" />
+            {t("liveTranslation")}
+          </Badge>
+          <h1 className="text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
+            {t("title")}
+          </h1>
+          <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
+            {t("subtitle")}
+          </p>
         </div>
 
-        {/* Title */}
-        <h1 className="display display-lg enter" style={{ marginBottom: 24 }}>
-          {t("title")}
-        </h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>{t("createSession")}</CardTitle>
+            <CardDescription>{t("subtitle")}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4" onSubmit={handleSubmit}>
+              {passwordRequired && (
+                <div className="grid gap-2">
+                  <Label htmlFor="broadcast-password">
+                    {t("passwordPlaceholder")}
+                  </Label>
+                  <Input
+                    id="broadcast-password"
+                    type="password"
+                    placeholder={t("passwordPlaceholder")}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={loading}
+                  />
+                </div>
+              )}
 
-        {/* Subtitle */}
-        <p
-          className="body enter-d1"
-          style={{ maxWidth: 340, margin: "0 auto 48px" }}
-        >
-          {t("subtitle")}
-        </p>
+              <div className="grid gap-2">
+                <Label htmlFor="event-id">{t("eventPlaceholder")}</Label>
+                <Input
+                  id="event-id"
+                  type="text"
+                  placeholder={t("eventPlaceholder")}
+                  value={eventId}
+                  onChange={(e) => setEventId(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
 
-        {/* Inputs */}
-        <div
-          className="enter-d2"
-          style={{
-            maxWidth: 340,
-            margin: "0 auto 20px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          {passwordRequired && (
-            <input
-              type="password"
-              className="input-field"
-              placeholder={t("passwordPlaceholder")}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ textAlign: "center" }}
-              disabled={loading}
-            />
-          )}
-          <input
-            type="text"
-            className="input-field"
-            placeholder={t("eventPlaceholder")}
-            value={eventId}
-            onChange={(e) => setEventId(e.target.value)}
-            style={{ textAlign: "center" }}
-            disabled={loading}
-          />
+              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
+                <Label className="items-start gap-3">
+                  <Checkbox
+                    checked={restrictLanguages}
+                    onCheckedChange={(checked) =>
+                      setRestrictLanguages(checked === true)
+                    }
+                    disabled={loading}
+                    className="mt-0.5"
+                  />
+                  <span className="grid gap-1">
+                    <span>{t("restrictLanguages")}</span>
+                    <span className="text-xs font-normal leading-5 text-muted-foreground">
+                      {t("selectedCount", { count: selectedLanguages.length })}
+                    </span>
+                  </span>
+                </Label>
 
-          {/* Allowlisting control */}
-          <div style={{ textAlign: "left", marginTop: 8 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "13px", color: "var(--fg-secondary)" }}>
-              <input
-                type="checkbox"
-                checked={restrictLanguages}
-                onChange={(e) => {
-                  setRestrictLanguages(e.target.checked);
-                }}
-                style={{ accentColor: "var(--fg)", cursor: "pointer" }}
-              />
-              {t("restrictLanguages")}
-            </label>
+                {restrictLanguages && (
+                  <div className="grid gap-3">
+                    {selectedLanguages.length > 0 && (
+                      <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-dashed bg-background p-2 pr-1 [scrollbar-gutter:stable]">
+                        {selectedLanguages.map((code) => {
+                          const lang = languageOptions.find(
+                            (item) => item.code === code
+                          );
+                          if (!lang) return null;
+                          return (
+                            <Button
+                              key={code}
+                              type="button"
+                              variant="secondary"
+                              size="xs"
+                              title={t("removeLanguage")}
+                              onClick={() =>
+                                setSelectedLanguages((prev) =>
+                                  prev.filter((item) => item !== code)
+                                )
+                              }
+                            >
+                              <span>{lang.flag}</span>
+                              <span>{lang.displayName}</span>
+                              <XIcon className="size-3" />
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
 
-            {restrictLanguages && (
-              <div className="enter" style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* Chip container to show selected languages at a glance */}
-                {selectedLanguages.length > 0 && (
-                  <div style={{ 
-                    display: "flex", 
-                    flexWrap: "wrap", 
-                    gap: "6px", 
-                    marginBottom: "4px",
-                    padding: "8px",
-                    border: "1px dashed var(--border)",
-                    background: "var(--bg-elevated)" 
-                  }}>
-                    {selectedLanguages.map((code) => {
-                      const lang = languageOptions.find((l) => l.code === code);
-                      if (!lang) return null;
-                      return (
-                        <div
-                          key={code}
-                          onClick={() => setSelectedLanguages((prev) => prev.filter((c) => c !== code))}
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "4px",
-                            background: "var(--bg)",
-                            border: "1px solid var(--border)",
-                            padding: "3px 6px",
-                            fontSize: "11px",
-                            cursor: "pointer",
-                            transition: "all 0.15s ease",
-                          }}
-                          title={t("removeLanguage")}
+                    <div className="relative">
+                      <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        type="search"
+                        placeholder={t("searchLanguages")}
+                        value={langSearch}
+                        onChange={(e) => setLangSearch(e.target.value)}
+                        disabled={loading}
+                        className="pl-8"
+                      />
+                    </div>
+
+                    <ScrollArea className="h-40 rounded-lg border bg-background">
+                      <div className="grid gap-1 p-2">
+                        {filteredLanguages.length === 0 ? (
+                          <p className="px-2 py-4 text-center text-xs text-muted-foreground">
+                            {t("noLanguagesFound")}
+                          </p>
+                        ) : (
+                          filteredLanguages.map((lang) => {
+                            const isChecked = selectedLanguages.includes(
+                              lang.code
+                            );
+                            return (
+                              <Label
+                                key={lang.code}
+                                className="flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted"
+                              >
+                                <Checkbox
+                                  checked={isChecked}
+                                  onCheckedChange={() => {
+                                    setSelectedLanguages((prev) =>
+                                      isChecked
+                                        ? prev.filter(
+                                            (code) => code !== lang.code
+                                          )
+                                        : [...prev, lang.code]
+                                    );
+                                  }}
+                                  disabled={loading}
+                                />
+                                <span>
+                                  {lang.flag} {lang.displayName}
+                                </span>
+                              </Label>
+                            );
+                          })
+                        )}
+                      </div>
+                    </ScrollArea>
+
+                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {t("selectedCount", { count: selectedLanguages.length })}
+                      </span>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() =>
+                            setSelectedLanguages(
+                              SUPPORTED_LANGUAGES.map((lang) => lang.code)
+                            )
+                          }
                         >
-                          <span>{lang.flag}</span>
-                          <span style={{ color: "var(--fg-secondary)" }}>{lang.displayName}</span>
-                          <span style={{ marginLeft: "2px", opacity: 0.5, fontWeight: "bold" }}>×</span>
-                        </div>
-                      );
-                    })}
+                          {t("selectAll")}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          onClick={() => setSelectedLanguages([])}
+                        >
+                          {t("clear")}
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 )}
-
-                <input
-                  type="text"
-                  placeholder={t("searchLanguages")}
-                  className="input-field"
-                  value={langSearch}
-                  onChange={(e) => setLangSearch(e.target.value)}
-                  style={{ padding: "8px 12px", fontSize: "13px" }}
-                />
-                
-                <div style={{ 
-                  maxHeight: "130px", 
-                  overflowY: "auto", 
-                  border: "1px solid var(--border)", 
-                  padding: "8px", 
-                  background: "var(--bg-elevated)",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6
-                }}>
-                  {filteredLanguages.length === 0 ? (
-                    <span style={{ fontSize: "12px", color: "var(--fg-tertiary)" }}>{t("noLanguagesFound")}</span>
-                  ) : (
-                    filteredLanguages.map(lang => {
-                      const isChecked = selectedLanguages.includes(lang.code);
-                      return (
-                        <label key={lang.code} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", fontSize: "13px" }}>
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {
-                              setSelectedLanguages(prev => 
-                                isChecked ? prev.filter(c => c !== lang.code) : [...prev, lang.code]
-                              );
-                            }}
-                            style={{ accentColor: "var(--fg)" }}
-                          />
-                          <span>{lang.flag} {lang.displayName}</span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-                
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "var(--fg-tertiary)" }}>
-                  <span>{t("selectedCount", { count: selectedLanguages.length })}</span>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button 
-                      type="button" 
-                      onClick={() => setSelectedLanguages(SUPPORTED_LANGUAGES.map(l => l.code))}
-                      style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
-                    >
-                      {t("selectAll")}
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => setSelectedLanguages([])}
-                      style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", textDecoration: "underline" }}
-                    >
-                      {t("clear")}
-                    </button>
-                  </div>
-                </div>
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Error message */}
-        {error && (
-          <p className="body-sm enter-d2" style={{ color: "var(--error)", marginBottom: 20 }}>
-            {error}
-          </p>
-        )}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
 
-        {/* CTA */}
-        <div className="enter-d2">
-          <button
-            className="btn btn-dark"
-            onClick={createSession}
-            disabled={loading}
-            id="create-session-btn"
-          >
-            {loading ? (
-              <>
-                <span className="spinner" /> {t("creating")}
-              </>
-            ) : (
-              t("createSession")
-            )}
-          </button>
-        </div>
-
-        {/* Steps */}
-        <div
-          className="enter-d3"
-          style={{
-            marginTop: 80,
-            display: "flex",
-            flexDirection: "column",
-            gap: 0,
-            textAlign: "left",
-          }}
-        >
-          <hr className="rule" />
-          {[
-            t("steps.speak"),
-            t("steps.share"),
-            t("steps.languages"),
-          ].map((text, i) => (
-            <div key={i}>
-              <div
-                style={{
-                  display: "flex",
-                  gap: 16,
-                  padding: "18px 0",
-                  alignItems: "baseline",
-                }}
+              <Button
+                type="submit"
+                disabled={loading}
+                id="create-session-btn"
+                className="w-full"
               >
-                <span className="mono" style={{ flexShrink: 0 }}>
-                  {String(i + 1).padStart(2, "0")}
-                </span>
-                <p className="body-sm" style={{ color: "var(--fg-secondary)" }}>
-                  {text}
-                </p>
+                {loading ? (
+                  <>
+                    <Spinner />
+                    {t("creating")}
+                  </>
+                ) : (
+                  <>
+                    <RadioTowerIcon />
+                    {t("createSession")}
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <div className="grid">
+          <Separator />
+          {[t("steps.speak"), t("steps.share"), t("steps.languages")].map(
+            (text, index) => (
+              <div key={text}>
+                <div className="grid grid-cols-[2rem_1fr] gap-4 py-4">
+                  <span className="font-mono text-xs text-muted-foreground">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                  <p className="text-sm leading-6 text-muted-foreground">
+                    {text}
+                  </p>
+                </div>
+                <Separator />
               </div>
-              <hr className="rule" />
-            </div>
-          ))}
+            )
+          )}
         </div>
 
-        {/* Footer */}
-        <p className="mono enter-d4" style={{ marginTop: 48 }}>
-          <a target="_blank" href="https://bpr.cz/" rel="noopener noreferrer">BPR s.r.o</a>
+        <p className="text-center font-mono text-xs text-muted-foreground">
+          <a
+            target="_blank"
+            href="https://bpr.cz/"
+            rel="noopener noreferrer"
+            className="underline-offset-4 hover:underline"
+          >
+            BPR s.r.o
+          </a>
         </p>
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
