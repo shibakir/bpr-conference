@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
+import { isLocale, routing, type Locale } from "@/i18n/routing";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
   organizerName?: unknown;
   password?: unknown;
   eventId?: unknown;
+  locale?: unknown;
   allowedLanguages?: unknown;
+}
+
+function getSessionPath(locale: Locale, sessionId: string, mode: "watch" | "broadcast") {
+  return `/${locale}/session/${sessionId}/${mode}`;
 }
 
 // POST /api/sessions — Create a new broadcast session
@@ -16,6 +22,18 @@ export async function POST(req: NextRequest) {
     const organizerName = typeof body.organizerName === "string" ? body.organizerName : "organizer";
     const password = body.password;
     const eventId = body.eventId;
+    let locale: Locale = routing.defaultLocale;
+
+    if (body.locale !== undefined) {
+      if (typeof body.locale !== "string" || !isLocale(body.locale)) {
+        return NextResponse.json(
+          { error: "Invalid locale" },
+          { status: 400 }
+        );
+      }
+
+      locale = body.locale;
+    }
 
     let allowedLanguages: string[] | undefined = undefined;
     if (Array.isArray(body.allowedLanguages)) {
@@ -63,13 +81,15 @@ export async function POST(req: NextRequest) {
     // Build the attendee join URL
     const protocol = req.headers.get("x-forwarded-proto") || "http";
     const host = req.headers.get("host") || "localhost:3000";
-    const joinUrl = `${protocol}://${host}/session/${sessionId}/watch`;
+    const origin = `${protocol}://${host}`;
+    const joinUrl = `${origin}${getSessionPath(locale, sessionId, "watch")}`;
 
     return NextResponse.json({
       sessionId,
       organizerIdentity,
+      locale,
       joinUrl,
-      broadcastUrl: `${protocol}://${host}/session/${sessionId}/broadcast`,
+      broadcastUrl: `${origin}${getSessionPath(locale, sessionId, "broadcast")}`,
     });
   } catch (error) {
     console.error("Error creating session:", error);

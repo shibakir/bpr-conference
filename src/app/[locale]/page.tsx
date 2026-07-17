@@ -68,6 +68,7 @@ export default function Home() {
           organizerName: "host", 
           password, 
           eventId,
+          locale,
           allowedLanguages: restrictLanguages ? selectedLanguages : undefined
         }),
       });
