@@ -25,6 +25,27 @@ import {
 } from "@livekit/rtc-node";
 import WebSocket from "ws";
 
+type QueuedTranslatedAudioFrame = {
+  pcmBuffer: Buffer;
+  durationMs: number;
+};
+
+function getPositiveIntegerEnv(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (!raw) return fallback;
+
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function getBooleanEnv(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.toLowerCase();
+  if (!raw) return fallback;
+  if (["1", "true", "yes", "on"].includes(raw)) return true;
+  if (["0", "false", "no", "off"].includes(raw)) return false;
+  return fallback;
+}
+
 export type BridgeStatus = "starting" | "active" | "error" | "closed";
 
 export class TranslationBridge {
@@ -36,6 +57,7 @@ export class TranslationBridge {
   private transcriptionSegmentId: number = 0;
   private framesSentToGemini: number = 0;
   private framesReceivedFromGemini: number = 0;
+  private framesPublishedToLiveKit: number = 0;
   private resumptionHandle: string | null = null;
   private isReconnecting: boolean = false;
   private pendingInterimText: string = "";
@@ -56,6 +78,24 @@ export class TranslationBridge {
   private readonly channels: number = 1;
   private readonly contextCompressionTriggerTokens: number = 25000;
   private readonly contextCompressionTargetTokens: number = 8000;
+  private readonly outputAudioSourceQueueMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_OUTPUT_QUEUE_MS",
+    700
+  );
+  private readonly maxOutputBacklogMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_MAX_OUTPUT_BACKLOG_MS",
+    3000
+  );
+  private readonly targetOutputBacklogMs: number = getPositiveIntegerEnv(
+    "TRANSLATION_TARGET_OUTPUT_BACKLOG_MS",
+    1500
+  );
+  private readonly outputBacklogLogIntervalMs: number = 5000;
+  private readonly outputBacklogInfoThresholdMs: number = 500;
+  private readonly dropStaleOutputAudio: boolean = getBooleanEnv(
+    "TRANSLATION_DROP_STALE_AUDIO",
+    true
+  );
 
   // LiveKit config
   private readonly livekitUrl: string;
@@ -66,7 +106,15 @@ export class TranslationBridge {
   private geminiSetupComplete: boolean = false;
   private organizerIdentity: string;
   private lastAudioFrameTime: number = 0;
-  private captureChain: Promise<void> = Promise.resolve();
+  private pendingTranslatedAudioFrames: QueuedTranslatedAudioFrame[] = [];
+  private pendingTranslatedAudioDurationMs: number = 0;
+  private isPublishingTranslatedAudio: boolean = false;
+  private droppedTranslatedAudioFrames: number = 0;
+  private droppedTranslatedAudioDurationMs: number = 0;
+  private lastLoggedDroppedTranslatedAudioFrames: number = 0;
+  private lastOutputBacklogLogAt: number = 0;
+  private lastOutputBacklogWarningAt: number = 0;
+  private activeOrganizerAudioPipelineId: string | null = null;
 
   constructor(
     sessionId: string,
@@ -145,6 +193,7 @@ export class TranslationBridge {
     this.audioSource = null;
     this.localTrack = null;
     this.geminiSetupComplete = false;
+    this.activeOrganizerAudioPipelineId = null;
 
     if (this.onStop) {
       this.onStop();
@@ -207,7 +256,15 @@ export class TranslationBridge {
 
     // Create an AudioSource to publish translated audio
     // Gemini outputs 24kHz mono PCM
-    this.audioSource = new AudioSource(this.sampleRate, this.channels);
+    this.audioSource = new AudioSource(
+      this.sampleRate,
+      this.channels,
+      this.outputAudioSourceQueueMs
+    );
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Output audio config: sourceQueue=${this.outputAudioSourceQueueMs}ms, maxBacklog=${this.maxOutputBacklogMs}ms, targetBacklog=${this.targetOutputBacklogMs}ms, dropStale=${this.dropStaleOutputAudio}`
+    );
+
     this.localTrack = LocalAudioTrack.createAudioTrack(
       `translated-audio-${this.targetLanguage}`,
       this.audioSource
@@ -423,6 +480,10 @@ export class TranslationBridge {
       realtimeInputConfig: {
         automaticActivityDetection: {
           disabled: boolean;
+          startOfSpeechSensitivity: "START_SENSITIVITY_HIGH";
+          endOfSpeechSensitivity: "END_SENSITIVITY_HIGH";
+          prefixPaddingMs: number;
+          silenceDurationMs: number;
         };
       };
       sessionResumption: {
@@ -446,6 +507,10 @@ export class TranslationBridge {
       realtimeInputConfig: {
         automaticActivityDetection: {
           disabled: false,
+          startOfSpeechSensitivity: "START_SENSITIVITY_HIGH",
+          endOfSpeechSensitivity: "END_SENSITIVITY_HIGH",
+          prefixPaddingMs: 100,
+          silenceDurationMs: 500,
         },
       },
       sessionResumption: this.resumptionHandle
@@ -580,28 +645,99 @@ export class TranslationBridge {
   }
 
   /**
-   * Queue an audio frame for sequential capture.
-   * Chains each captureFrame call to avoid promise pile-up.
+   * Queue translated audio for sequential capture.
+   * If Gemini produces audio faster than LiveKit can play it, discard stale
+   * pending frames so listeners stay close to live instead of drifting behind.
    */
   private queueAudioFrame(base64Audio: string): void {
-    this.captureChain = this.captureChain.then(() =>
-      this.publishTranslatedAudio(base64Audio)
-    );
+    try {
+      const pcmBuffer = Buffer.from(base64Audio, "base64");
+      const durationMs = this.getPcmDurationMs(pcmBuffer);
+
+      if (durationMs <= 0) return;
+
+      this.pendingTranslatedAudioFrames.push({ pcmBuffer, durationMs });
+      this.pendingTranslatedAudioDurationMs += durationMs;
+
+      this.maybeLogOutputBacklog();
+
+      if (!this.isPublishingTranslatedAudio) {
+        this.drainTranslatedAudioQueue().catch((error) => {
+          console.error(
+            `[TranslationBridge:${this.targetLanguage}] Error draining translated audio queue:`,
+            error
+          );
+        });
+      }
+    } catch (error) {
+      console.error(
+        `[TranslationBridge:${this.targetLanguage}] Error queueing translated audio frame:`,
+        error
+      );
+    }
   }
 
-  private async publishTranslatedAudio(base64Audio: string): Promise<void> {
+  private async drainTranslatedAudioQueue(): Promise<void> {
+    if (this.isPublishingTranslatedAudio) return;
+
+    this.isPublishingTranslatedAudio = true;
+    try {
+      while (
+        this.pendingTranslatedAudioFrames.length > 0 &&
+        this.status !== "closed"
+      ) {
+        this.trimTranslatedAudioBacklog("drain", true);
+
+        const queuedFrame = this.pendingTranslatedAudioFrames.shift();
+        if (!queuedFrame) continue;
+
+        this.pendingTranslatedAudioDurationMs = Math.max(
+          this.pendingTranslatedAudioDurationMs - queuedFrame.durationMs,
+          0
+        );
+
+        await this.publishTranslatedAudio(queuedFrame);
+      }
+    } finally {
+      this.isPublishingTranslatedAudio = false;
+
+      if (this.status === "closed") {
+        this.pendingTranslatedAudioFrames = [];
+        this.pendingTranslatedAudioDurationMs = 0;
+      } else if (this.pendingTranslatedAudioFrames.length > 0) {
+        this.drainTranslatedAudioQueue().catch((error) => {
+          console.error(
+            `[TranslationBridge:${this.targetLanguage}] Error restarting translated audio queue drain:`,
+            error
+          );
+        });
+      }
+    }
+  }
+
+  private async publishTranslatedAudio(
+    queuedFrame: QueuedTranslatedAudioFrame
+  ): Promise<void> {
     if (!this.audioSource || this.status === "closed") return;
 
     try {
-      const pcmBuffer = Buffer.from(base64Audio, "base64");
       const int16 = new Int16Array(
-        pcmBuffer.buffer,
-        pcmBuffer.byteOffset,
-        pcmBuffer.byteLength / 2
+        queuedFrame.pcmBuffer.buffer,
+        queuedFrame.pcmBuffer.byteOffset,
+        queuedFrame.pcmBuffer.byteLength / 2
       );
 
       const frame = new AudioFrame(int16, this.sampleRate, this.channels, int16.length);
       await this.audioSource.captureFrame(frame);
+      this.framesPublishedToLiveKit++;
+
+      if (this.framesPublishedToLiveKit <= 3 || this.framesPublishedToLiveKit % 100 === 0) {
+        console.log(
+          `[TranslationBridge:${this.targetLanguage}] Published translated audio frame #${this.framesPublishedToLiveKit} to LiveKit (${Math.round(
+            queuedFrame.durationMs
+          )}ms)`
+        );
+      }
 
       const now = Date.now();
       if (this.lastAudioFrameTime && now - this.lastAudioFrameTime > 2000) {
@@ -610,6 +746,7 @@ export class TranslationBridge {
         );
       }
       this.lastAudioFrameTime = now;
+      this.maybeLogOutputBacklog();
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       if (msg.includes("InvalidState") || msg.includes("closed")) {
@@ -624,6 +761,122 @@ export class TranslationBridge {
         );
       }
     }
+  }
+
+  private getPcmDurationMs(pcmBuffer: Buffer): number {
+    const samplesPerChannel = pcmBuffer.byteLength / 2 / this.channels;
+    return (samplesPerChannel / this.sampleRate) * 1000;
+  }
+
+  private getNativeOutputQueueMs(): number {
+    return this.audioSource?.queuedDuration ?? 0;
+  }
+
+  private getTotalOutputBacklogMs(): number {
+    return this.getNativeOutputQueueMs() + this.pendingTranslatedAudioDurationMs;
+  }
+
+  private trimTranslatedAudioBacklog(
+    reason: "enqueue" | "drain",
+    allowNativeClear: boolean
+  ): void {
+    if (!this.dropStaleOutputAudio) return;
+
+    const source = this.audioSource;
+    let nativeQueuedMs = this.getNativeOutputQueueMs();
+    const totalBeforeMs = nativeQueuedMs + this.pendingTranslatedAudioDurationMs;
+
+    if (totalBeforeMs <= this.maxOutputBacklogMs) return;
+
+    let clearedNativeMs = 0;
+    let droppedFrames = 0;
+    let droppedDurationMs = 0;
+
+    if (
+      allowNativeClear &&
+      source &&
+      nativeQueuedMs > this.targetOutputBacklogMs
+    ) {
+      source.clearQueue();
+      clearedNativeMs = nativeQueuedMs;
+      nativeQueuedMs = 0;
+    }
+
+    const targetBacklogMs = Math.min(
+      this.targetOutputBacklogMs,
+      this.maxOutputBacklogMs
+    );
+
+    while (
+      nativeQueuedMs + this.pendingTranslatedAudioDurationMs >
+        targetBacklogMs &&
+      this.pendingTranslatedAudioFrames.length > 1
+    ) {
+      const dropped = this.pendingTranslatedAudioFrames.shift();
+      if (!dropped) break;
+
+      this.pendingTranslatedAudioDurationMs = Math.max(
+        this.pendingTranslatedAudioDurationMs - dropped.durationMs,
+        0
+      );
+      droppedFrames++;
+      droppedDurationMs += dropped.durationMs;
+    }
+
+    if (clearedNativeMs === 0 && droppedFrames === 0) return;
+
+    this.droppedTranslatedAudioFrames += droppedFrames;
+    this.droppedTranslatedAudioDurationMs += clearedNativeMs + droppedDurationMs;
+
+    const now = Date.now();
+    if (now - this.lastOutputBacklogWarningAt < 2000) return;
+    this.lastOutputBacklogWarningAt = now;
+
+    console.warn(
+      `[TranslationBridge:${this.targetLanguage}] Output audio backlog capped during ${reason}: total=${Math.round(
+        totalBeforeMs
+      )}ms, clearedNative=${Math.round(
+        clearedNativeMs
+      )}ms, droppedPending=${droppedFrames} frames/${Math.round(
+        droppedDurationMs
+      )}ms, remaining=${Math.round(this.getTotalOutputBacklogMs())}ms`
+    );
+  }
+
+  private maybeLogOutputBacklog(): void {
+    const now = Date.now();
+    if (now - this.lastOutputBacklogLogAt < this.outputBacklogLogIntervalMs) {
+      return;
+    }
+
+    const nativeQueuedMs = this.getNativeOutputQueueMs();
+    const totalBacklogMs = nativeQueuedMs + this.pendingTranslatedAudioDurationMs;
+    const droppedFrameCountChanged =
+      this.droppedTranslatedAudioFrames !==
+      this.lastLoggedDroppedTranslatedAudioFrames;
+
+    if (
+      totalBacklogMs < this.outputBacklogInfoThresholdMs &&
+      !droppedFrameCountChanged
+    ) {
+      return;
+    }
+
+    this.lastOutputBacklogLogAt = now;
+    this.lastLoggedDroppedTranslatedAudioFrames =
+      this.droppedTranslatedAudioFrames;
+
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Output audio backlog: total=${Math.round(
+        totalBacklogMs
+      )}ms, native=${Math.round(nativeQueuedMs)}ms, pending=${Math.round(
+        this.pendingTranslatedAudioDurationMs
+      )}ms, pendingFrames=${
+        this.pendingTranslatedAudioFrames.length
+      }, dropped=${this.droppedTranslatedAudioFrames} frames/${Math.round(
+        this.droppedTranslatedAudioDurationMs
+      )}ms`
+    );
   }
 
   private async subscribeToOrganizer(): Promise<void> {
@@ -672,7 +925,7 @@ export class TranslationBridge {
           participant.identity === this.organizerIdentity &&
           publication.kind === TrackKind.KIND_AUDIO
         ) {
-          this.pipeTrackToGemini(track);
+          this.pipeTrackToGemini(track, publication);
         }
       }
     );
@@ -684,14 +937,7 @@ export class TranslationBridge {
   private subscribeToParticipantAudio(
     participant: RemoteParticipant
   ): void {
-    for (const [, publication] of participant.trackPublications) {
-      if (publication.kind === TrackKind.KIND_AUDIO) {
-        // Manually subscribe — this triggers TrackSubscribed event
-        publication.setSubscribed(true);
-      }
-    }
-
-    // Also listen for TrackSubscribed to pipe to Gemini
+    // Listen before setSubscribed() so the subscription event cannot race past us.
     this.room!.on(
       RoomEvent.TrackSubscribed,
       (
@@ -703,15 +949,50 @@ export class TranslationBridge {
           p.identity === this.organizerIdentity &&
           pub.kind === TrackKind.KIND_AUDIO
         ) {
-          this.pipeTrackToGemini(track);
+          this.pipeTrackToGemini(track, pub);
         }
       }
     );
+
+    const audioPublications = Array.from(participant.trackPublications.values())
+      .filter((publication) => publication.kind === TrackKind.KIND_AUDIO);
+    const preferredPublication =
+      audioPublications.find((publication) => publication.name === "broadcast-audio") ??
+      audioPublications[0];
+
+    if (!preferredPublication) {
+      console.log(
+        `[TranslationBridge:${this.targetLanguage}] Organizer ${this.organizerIdentity} has no audio tracks yet`
+      );
+      return;
+    }
+
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Subscribing to organizer audio publication ${this.getPublicationLabel(preferredPublication)}`
+    );
+    preferredPublication.setSubscribed(true);
   }
 
-  private pipeTrackToGemini(track: RemoteAudioTrack): void {
+  private pipeTrackToGemini(
+    track: RemoteAudioTrack,
+    publication: RemoteTrackPublication
+  ): void {
+    const pipelineId = this.getAudioPipelineId(track, publication);
+
+    if (this.activeOrganizerAudioPipelineId) {
+      const duplicateKind =
+        this.activeOrganizerAudioPipelineId === pipelineId
+          ? "duplicate"
+          : "additional";
+      console.warn(
+        `[TranslationBridge:${this.targetLanguage}] Ignoring ${duplicateKind} organizer audio pipeline ${pipelineId}; active=${this.activeOrganizerAudioPipelineId}`
+      );
+      return;
+    }
+
+    this.activeOrganizerAudioPipelineId = pipelineId;
     console.log(
-      `[TranslationBridge:${this.targetLanguage}] Subscribed to organizer audio track, piping to Gemini`
+      `[TranslationBridge:${this.targetLanguage}] Subscribed to organizer audio track ${pipelineId} (${this.getPublicationLabel(publication)}), piping to Gemini`
     );
 
     const audioStream = new AudioStream(track, {
@@ -730,12 +1011,29 @@ export class TranslationBridge {
       }
     };
 
-    readLoop().catch((err: Error) => {
-      console.error(
-        `[TranslationBridge:${this.targetLanguage}] Audio stream error:`,
-        err
-      );
-    });
+    readLoop()
+      .catch((err: Error) => {
+        console.error(
+          `[TranslationBridge:${this.targetLanguage}] Audio stream error:`,
+          err
+        );
+      })
+      .finally(() => {
+        if (this.activeOrganizerAudioPipelineId === pipelineId) {
+          this.activeOrganizerAudioPipelineId = null;
+        }
+      });
+  }
+
+  private getAudioPipelineId(
+    track: RemoteAudioTrack,
+    publication: RemoteTrackPublication
+  ): string {
+    return publication.sid || track.sid || publication.name || track.name || "unknown";
+  }
+
+  private getPublicationLabel(publication: RemoteTrackPublication): string {
+    return `sid=${publication.sid || "unknown"}, name=${publication.name || "unnamed"}`;
   }
 
   private sendAudioToGemini(frame: AudioFrame): void {

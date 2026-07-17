@@ -16,6 +16,9 @@ import { Track, RoomEvent, type LocalTrackPublication } from "livekit-client";
 import { useLocale, useTranslations } from "next-intl";
 import {
   AlertTriangleIcon,
+  CheckIcon,
+  CopyIcon,
+  ExternalLinkIcon,
   HomeIcon,
   LockKeyholeIcon,
   LogInIcon,
@@ -81,6 +84,30 @@ function getClientOrigin() {
 
 function getServerOrigin() {
   return "";
+}
+
+async function copyTextToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textArea = document.createElement("textarea");
+  textArea.value = text;
+  textArea.setAttribute("readonly", "");
+  textArea.style.position = "fixed";
+  textArea.style.opacity = "0";
+  document.body.appendChild(textArea);
+  textArea.select();
+
+  try {
+    const copied = document.execCommand("copy");
+    if (!copied) {
+      throw new Error("Copy command was rejected");
+    }
+  } finally {
+    document.body.removeChild(textArea);
+  }
 }
 
 type NavigatorWithWakeLock = Navigator & {
@@ -208,6 +235,8 @@ function BroadcastControls({
   const [micVolume, setMicVolume] = useState(100);
   const [tabVolume, setTabVolume] = useState(100);
   const [isWakeLockActive, setIsWakeLockActive] = useState(false);
+  const [isJoinUrlCopied, setIsJoinUrlCopied] = useState(false);
+  const copyResetTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("wakeLock" in navigator)) {
@@ -267,6 +296,34 @@ function BroadcastControls({
   });
 
   const joinUrl = origin ? `${origin}${joinPath}` : joinPath;
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyJoinUrl = useCallback(async () => {
+    const urlToCopy = origin ? joinUrl : `${window.location.origin}${joinPath}`;
+
+    try {
+      await copyTextToClipboard(urlToCopy);
+      setIsJoinUrlCopied(true);
+
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+
+      copyResetTimeoutRef.current = window.setTimeout(() => {
+        setIsJoinUrlCopied(false);
+        copyResetTimeoutRef.current = null;
+      }, 2000);
+    } catch (err) {
+      console.error("Failed to copy attendee link:", err);
+    }
+  }, [joinPath, joinUrl, origin]);
 
   const fetchTranslations = useCallback(async () => {
     try {
@@ -641,9 +698,22 @@ function BroadcastControls({
           {t("shareWithAttendees")}
         </Badge>
         <SessionQRCode url={joinUrl || joinPath} size={140} />
-        <p className="break-all font-mono text-xs leading-5 text-muted-foreground">
-          {joinUrl}
-        </p>
+        <div className="grid w-full max-w-sm gap-2 sm:grid-cols-2">
+          <Button type="button" variant="outline" onClick={handleCopyJoinUrl}>
+            {isJoinUrlCopied ? (
+              <CheckIcon className="text-success" />
+            ) : (
+              <CopyIcon />
+            )}
+            {isJoinUrlCopied ? t("linkCopied") : t("copyLink")}
+          </Button>
+          <Button asChild variant="outline">
+            <a href={joinUrl} target="_blank" rel="noopener noreferrer">
+              <ExternalLinkIcon />
+              {t("openInNewTab")}
+            </a>
+          </Button>
+        </div>
       </section>
 
       <Separator />
