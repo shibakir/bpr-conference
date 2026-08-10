@@ -46,6 +46,7 @@ export async function POST(req: NextRequest) {
 
     // Validate targetLanguage against source language and allowedLanguages allowlist
     if (
+      session.inputLanguageMode === "single" &&
       normalizedTargetLanguage !== "original" &&
       normalizedTargetLanguage === session.sourceLanguage
     ) {

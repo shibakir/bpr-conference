@@ -39,12 +39,15 @@ export class TranslationBridge {
   private localTrack: LocalAudioTrack | null = null;
   private publishedTrackSid: string = "";
   private transcriptionSegmentId: number = 0;
+  private inputDiagnosticSegmentId: number = 0;
   private framesSentToGemini: number = 0;
   private framesReceivedFromGemini: number = 0;
   private resumptionHandle: string | null = null;
   private isReconnecting: boolean = false;
   private pendingInterimText: string = "";
+  private pendingInputDiagnosticText: string = "";
   private interimTimeout: NodeJS.Timeout | null = null;
+  private inputDiagnosticTimeout: NodeJS.Timeout | null = null;
 
   public readonly targetLanguage: string;
   public readonly sessionId: string;
@@ -72,6 +75,7 @@ export class TranslationBridge {
   private readonly livekitApiKey: string;
   private readonly livekitApiSecret: string;
   private readonly enableTranscription: boolean;
+  private readonly enableInputDiagnostics: boolean;
 
   private geminiSetupComplete: boolean = false;
   private organizerIdentity: string;
@@ -96,6 +100,7 @@ export class TranslationBridge {
       livekitApiKey: string;
       livekitApiSecret: string;
       enableTranscription?: boolean;
+      enableInputDiagnostics?: boolean;
     }
   ) {
     this.sessionId = sessionId;
@@ -107,6 +112,7 @@ export class TranslationBridge {
     this.livekitApiKey = config.livekitApiKey;
     this.livekitApiSecret = config.livekitApiSecret;
     this.enableTranscription = config.enableTranscription === true;
+    this.enableInputDiagnostics = config.enableInputDiagnostics === true;
   }
 
   async start(): Promise<void> {
@@ -149,6 +155,11 @@ export class TranslationBridge {
       this.interimTimeout = null;
     }
     this.pendingInterimText = "";
+    if (this.inputDiagnosticTimeout) {
+      clearTimeout(this.inputDiagnosticTimeout);
+      this.inputDiagnosticTimeout = null;
+    }
+    this.pendingInputDiagnosticText = "";
 
     if (this.geminiWs) {
       this.geminiWs.close();
@@ -435,6 +446,7 @@ export class TranslationBridge {
   private sendGeminiSetup(ws: WebSocket = this.geminiWs!): void {
     const setup: {
       model: string;
+      inputAudioTranscription?: Record<string, never>;
       outputAudioTranscription?: Record<string, never>;
       generationConfig: {
         responseModalities: string[];
@@ -492,6 +504,10 @@ export class TranslationBridge {
 
     if (this.enableTranscription) {
       setup.outputAudioTranscription = {};
+    }
+
+    if (this.enableInputDiagnostics) {
+      setup.inputAudioTranscription = {};
     }
 
     const setupMessage = { setup };
@@ -590,6 +606,31 @@ export class TranslationBridge {
         }
       }
 
+      if (
+        this.enableInputDiagnostics &&
+        serverContent?.inputTranscription?.text
+      ) {
+        const text = serverContent.inputTranscription.text;
+        const isInterim = !serverContent.turnComplete;
+
+        console.log(
+          `[TranslationBridge:${this.targetLanguage}] Input diagnostic${isInterim ? " interim" : " final"}:`,
+          text.slice(0, 160)
+        );
+
+        if (isInterim) {
+          this.handleInputDiagnosticInterim(text);
+        } else {
+          if (this.inputDiagnosticTimeout) {
+            clearTimeout(this.inputDiagnosticTimeout);
+            this.inputDiagnosticTimeout = null;
+          }
+          const finalText = this.pendingInputDiagnosticText + text;
+          this.pendingInputDiagnosticText = "";
+          this.publishInputDiagnosticText(finalText, false);
+        }
+      }
+
       // If turn is complete, flush remaining interim buffer and advance the segment id
       if (this.enableTranscription && serverContent?.turnComplete) {
         if (this.interimTimeout) {
@@ -601,6 +642,18 @@ export class TranslationBridge {
           this.pendingInterimText = "";
         }
         this.transcriptionSegmentId++;
+      }
+
+      if (this.enableInputDiagnostics && serverContent?.turnComplete) {
+        if (this.inputDiagnosticTimeout) {
+          clearTimeout(this.inputDiagnosticTimeout);
+          this.inputDiagnosticTimeout = null;
+        }
+        if (this.pendingInputDiagnosticText) {
+          this.publishInputDiagnosticText(this.pendingInputDiagnosticText, false);
+          this.pendingInputDiagnosticText = "";
+        }
+        this.inputDiagnosticSegmentId++;
       }
     } catch (error) {
       console.error(
@@ -1047,6 +1100,30 @@ export class TranslationBridge {
     }
   }
 
+  private handleInputDiagnosticInterim(text: string): void {
+    if (!this.enableInputDiagnostics) return;
+
+    this.pendingInputDiagnosticText += text;
+
+    if (!this.inputDiagnosticTimeout) {
+      this.inputDiagnosticTimeout = setTimeout(() => {
+        this.flushInputDiagnostic();
+      }, 250);
+    }
+  }
+
+  private flushInputDiagnostic(): void {
+    this.inputDiagnosticTimeout = null;
+    if (
+      this.enableInputDiagnostics &&
+      this.pendingInputDiagnosticText &&
+      this.status === "active"
+    ) {
+      this.publishInputDiagnosticText(this.pendingInputDiagnosticText, true);
+      this.pendingInputDiagnosticText = "";
+    }
+  }
+
   private async publishTranscriptionText(text: string, interim: boolean): Promise<void> {
     if (!this.enableTranscription) return;
     if (!this.room || !this.room.localParticipant) return;
@@ -1082,6 +1159,49 @@ export class TranslationBridge {
     } catch (error) {
       console.error(
         `[TranslationBridge:${this.targetLanguage}] Error publishing transcription:`,
+        error
+      );
+    }
+  }
+
+  private async publishInputDiagnosticText(
+    text: string,
+    interim: boolean
+  ): Promise<void> {
+    if (!this.enableInputDiagnostics) return;
+    if (!this.room || !this.room.localParticipant) return;
+
+    try {
+      const destinationIdentities = Array.from(
+        this.room.remoteParticipants.values()
+      )
+        .filter((p) => p.identity === this.organizerIdentity)
+        .map((p) => p.identity);
+
+      if (destinationIdentities.length === 0) {
+        return;
+      }
+
+      const payload = JSON.stringify({
+        type: "input-diagnostic",
+        targetLanguage: this.targetLanguage,
+        segmentId: `${this.targetLanguage}-input-${this.inputDiagnosticSegmentId}`,
+        text,
+        final: !interim,
+        timestamp: Date.now(),
+      });
+
+      await this.room.localParticipant.publishData(
+        new TextEncoder().encode(payload),
+        {
+          reliable: !interim,
+          topic: "translation-diagnostics",
+          destination_identities: destinationIdentities,
+        }
+      );
+    } catch (error) {
+      console.error(
+        `[TranslationBridge:${this.targetLanguage}] Error publishing input diagnostic:`,
         error
       );
     }

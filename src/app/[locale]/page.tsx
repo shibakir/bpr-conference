@@ -52,6 +52,7 @@ const DEFAULT_LANGUAGES = [
 ];
 
 const DEFAULT_SOURCE_LANGUAGE = "cs";
+type InputLanguageMode = "single" | "multi";
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -61,6 +62,8 @@ export default function Home() {
   const [passwordRequired, setPasswordRequired] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [inputLanguageMode, setInputLanguageMode] =
+    useState<InputLanguageMode>("multi");
   const [sourceLanguage, setSourceLanguage] = useState(DEFAULT_SOURCE_LANGUAGE);
   const [durationMinutes, setDurationMinutes] = useState(
     DEFAULT_SESSION_DURATION_MINUTES
@@ -85,13 +88,21 @@ export default function Home() {
   );
 
   const translationLanguageOptions = useMemo(
-    () => languageOptions.filter((lang) => lang.code !== sourceLanguage),
-    [languageOptions, sourceLanguage]
+    () =>
+      languageOptions.filter(
+        (lang) =>
+          inputLanguageMode !== "single" || lang.code !== sourceLanguage
+      ),
+    [inputLanguageMode, languageOptions, sourceLanguage]
   );
 
   const selectedTranslationLanguages = useMemo(
-    () => selectedLanguages.filter((code) => code !== sourceLanguage),
-    [selectedLanguages, sourceLanguage]
+    () =>
+      selectedLanguages.filter(
+        (code) =>
+          inputLanguageMode !== "single" || code !== sourceLanguage
+      ),
+    [inputLanguageMode, selectedLanguages, sourceLanguage]
   );
 
   const filteredLanguages = translationLanguageOptions.filter((lang) => {
@@ -106,9 +117,21 @@ export default function Home() {
   function handleSourceLanguageChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextSourceLanguage = event.target.value;
     setSourceLanguage(nextSourceLanguage);
-    setSelectedLanguages((prev) =>
-      prev.filter((code) => code !== nextSourceLanguage)
-    );
+    if (inputLanguageMode === "single") {
+      setSelectedLanguages((prev) =>
+        prev.filter((code) => code !== nextSourceLanguage)
+      );
+    }
+  }
+
+  function handleInputLanguageModeChange(event: ChangeEvent<HTMLSelectElement>) {
+    const nextMode = event.target.value === "single" ? "single" : "multi";
+    setInputLanguageMode(nextMode);
+    if (nextMode === "single") {
+      setSelectedLanguages((prev) =>
+        prev.filter((code) => code !== sourceLanguage)
+      );
+    }
   }
 
   useEffect(() => {
@@ -151,8 +174,11 @@ export default function Home() {
           organizerName: "host",
           password,
           locale,
-          sourceLanguage,
+          inputLanguageMode,
+          sourceLanguage:
+            inputLanguageMode === "single" ? sourceLanguage : undefined,
           enableTranscription,
+          enableInputDiagnostics: true,
           durationMinutes,
           allowedLanguages: restrictLanguages
             ? selectedTranslationLanguages
@@ -289,6 +315,32 @@ export default function Home() {
               </div>
 
               <div className="grid gap-2">
+                <Label htmlFor="input-language-mode">
+                  {t("inputLanguageMode")}
+                </Label>
+                <NativeSelect
+                  id="input-language-mode"
+                  className="w-full"
+                  value={inputLanguageMode}
+                  onChange={handleInputLanguageModeChange}
+                  disabled={loading}
+                >
+                  <NativeSelectOption value="multi">
+                    {t("inputLanguageModeMulti")}
+                  </NativeSelectOption>
+                  <NativeSelectOption value="single">
+                    {t("inputLanguageModeSingle")}
+                  </NativeSelectOption>
+                </NativeSelect>
+                <p className="text-xs leading-5 text-muted-foreground">
+                  {inputLanguageMode === "multi"
+                    ? t("inputLanguageModeMultiDescription")
+                    : t("inputLanguageModeSingleDescription")}
+                </p>
+              </div>
+
+              {inputLanguageMode === "single" && (
+              <div className="grid gap-2">
                 <Label htmlFor="source-language">{t("sourceLanguage")}</Label>
                 <NativeSelect
                   id="source-language"
@@ -304,6 +356,7 @@ export default function Home() {
                   ))}
                 </NativeSelect>
               </div>
+              )}
 
               <Label className="items-start gap-3 rounded-lg border bg-muted/30 p-3">
                 <Checkbox
