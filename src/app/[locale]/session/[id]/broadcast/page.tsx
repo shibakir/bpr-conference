@@ -4,11 +4,11 @@ import { use, useCallback, useRef } from "react";
 import { LiveKitRoom } from "@livekit/components-react";
 import "@livekit/components-styles";
 import { useTranslations } from "next-intl";
+import { CenteredLoadingState } from "@/components/CenteredPage";
 import { useRouter } from "@/i18n/navigation";
 import { useBroadcastToken } from "./hooks/useBroadcastToken";
 import { BroadcastControls } from "./components/BroadcastControls";
 import { BroadcastErrorState } from "./components/BroadcastErrorState";
-import { BroadcastLoadingState } from "./components/BroadcastLoadingState";
 import { BroadcastPasswordGate } from "./components/BroadcastPasswordGate";
 
 export default function BroadcastPage({
@@ -54,7 +54,7 @@ export default function BroadcastPage({
   }
 
   if (!broadcastToken.token || !broadcastToken.livekitUrl) {
-    return <BroadcastLoadingState />;
+    return <CenteredLoadingState />;
   }
 
   return (

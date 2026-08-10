@@ -9,6 +9,7 @@ import {
   SearchIcon,
   XIcon,
 } from "lucide-react";
+import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,7 @@ import {
   MAX_SESSION_DURATION_MINUTES,
   MIN_SESSION_DURATION_MINUTES,
 } from "@/lib/session-duration";
+import type { InputLanguageMode } from "@/lib/session-types";
 
 const DEFAULT_LANGUAGES = [
   "en",
@@ -52,7 +54,6 @@ const DEFAULT_LANGUAGES = [
 ];
 
 const DEFAULT_SOURCE_LANGUAGE = "cs";
-type InputLanguageMode = "single" | "multi";
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -214,7 +215,7 @@ export default function Home() {
   const titleHighlightIndex = title.indexOf(titleHighlight);
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-10 sm:px-6">
+    <CenteredPage className="sm:px-6">
       <section className="grid w-full max-w-xl gap-6">
         <nav className="flex justify-center gap-1" aria-label="Language">
           {locales.map((item) => (
@@ -568,6 +569,6 @@ export default function Home() {
           </a>
         </p>
       </section>
-    </main>
+    </CenteredPage>
   );
 }

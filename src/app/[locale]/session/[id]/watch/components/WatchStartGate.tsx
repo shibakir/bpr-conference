@@ -2,6 +2,7 @@
 
 import { Volume2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { CenteredPage } from "@/components/CenteredPage";
 import SessionCountdown from "@/components/SessionCountdown";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,7 +27,7 @@ export function WatchStartGate({
   const t = useTranslations("Watch");
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-10">
+    <CenteredPage>
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <CardTitle className="text-3xl">{t("ready")}</CardTitle>
@@ -49,6 +50,6 @@ export function WatchStartGate({
           </p>
         </CardContent>
       </Card>
-    </main>
+    </CenteredPage>
   );
 }

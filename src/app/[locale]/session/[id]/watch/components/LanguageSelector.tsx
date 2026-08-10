@@ -20,6 +20,7 @@ import {
   getLanguageByCode,
   getLanguageDisplayName,
 } from "@/lib/languages";
+import type { InputLanguageMode } from "@/lib/session-types";
 
 interface LanguageSelectorProps {
   sessionId: string;
@@ -30,7 +31,7 @@ interface LanguageSelectorProps {
   ) => void;
   disabled?: boolean;
   allowedLanguages?: string[];
-  inputLanguageMode?: "single" | "multi";
+  inputLanguageMode?: InputLanguageMode;
   sourceLanguage?: string;
 }
 

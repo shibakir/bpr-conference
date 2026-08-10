@@ -10,6 +10,7 @@
 import { TranslationBridge, BridgeStatus } from "./translation-bridge";
 import { RoomServiceClient, type ParticipantInfo } from "livekit-server-sdk";
 import { DEFAULT_SESSION_DURATION_MINUTES } from "./session-duration";
+import type { InputLanguageMode } from "./session-types";
 
 export interface TranslationInfo {
   language: string;
@@ -30,8 +31,6 @@ export interface SessionInfo {
   enableInputDiagnostics: boolean;
   allowedLanguages?: string[];
 }
-
-export type InputLanguageMode = "single" | "multi";
 
 const globalForSessionManager = global as unknown as {
   sessionManagerInstance: TranslationSessionManager;

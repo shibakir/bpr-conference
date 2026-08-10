@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { CenteredPage } from "@/components/CenteredPage";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -18,7 +19,7 @@ export function WatchErrorState({ error }: { error: WatchError }) {
   const isInactiveSession = error.kind === "inactive";
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-10">
+    <CenteredPage>
       <Card className="w-full max-w-md text-center">
         <CardHeader>
           <CardTitle className="flex items-center justify-center gap-2">
@@ -42,6 +43,6 @@ export function WatchErrorState({ error }: { error: WatchError }) {
           </Button>
         </CardContent>
       </Card>
-    </main>
+    </CenteredPage>
   );
 }

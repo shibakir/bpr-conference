@@ -6,8 +6,6 @@ export interface TranscriptEntry {
   timestamp: number;
 }
 
-export type InputLanguageMode = "single" | "multi";
-
 export type WatchError = {
   kind: "ended" | "inactive" | "generic";
   message: string;

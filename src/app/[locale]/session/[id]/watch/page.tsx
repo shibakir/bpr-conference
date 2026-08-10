@@ -3,17 +3,19 @@
 import { use, useState } from "react";
 import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
 import "@livekit/components-styles";
+import { CenteredLoadingState } from "@/components/CenteredPage";
 import { useWatchToken } from "./hooks/useWatchToken";
 import { AttendeeView } from "./components/AttendeeView";
 import { WatchErrorState } from "./components/WatchErrorState";
-import { WatchLoadingState } from "./components/WatchLoadingState";
 import { WatchStartGate } from "./components/WatchStartGate";
+import { useTranslations } from "next-intl";
 
 export default function WatchPage({
   params,
 }: {
   params: Promise<{ locale: string; id: string }>;
 }) {
+  const t = useTranslations("Watch");
   const { id: sessionId } = use(params);
   const [started, setStarted] = useState(false);
   const { error, expiresAt, livekitUrl, markExpired, token } =
@@ -24,7 +26,7 @@ export default function WatchPage({
   }
 
   if (!token || !livekitUrl) {
-    return <WatchLoadingState />;
+    return <CenteredLoadingState label={t("joining")} />;
   }
 
   if (!started) {

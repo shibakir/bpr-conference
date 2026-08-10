@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { InputLanguageMode } from "../types";
+import type { InputLanguageMode } from "@/lib/session-types";
 
 export function useSessionDetails(sessionId: string) {
   const [allowedLanguages, setAllowedLanguages] = useState<

@@ -3,6 +3,7 @@
 import { FormEvent } from "react";
 import { LockKeyholeIcon, LogInIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -34,7 +35,7 @@ export function BroadcastPasswordGate({
   const t = useTranslations("Broadcast");
 
   return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-10">
+    <CenteredPage>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="flex items-center justify-center gap-2 text-3xl">
@@ -86,6 +87,6 @@ export function BroadcastPasswordGate({
           </Button>
         </CardContent>
       </Card>
-    </main>
+    </CenteredPage>
   );
 }

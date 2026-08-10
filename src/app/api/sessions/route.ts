@@ -8,9 +8,8 @@ import {
   MIN_SESSION_DURATION_MINUTES,
   parseSessionDurationMinutes,
 } from "@/lib/session-duration";
-import TranslationSessionManager, {
-  type InputLanguageMode,
-} from "@/lib/translation-session-manager";
+import type { InputLanguageMode } from "@/lib/session-types";
+import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
   organizerName?: unknown;
