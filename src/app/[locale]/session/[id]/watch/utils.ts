@@ -1,3 +1,5 @@
+import type { TranscriptEntry } from "./types";
+
 export function splitIntoParagraphs(
   text: string,
   sentencesPerParagraph = 2
@@ -30,4 +32,20 @@ export function splitIntoParagraphs(
   }
 
   return paragraphs;
+}
+
+export function getTranscriptParagraphs(
+  transcripts: TranscriptEntry[],
+  sentencesPerParagraph = 2
+): Array<{ id: string; text: string; final: boolean }> {
+  return transcripts.flatMap((entry, entryIndex) =>
+    splitIntoParagraphs(entry.text, sentencesPerParagraph)
+      .map((text) => text.trim())
+      .filter(Boolean)
+      .map((text, paragraphIndex) => ({
+        id: `${entry.id}-${entryIndex}-${paragraphIndex}`,
+        text,
+        final: entry.final,
+      }))
+  );
 }

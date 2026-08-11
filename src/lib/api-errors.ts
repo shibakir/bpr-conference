@@ -10,6 +10,7 @@ export const API_ERROR_CODES = {
   SESSION_INACTIVE: "session_inactive",
   SESSION_NOT_FOUND: "session_not_found",
   TARGET_LANGUAGE_MATCHES_SOURCE: "target_language_matches_source",
+  TRANSLATION_OUTPUTS_DISABLED: "translation_outputs_disabled",
   TRANSLATION_START_FAILED: "translation_start_failed",
   UNSUPPORTED_SOURCE_LANGUAGE: "unsupported_source_language",
   UNSUPPORTED_TARGET_LANGUAGE: "unsupported_target_language",

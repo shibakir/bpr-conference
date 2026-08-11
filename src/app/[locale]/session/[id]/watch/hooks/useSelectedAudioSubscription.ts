@@ -1,17 +1,28 @@
 "use client";
 
-import { useEffect } from "react";
-import { RoomEvent, Track, type RemoteParticipant, type Room } from "livekit-client";
+import { useEffect, useRef } from "react";
+import {
+  RoomEvent,
+  Track,
+  type RemoteParticipant,
+  type RemoteTrack,
+  type RemoteTrackPublication,
+  type Room,
+} from "livekit-client";
 
 export function useSelectedAudioSubscription({
+  enableTranslatedAudio,
   room,
   currentLanguage,
   translatorIdentity,
 }: {
+  enableTranslatedAudio: boolean;
   room: Room | undefined;
   currentLanguage: string;
   translatorIdentity: string | null;
 }) {
+  const desiredSubscriptionRef = useRef(new Map<string, boolean>());
+
   useEffect(() => {
     if (!room) return;
 
@@ -23,11 +34,26 @@ export function useSelectedAudioSubscription({
 
         for (const [, pub] of participant.trackPublications) {
           if (pub.kind === Track.Kind.Audio) {
-            if (currentLanguage === "original") {
-              pub.setSubscribed(isOrganizer);
-            } else {
-              pub.setSubscribed(!!isSelectedTranslator);
+            const shouldSubscribe =
+              currentLanguage === "original"
+                ? isOrganizer
+                : enableTranslatedAudio && !!isSelectedTranslator;
+            const key = `${participant.identity}:${pub.trackSid}`;
+
+            if (desiredSubscriptionRef.current.get(key) !== shouldSubscribe) {
+              desiredSubscriptionRef.current.set(key, shouldSubscribe);
+              console.info("[WatchAudio] subscription target changed", {
+                currentLanguage,
+                enableTranslatedAudio,
+                participant: participant.identity,
+                selectedTranslator: translatorIdentity,
+                shouldSubscribe,
+                trackName: pub.trackName,
+                trackSid: pub.trackSid,
+              });
             }
+
+            pub.setSubscribed(shouldSubscribe);
           }
         }
       }
@@ -44,18 +70,94 @@ export function useSelectedAudioSubscription({
       const isOrganizer = participant.identity.startsWith("organizer-");
       const isSelectedTranslator =
         translatorIdentity && participant.identity === translatorIdentity;
-      if (isOrganizer || isSelectedTranslator) {
+      if (isOrganizer || (enableTranslatedAudio && isSelectedTranslator)) {
         updateSubscriptions();
       }
     };
 
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
 
+    const handleTrackSubscribed = (
+      track: RemoteTrack,
+      pub: RemoteTrackPublication,
+      participant: RemoteParticipant
+    ) => {
+      if (pub.kind !== Track.Kind.Audio) return;
+
+      console.info("[WatchAudio] track subscribed", {
+        currentLanguage,
+        enableTranslatedAudio,
+        participant: participant.identity,
+        selectedTranslator: translatorIdentity,
+        trackName: pub.trackName,
+        trackSid: pub.trackSid,
+        trackSource: track.source,
+      });
+    };
+
+    const handleTrackUnsubscribed = (
+      track: RemoteTrack,
+      pub: RemoteTrackPublication,
+      participant: RemoteParticipant
+    ) => {
+      if (pub.kind !== Track.Kind.Audio) return;
+
+      console.info("[WatchAudio] track unsubscribed", {
+        currentLanguage,
+        enableTranslatedAudio,
+        participant: participant.identity,
+        selectedTranslator: translatorIdentity,
+        trackName: pub.trackName,
+        trackSid: pub.trackSid,
+        trackSource: track.source,
+      });
+    };
+
+    const handleSubscriptionFailed = (
+      trackSid: string,
+      participant: RemoteParticipant,
+      error?: unknown
+    ) => {
+      console.warn("[WatchAudio] track subscription failed", {
+        currentLanguage,
+        enableTranslatedAudio,
+        error: error instanceof Error ? error.message : String(error),
+        participant: participant.identity,
+        selectedTranslator: translatorIdentity,
+        trackSid,
+      });
+    };
+
+    const handleAudioPlaybackStatusChanged = (playing: boolean) => {
+      const log = playing ? console.info : console.warn;
+      log("[WatchAudio] playback status changed", {
+        currentLanguage,
+        enableTranslatedAudio,
+        playing,
+        selectedTranslator: translatorIdentity,
+      });
+    };
+
+    room.on(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+    room.on(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+    room.on(RoomEvent.TrackSubscriptionFailed, handleSubscriptionFailed);
+    room.on(
+      RoomEvent.AudioPlaybackStatusChanged,
+      handleAudioPlaybackStatusChanged
+    );
+
     return () => {
       room.off(RoomEvent.Connected, handleUpdate);
       room.off(RoomEvent.TrackPublished, handleUpdate);
       room.off(RoomEvent.TrackUnpublished, handleUpdate);
       room.off(RoomEvent.ParticipantConnected, handleParticipantConnected);
+      room.off(RoomEvent.TrackSubscribed, handleTrackSubscribed);
+      room.off(RoomEvent.TrackUnsubscribed, handleTrackUnsubscribed);
+      room.off(RoomEvent.TrackSubscriptionFailed, handleSubscriptionFailed);
+      room.off(
+        RoomEvent.AudioPlaybackStatusChanged,
+        handleAudioPlaybackStatusChanged
+      );
     };
-  }, [room, currentLanguage, translatorIdentity]);
+  }, [enableTranslatedAudio, room, currentLanguage, translatorIdentity]);
 }

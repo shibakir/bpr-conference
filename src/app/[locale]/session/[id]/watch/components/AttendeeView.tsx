@@ -19,6 +19,7 @@ import {
   useTranscriptAutoScroll,
 } from "../hooks/useTranslatedTranscripts";
 import LanguageSelector from "./LanguageSelector";
+import { FloatingTranscriptWindow } from "./FloatingTranscriptWindow";
 import { ListenerStatus } from "./ListenerStatus";
 import { TranscriptPanel } from "./TranscriptPanel";
 
@@ -49,9 +50,16 @@ export function AttendeeView({
     enabled: sessionDetails.enableTranscription,
     currentLanguageRef,
   });
+  const translationsEnabled =
+    sessionDetails.enableAudioTranslation || sessionDetails.enableTranscription;
 
   useTranscriptAutoScroll(transcripts, transcriptEndRef);
-  useSelectedAudioSubscription({ room, currentLanguage, translatorIdentity });
+  useSelectedAudioSubscription({
+    enableTranslatedAudio: sessionDetails.enableAudioTranslation,
+    room,
+    currentLanguage,
+    translatorIdentity,
+  });
   useParticipantLanguageAttribute({ room, currentLanguage });
   useTranslationUnsubscribeOnLeave({ sessionId, currentLanguageRef });
 
@@ -70,6 +78,7 @@ export function AttendeeView({
     }
 
     return (
+      sessionDetails.enableAudioTranslation &&
       translatorIdentity &&
       trackRef.participant.identity === translatorIdentity &&
       pub.isSubscribed &&
@@ -79,21 +88,12 @@ export function AttendeeView({
 
   const handleLanguageChange = useCallback(
     (langCode: string, newTranslatorIdentity: string | null) => {
-      const prev = currentLanguageRef.current;
-      if (prev && prev !== "original" && prev !== langCode) {
-        fetch("/api/translate/unsubscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sessionId, targetLanguage: prev }),
-        }).catch(() => {});
-      }
-
       setCurrentLanguage(langCode);
       currentLanguageRef.current = langCode;
       setTranslatorIdentity(newTranslatorIdentity);
       clearTranscripts();
     },
-    [clearTranscripts, sessionId]
+    [clearTranscripts]
   );
 
   return (
@@ -125,6 +125,7 @@ export function AttendeeView({
           allowedLanguages={sessionDetails.allowedLanguages}
           inputLanguageMode={sessionDetails.inputLanguageMode}
           sourceLanguage={sessionDetails.sourceLanguage}
+          translationsEnabled={translationsEnabled}
         />
       </section>
 
@@ -136,6 +137,12 @@ export function AttendeeView({
             canDecreaseFontSize={fontSizePreference.canDecreaseFontSize}
             canIncreaseFontSize={fontSizePreference.canIncreaseFontSize}
             currentLanguage={currentLanguage}
+            floatingWindowControl={
+              <FloatingTranscriptWindow
+                currentLanguage={currentLanguage}
+                transcripts={transcripts}
+              />
+            }
             fontSize={fontSizePreference.fontSize}
             onDecreaseFontSize={fontSizePreference.decreaseFontSize}
             onIncreaseFontSize={fontSizePreference.increaseFontSize}

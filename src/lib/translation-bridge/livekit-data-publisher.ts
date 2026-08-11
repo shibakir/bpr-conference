@@ -22,8 +22,6 @@ export class TranslationDataPublisher {
         .filter((participant) => participant.attributes?.language === this.options.targetLanguage)
         .map((participant) => participant.identity);
 
-      if (destinationIdentities.length === 0) return;
-
       const payload = JSON.stringify({
         type: "transcription",
         language: this.options.targetLanguage,
@@ -34,9 +32,11 @@ export class TranslationDataPublisher {
       });
 
       await room.localParticipant.publishData(new TextEncoder().encode(payload), {
-        reliable: !interim,
+        reliable: true,
         topic: "transcription",
-        destination_identities: destinationIdentities,
+        ...(destinationIdentities.length > 0
+          ? { destination_identities: destinationIdentities }
+          : {}),
       });
     } catch (error) {
       console.error(

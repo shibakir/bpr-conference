@@ -8,7 +8,11 @@ import {
   MIN_SESSION_DURATION_MINUTES,
   parseSessionDurationMinutes,
 } from "@/lib/session-duration";
-import type { InputLanguageMode } from "@/lib/session-types";
+import {
+  isTranslationOutputMode,
+  type InputLanguageMode,
+  type TranslationOutputMode,
+} from "@/lib/session-types";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
@@ -19,6 +23,8 @@ interface CreateSessionRequest {
   allowedLanguages?: unknown;
   inputLanguageMode?: unknown;
   sourceLanguage?: unknown;
+  translationOutputs?: unknown;
+  enableAudioTranslation?: unknown;
   enableTranscription?: unknown;
   enableInputDiagnostics?: unknown;
   durationMinutes?: unknown;
@@ -103,7 +109,32 @@ export async function POST(req: NextRequest) {
       sourceLanguage = source.code;
     }
 
-    const enableTranscription = body.enableTranscription === true;
+    let enableAudioTranslation = body.enableAudioTranslation !== false;
+    let enableTranscription = body.enableTranscription === true;
+
+    if (body.translationOutputs !== undefined) {
+      if (!Array.isArray(body.translationOutputs)) {
+        return NextResponse.json(
+          apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid translation outputs"),
+          { status: 400 }
+        );
+      }
+
+      if (!body.translationOutputs.every(isTranslationOutputMode)) {
+        return NextResponse.json(
+          apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid translation outputs"),
+          { status: 400 }
+        );
+      }
+
+      const translationOutputs = Array.from(
+        new Set(body.translationOutputs)
+      ) as TranslationOutputMode[];
+
+      enableAudioTranslation = translationOutputs.includes("audio");
+      enableTranscription = translationOutputs.includes("text");
+    }
+
     const enableInputDiagnostics = body.enableInputDiagnostics === true;
 
     let allowedLanguages: string[] | undefined = undefined;
@@ -157,6 +188,7 @@ export async function POST(req: NextRequest) {
     manager.createSession(sessionId, organizerIdentity, {
       inputLanguageMode,
       sourceLanguage,
+      enableAudioTranslation,
       enableTranscription,
       enableInputDiagnostics,
       allowedLanguages,
@@ -176,8 +208,13 @@ export async function POST(req: NextRequest) {
       locale,
       inputLanguageMode,
       sourceLanguage,
+      enableAudioTranslation,
       enableTranscription,
       enableInputDiagnostics,
+      translationOutputs: [
+        ...(enableAudioTranslation ? ["audio"] : []),
+        ...(enableTranscription ? ["text"] : []),
+      ],
       durationMinutes,
       expiresAt: session?.expiresAt.toISOString(),
       joinUrl,

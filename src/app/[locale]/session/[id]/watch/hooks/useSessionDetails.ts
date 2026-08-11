@@ -12,6 +12,7 @@ export function useSessionDetails(sessionId: string) {
   const [sourceLanguage, setSourceLanguage] = useState<string | undefined>(
     undefined
   );
+  const [enableAudioTranslation, setEnableAudioTranslation] = useState(true);
   const [enableTranscription, setEnableTranscription] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -30,6 +31,7 @@ export function useSessionDetails(sessionId: string) {
               ? data.sourceLanguage
               : undefined
           );
+          setEnableAudioTranslation(data.enableAudioTranslation !== false);
           setEnableTranscription(data.enableTranscription === true);
         }
       } catch (err) {
@@ -46,6 +48,7 @@ export function useSessionDetails(sessionId: string) {
     allowedLanguages,
     inputLanguageMode,
     sourceLanguage,
+    enableAudioTranslation,
     enableTranscription,
     loaded,
   };

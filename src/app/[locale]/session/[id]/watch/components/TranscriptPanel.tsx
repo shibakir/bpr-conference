@@ -1,18 +1,18 @@
 "use client";
 
-import { CSSProperties, RefObject } from "react";
+import { ReactNode, RefObject } from "react";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
 import type { TranscriptEntry } from "../types";
-import { splitIntoParagraphs } from "../utils";
+import { TranscriptFeed } from "./TranscriptFeed";
 
 export function TranscriptPanel({
   canDecreaseFontSize,
   canIncreaseFontSize,
   currentLanguage,
+  floatingWindowControl,
   fontSize,
   onDecreaseFontSize,
   onIncreaseFontSize,
@@ -22,6 +22,7 @@ export function TranscriptPanel({
   canDecreaseFontSize: boolean;
   canIncreaseFontSize: boolean;
   currentLanguage: string;
+  floatingWindowControl?: ReactNode;
   fontSize: number;
   onDecreaseFontSize: () => void;
   onIncreaseFontSize: () => void;
@@ -29,17 +30,15 @@ export function TranscriptPanel({
   transcripts: TranscriptEntry[];
 }) {
   const t = useTranslations("Watch");
-  const transcriptStyle = {
-    "--transcript-font-size": `${fontSize}px`,
-  } as CSSProperties;
 
   return (
-    <section className="space-y-4" style={transcriptStyle}>
+    <section className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           {t("transcription")}
         </span>
         <div className="flex items-center gap-1">
+          {floatingWindowControl}
           <Button
             type="button"
             variant="outline"
@@ -69,40 +68,12 @@ export function TranscriptPanel({
 
       <ScrollArea className="h-80 rounded-lg border bg-card">
         <div className="p-4">
-          {transcripts.length === 0 ? (
-            <p className="text-sm italic text-muted-foreground">
-              {currentLanguage === "original"
-                ? t("selectLanguageForTranscription")
-                : t("waitingForSpeech")}
-            </p>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {transcripts.map((entry, i) => {
-                const paragraphs = splitIntoParagraphs(entry.text, 2);
-                return (
-                  <div
-                    key={`${entry.id}-${i}`}
-                    className="flex flex-col gap-2"
-                  >
-                    {paragraphs.map((para, paraIdx) => (
-                      <p
-                        key={paraIdx}
-                        className={cn(
-                          "font-sans text-[length:var(--transcript-font-size)] leading-7 transition-colors",
-                          entry.final
-                            ? "text-foreground"
-                            : "text-muted-foreground"
-                        )}
-                      >
-                        {para}
-                      </p>
-                    ))}
-                  </div>
-                );
-              })}
-              <div ref={transcriptEndRef} />
-            </div>
-          )}
+          <TranscriptFeed
+            currentLanguage={currentLanguage}
+            fontSize={fontSize}
+            transcriptEndRef={transcriptEndRef}
+            transcripts={transcripts}
+          />
         </div>
       </ScrollArea>
     </section>

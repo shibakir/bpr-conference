@@ -6,7 +6,7 @@
  * 1. Joins the LiveKit room as a bot participant (e.g., "translator-es")
  * 2. Subscribes to the organizer's audio track
  * 3. Pipes PCM audio frames to Gemini Live API via WebSocket
- * 4. Receives translated audio back and publishes it as a new track
+ * 4. Receives translated output and publishes enabled audio/text outputs
  */
 
 import {
@@ -33,6 +33,54 @@ import { TranslatedAudioOutput } from "./translated-audio-output";
 
 export type BridgeStatus = "starting" | "active" | "error" | "closed";
 
+function sanitizeGeminiDebugValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeGeminiDebugValue);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entry]) => {
+        if (key === "data" && typeof entry === "string") {
+          return [key, `[redacted string length=${entry.length}]`];
+        }
+
+        return [key, sanitizeGeminiDebugValue(entry)];
+      })
+    );
+  }
+
+  if (typeof value === "string" && value.length > 500) {
+    return `${value.slice(0, 500)}...[truncated length=${value.length}]`;
+  }
+
+  return value;
+}
+
+function hasGeminiTextDebugSignal(message: unknown): boolean {
+  if (typeof message === "string") {
+    return /transcription|transcript|caption|text/i.test(message);
+  }
+
+  if (Array.isArray(message)) {
+    return message.some(hasGeminiTextDebugSignal);
+  }
+
+  if (message && typeof message === "object") {
+    return Object.entries(message).some(
+      ([key, value]) =>
+        /transcription|transcript|caption|text/i.test(key) ||
+        hasGeminiTextDebugSignal(value)
+    );
+  }
+
+  return false;
+}
+
+function endsWithSentenceBoundary(text: string): boolean {
+  return /[.!?。！？؟।]$/u.test(text.trim());
+}
+
 export class TranslationBridge {
   private room: Room | null = null;
   private localTrack: LocalAudioTrack | null = null;
@@ -43,8 +91,11 @@ export class TranslationBridge {
   private framesReceivedFromGemini: number = 0;
   private pendingInterimText: string = "";
   private pendingInputDiagnosticText: string = "";
+  private transcriptionSegmentHasText = false;
+  private inputDiagnosticSegmentHasText = false;
   private interimTimeout: NodeJS.Timeout | null = null;
   private inputDiagnosticTimeout: NodeJS.Timeout | null = null;
+  private geminiDebugMessageCount = 0;
 
   public readonly targetLanguage: string;
   public readonly sessionId: string;
@@ -74,6 +125,7 @@ export class TranslationBridge {
   private readonly livekitUrl: string;
   private readonly livekitApiKey: string;
   private readonly livekitApiSecret: string;
+  private readonly enableAudioTranslation: boolean;
   private readonly enableTranscription: boolean;
   private readonly enableInputDiagnostics: boolean;
   private readonly geminiConnection: GeminiLiveConnection;
@@ -93,6 +145,7 @@ export class TranslationBridge {
       livekitUrl: string;
       livekitApiKey: string;
       livekitApiSecret: string;
+      enableAudioTranslation?: boolean;
       enableTranscription?: boolean;
       enableInputDiagnostics?: boolean;
     }
@@ -105,12 +158,14 @@ export class TranslationBridge {
     this.livekitUrl = config.livekitUrl;
     this.livekitApiKey = config.livekitApiKey;
     this.livekitApiSecret = config.livekitApiSecret;
+    this.enableAudioTranslation = config.enableAudioTranslation !== false;
     this.enableTranscription = config.enableTranscription === true;
     this.enableInputDiagnostics = config.enableInputDiagnostics === true;
     this.geminiConnection = new GeminiLiveConnection({
       apiKey: this.geminiApiKey,
       model: this.geminiModel,
       targetLanguage,
+      enableAudioTranslation: this.enableAudioTranslation,
       enableTranscription: this.enableTranscription,
       enableInputDiagnostics: this.enableInputDiagnostics,
       contextCompressionTriggerTokens: this.contextCompressionTriggerTokens,
@@ -227,6 +282,7 @@ export class TranslationBridge {
       room: this.sessionId,
       canPublish: true,
       canSubscribe: true,
+      canPublishData: true,
     });
 
     const token = await at.toJwt();
@@ -267,6 +323,13 @@ export class TranslationBridge {
       `[TranslationBridge:${this.targetLanguage}] Joined room as ${this.identity}`
     );
 
+    if (!this.enableAudioTranslation) {
+      console.log(
+        `[TranslationBridge:${this.targetLanguage}] Translated audio publication disabled`
+      );
+      return;
+    }
+
     // Create an AudioSource to publish translated audio
     // Gemini outputs 24kHz mono PCM
     const audioSource = new AudioSource(
@@ -306,23 +369,65 @@ export class TranslationBridge {
     await this.geminiConnection.connect();
   }
 
+  private maybeLogGeminiDebugMessage(message: GeminiServerMessage): void {
+    if (this.targetLanguage !== "cs" || !this.enableTranscription) {
+      return;
+    }
+
+    this.geminiDebugMessageCount++;
+
+    const shouldLog =
+      this.geminiDebugMessageCount <= 25 ||
+      this.geminiDebugMessageCount % 100 === 0 ||
+      hasGeminiTextDebugSignal(message);
+
+    if (!shouldLog) return;
+
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Gemini raw debug #${this.geminiDebugMessageCount}:`,
+      JSON.stringify(sanitizeGeminiDebugValue(message), null, 2)
+    );
+  }
+
   private handleGeminiMessage(message: GeminiServerMessage): void {
     try {
+      this.maybeLogGeminiDebugMessage(message);
+
       // Handle audio response
       const serverContent = message?.serverContent;
       const parts = serverContent?.modelTurn?.parts;
+      const modelTurnText = parts
+        ?.map((part) => part.text)
+        .filter((text): text is string => Boolean(text))
+        .join("");
+      const outputTranscription =
+        serverContent?.outputTranscription ?? message.outputTranscription;
+      const inputTranscription =
+        serverContent?.inputTranscription ?? message.inputTranscription;
+      const isOutputTranscriptionComplete =
+        outputTranscription?.finished === true ||
+        serverContent?.turnComplete === true;
+      const isInputTranscriptionComplete =
+        inputTranscription?.finished === true ||
+        serverContent?.turnComplete === true;
 
       if (parts?.length) {
         for (const part of parts) {
           if (part.inlineData?.data) {
             const receivedAt = Date.now();
             this.framesReceivedFromGemini++;
-            this.latencyMetrics.recordGeminiAudioReceived(receivedAt);
-            if (this.framesReceivedFromGemini <= 3 || this.framesReceivedFromGemini % 100 === 0) {
+            if (
+              this.framesReceivedFromGemini <= 3 ||
+              this.framesReceivedFromGemini % 100 === 0
+            ) {
               console.log(
-                `[TranslationBridge:${this.targetLanguage}] Received audio frame #${this.framesReceivedFromGemini} from Gemini (${part.inlineData.data.length} bytes base64)`
+                `[TranslationBridge:${this.targetLanguage}] Received audio frame #${this.framesReceivedFromGemini} from Gemini (${part.inlineData.data.length} bytes base64${this.enableAudioTranslation ? "" : ", publication disabled"})`
               );
             }
+            if (!this.enableAudioTranslation) {
+              continue;
+            }
+            this.latencyMetrics.recordGeminiAudioReceived(receivedAt);
             // Queue frame for sequential capture (avoid promise pile-up)
             this.translatedAudioOutput.enqueue(
               part.inlineData.data,
@@ -333,39 +438,39 @@ export class TranslationBridge {
         }
       }
 
-      // Handle output transcription (separate field from modelTurn)
-      if (this.enableTranscription && serverContent?.outputTranscription?.text) {
-        const text = serverContent.outputTranscription.text;
-        const isInterim = !serverContent.turnComplete;
-
-        if (isInterim) {
-          this.handleInterimTranscription(text);
-        } else {
-          if (this.interimTimeout) {
-            clearTimeout(this.interimTimeout);
-            this.interimTimeout = null;
-          }
-          const finalText = this.pendingInterimText + text;
-          this.pendingInterimText = "";
-          console.log(
-            `[TranslationBridge:${this.targetLanguage}] Final Transcription:`,
-            finalText.slice(0, 100)
-          );
-          void this.dataPublisher.publishTranscription(
-            this.room,
-            finalText,
-            false,
-            this.transcriptionSegmentId
-          );
+      // Handle output transcription. Gemini may send it inside serverContent
+      // or as a top-level server message, depending on the Live API surface.
+      let publishedFinalTranscription = false;
+      if (this.enableTranscription && outputTranscription?.text) {
+        const shouldComplete =
+          isOutputTranscriptionComplete ||
+          endsWithSentenceBoundary(outputTranscription.text);
+        publishedFinalTranscription = this.handleOutputTranscriptionText(
+          outputTranscription.text,
+          shouldComplete
+        );
+        if (publishedFinalTranscription && !isOutputTranscriptionComplete) {
+          this.completeCurrentTranscriptionSegment();
+        }
+      } else if (this.enableTranscription && modelTurnText) {
+        // Some Live API surfaces expose the translated text as modelTurn text
+        // parts instead of the dedicated outputTranscription field.
+        const shouldComplete =
+          serverContent?.turnComplete === true ||
+          endsWithSentenceBoundary(modelTurnText);
+        publishedFinalTranscription = this.handleOutputTranscriptionText(
+          modelTurnText,
+          shouldComplete
+        );
+        if (publishedFinalTranscription && serverContent?.turnComplete !== true) {
+          this.completeCurrentTranscriptionSegment();
         }
       }
 
-      if (
-        this.enableInputDiagnostics &&
-        serverContent?.inputTranscription?.text
-      ) {
-        const text = serverContent.inputTranscription.text;
-        const isInterim = !serverContent.turnComplete;
+      let publishedFinalInputDiagnostic = false;
+      if (this.enableInputDiagnostics && inputTranscription?.text) {
+        const text = inputTranscription.text;
+        const isInterim = !isInputTranscriptionComplete;
 
         console.log(
           `[TranslationBridge:${this.targetLanguage}] Input diagnostic${isInterim ? " interim" : " final"}:`,
@@ -381,17 +486,22 @@ export class TranslationBridge {
           }
           const finalText = this.pendingInputDiagnosticText + text;
           this.pendingInputDiagnosticText = "";
+          this.inputDiagnosticSegmentHasText = true;
           void this.dataPublisher.publishInputDiagnostic(
             this.room,
             finalText,
             false,
             this.inputDiagnosticSegmentId
           );
+          publishedFinalInputDiagnostic = true;
         }
       }
 
       // If turn is complete, flush remaining interim buffer and advance the segment id
-      if (this.enableTranscription && serverContent?.turnComplete) {
+      if (
+        this.enableTranscription &&
+        (serverContent?.turnComplete || outputTranscription?.finished)
+      ) {
         if (this.interimTimeout) {
           clearTimeout(this.interimTimeout);
           this.interimTimeout = null;
@@ -404,11 +514,25 @@ export class TranslationBridge {
             this.transcriptionSegmentId
           );
           this.pendingInterimText = "";
+          this.transcriptionSegmentHasText = true;
+        } else if (
+          this.transcriptionSegmentHasText &&
+          !publishedFinalTranscription
+        ) {
+          void this.dataPublisher.publishTranscription(
+            this.room,
+            "",
+            false,
+            this.transcriptionSegmentId
+          );
         }
-        this.transcriptionSegmentId++;
+        this.completeCurrentTranscriptionSegment();
       }
 
-      if (this.enableInputDiagnostics && serverContent?.turnComplete) {
+      if (
+        this.enableInputDiagnostics &&
+        (serverContent?.turnComplete || inputTranscription?.finished)
+      ) {
         if (this.inputDiagnosticTimeout) {
           clearTimeout(this.inputDiagnosticTimeout);
           this.inputDiagnosticTimeout = null;
@@ -421,7 +545,19 @@ export class TranslationBridge {
             this.inputDiagnosticSegmentId
           );
           this.pendingInputDiagnosticText = "";
+          this.inputDiagnosticSegmentHasText = true;
+        } else if (
+          this.inputDiagnosticSegmentHasText &&
+          !publishedFinalInputDiagnostic
+        ) {
+          void this.dataPublisher.publishInputDiagnostic(
+            this.room,
+            "",
+            false,
+            this.inputDiagnosticSegmentId
+          );
         }
+        this.inputDiagnosticSegmentHasText = false;
         this.inputDiagnosticSegmentId++;
       }
     } catch (error) {
@@ -635,9 +771,46 @@ export class TranslationBridge {
     }
   }
 
+  private handleOutputTranscriptionText(
+    text: string,
+    isComplete: boolean
+  ): boolean {
+    if (!this.enableTranscription) return false;
+
+    if (!isComplete) {
+      this.handleInterimTranscription(text);
+      return false;
+    }
+
+    if (this.interimTimeout) {
+      clearTimeout(this.interimTimeout);
+      this.interimTimeout = null;
+    }
+    const finalText = this.pendingInterimText + text;
+    this.pendingInterimText = "";
+    this.transcriptionSegmentHasText = true;
+    console.log(
+      `[TranslationBridge:${this.targetLanguage}] Final Transcription:`,
+      finalText.slice(0, 100)
+    );
+    void this.dataPublisher.publishTranscription(
+      this.room,
+      finalText,
+      false,
+      this.transcriptionSegmentId
+    );
+    return true;
+  }
+
+  private completeCurrentTranscriptionSegment(): void {
+    this.transcriptionSegmentHasText = false;
+    this.transcriptionSegmentId++;
+  }
+
   private flushInterimTranscription(): void {
     this.interimTimeout = null;
     if (this.enableTranscription && this.pendingInterimText && this.status === "active") {
+      this.transcriptionSegmentHasText = true;
       void this.dataPublisher.publishTranscription(
         this.room,
         this.pendingInterimText,
@@ -667,6 +840,7 @@ export class TranslationBridge {
       this.pendingInputDiagnosticText &&
       this.status === "active"
     ) {
+      this.inputDiagnosticSegmentHasText = true;
       void this.dataPublisher.publishInputDiagnostic(
         this.room,
         this.pendingInputDiagnosticText,

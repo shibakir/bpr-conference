@@ -3,10 +3,12 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
+  CaptionsIcon,
   ClockIcon,
   LanguagesIcon,
   RadioTowerIcon,
   SearchIcon,
+  Volume2Icon,
   XIcon,
 } from "lucide-react";
 import { CenteredPage } from "@/components/CenteredPage";
@@ -40,7 +42,12 @@ import {
   MAX_SESSION_DURATION_MINUTES,
   MIN_SESSION_DURATION_MINUTES,
 } from "@/lib/session-duration";
-import type { InputLanguageMode } from "@/lib/session-types";
+import {
+  TRANSLATION_OUTPUT_MODES,
+  type InputLanguageMode,
+  type TranslationOutputMode,
+} from "@/lib/session-types";
+import { cn } from "@/lib/utils";
 
 const DEFAULT_LANGUAGES = [
   "en",
@@ -54,6 +61,7 @@ const DEFAULT_LANGUAGES = [
 ];
 
 const DEFAULT_SOURCE_LANGUAGE = "cs";
+const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -69,7 +77,8 @@ export default function Home() {
   const [durationMinutes, setDurationMinutes] = useState(
     DEFAULT_SESSION_DURATION_MINUTES
   );
-  const [enableTranscription, setEnableTranscription] = useState(false);
+  const [translationOutputs, setTranslationOutputs] =
+    useState<TranslationOutputMode[]>(DEFAULT_TRANSLATION_OUTPUTS);
   const [restrictLanguages, setRestrictLanguages] = useState(true);
   const [selectedLanguages, setSelectedLanguages] =
     useState<string[]>(DEFAULT_LANGUAGES);
@@ -114,6 +123,8 @@ export default function Home() {
       lang.code.toLowerCase().includes(query.toLowerCase())
     );
   });
+  const enableAudioTranslation = translationOutputs.includes("audio");
+  const enableTranscription = translationOutputs.includes("text");
 
   function handleSourceLanguageChange(event: ChangeEvent<HTMLSelectElement>) {
     const nextSourceLanguage = event.target.value;
@@ -133,6 +144,19 @@ export default function Home() {
         prev.filter((code) => code !== sourceLanguage)
       );
     }
+  }
+
+  function toggleTranslationOutput(output: TranslationOutputMode) {
+    setTranslationOutputs((prev) => {
+      const next = new Set(prev);
+      if (next.has(output)) {
+        next.delete(output);
+      } else {
+        next.add(output);
+      }
+
+      return TRANSLATION_OUTPUT_MODES.filter((mode) => next.has(mode));
+    });
   }
 
   useEffect(() => {
@@ -178,6 +202,8 @@ export default function Home() {
           inputLanguageMode,
           sourceLanguage:
             inputLanguageMode === "single" ? sourceLanguage : undefined,
+          translationOutputs,
+          enableAudioTranslation,
           enableTranscription,
           enableInputDiagnostics: true,
           durationMinutes,
@@ -359,22 +385,82 @@ export default function Home() {
               </div>
               )}
 
-              <Label className="items-start gap-3 rounded-lg border bg-muted/30 p-3">
-                <Checkbox
-                  checked={enableTranscription}
-                  onCheckedChange={(checked) =>
-                    setEnableTranscription(checked === true)
-                  }
-                  disabled={loading}
-                  className="mt-0.5"
-                />
-                <span className="grid gap-1">
-                  <span>{t("enableTranscription")}</span>
-                  <span className="text-xs font-normal leading-5 text-muted-foreground">
-                    {t("enableTranscriptionDescription")}
+              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
+                <div className="grid gap-1">
+                  <Label>{t("translationOutputs")}</Label>
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {t("translationOutputsDescription")}
+                  </p>
+                </div>
+
+                <div
+                  role="group"
+                  aria-label={t("translationOutputs")}
+                  className="grid gap-2 sm:grid-cols-2"
+                >
+                  {[
+                    {
+                      description: t("enableVoiceTranslationDescription"),
+                      icon: Volume2Icon,
+                      label: t("enableVoiceTranslation"),
+                      value: "audio" as const,
+                    },
+                    {
+                      description: t("enableTextTranslationDescription"),
+                      icon: CaptionsIcon,
+                      label: t("enableTextTranslation"),
+                      value: "text" as const,
+                    },
+                  ].map((option) => {
+                    const Icon = option.icon;
+                    const selected = translationOutputs.includes(option.value);
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        aria-pressed={selected}
+                        disabled={loading}
+                        onClick={() => toggleTranslationOutput(option.value)}
+                        className={cn(
+                          "flex min-h-24 items-start gap-3 rounded-lg border p-3 text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
+                          selected
+                            ? "border-primary bg-primary/10"
+                            : "border-border bg-background hover:bg-muted"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-8 shrink-0 items-center justify-center rounded-md",
+                            selected
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          <Icon className="size-4" />
+                        </span>
+                        <span className="grid gap-1">
+                          <span className="font-medium">{option.label}</span>
+                          <span className="text-xs leading-5 text-muted-foreground">
+                            {option.description}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+                  <span>
+                    {t("translationOutputsSelectedCount", {
+                      count: translationOutputs.length,
+                    })}
                   </span>
-                </span>
-              </Label>
+                  {translationOutputs.length === 0 && (
+                    <span>{t("translationOutputsNone")}</span>
+                  )}
+                </div>
+              </div>
 
               <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
                 <Label className="items-start gap-3">

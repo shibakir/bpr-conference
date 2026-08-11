@@ -1,9 +1,15 @@
 "use client";
 
 import { use, useState } from "react";
-import { LiveKitRoom, RoomAudioRenderer } from "@livekit/components-react";
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  StartAudio,
+} from "@livekit/components-react";
 import "@livekit/components-styles";
 import { CenteredLoadingState } from "@/components/CenteredPage";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useWatchToken } from "./hooks/useWatchToken";
 import { AttendeeView } from "./components/AttendeeView";
 import { WatchErrorState } from "./components/WatchErrorState";
@@ -52,6 +58,10 @@ export default function WatchPage({
         className="flex w-full flex-col items-center"
       >
         <RoomAudioRenderer />
+        <StartAudio
+          label={t("enableAudio")}
+          className={cn(buttonVariants(), "mb-4")}
+        />
         <AttendeeView
           sessionId={sessionId}
           expiresAt={expiresAt}

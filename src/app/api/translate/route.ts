@@ -90,12 +90,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const enableAudioTranslation = session.enableAudioTranslation !== false;
+
+    if (!enableAudioTranslation && !session.enableTranscription) {
+      return NextResponse.json(
+        apiError(
+          API_ERROR_CODES.TRANSLATION_OUTPUTS_DISABLED,
+          "Translation outputs are disabled for this session"
+        ),
+        { status: 400 }
+      );
+    }
+
     // Get or create the translation bridge
     const bridge = await manager.getOrCreate(
       sessionId,
       normalizedTargetLanguage,
       session.organizerIdentity,
       {
+        enableAudioTranslation,
         enableTranscription: session.enableTranscription,
       }
     );
@@ -104,6 +117,8 @@ export async function POST(req: NextRequest) {
       translatorIdentity: bridge.identity,
       status: bridge.status,
       targetLanguage: bridge.targetLanguage,
+      enableAudioTranslation,
+      enableTranscription: session.enableTranscription,
     });
   } catch (error) {
     console.error("Error requesting translation:", error);

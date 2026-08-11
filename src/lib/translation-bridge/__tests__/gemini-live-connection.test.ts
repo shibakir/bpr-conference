@@ -38,6 +38,7 @@ function createConnection(
     apiKey: "test-key",
     model: "gemini-test-model",
     targetLanguage: "cs",
+    enableAudioTranslation: true,
     enableTranscription: true,
     enableInputDiagnostics: true,
     contextCompressionTriggerTokens: 25_000,
@@ -64,6 +65,16 @@ describe("GeminiLiveConnection", () => {
     expect(setupPayload.setup.model).toBe("models/gemini-test-model");
     expect(setupPayload.setup.outputAudioTranscription).toEqual({});
     expect(setupPayload.setup.inputAudioTranscription).toEqual({});
+    expect(setupPayload.setup.generationConfig.responseModalities).toEqual([
+      "AUDIO",
+      "TEXT",
+    ]);
+    expect(
+      setupPayload.setup.generationConfig.outputAudioTranscription
+    ).toBeUndefined();
+    expect(
+      setupPayload.setup.generationConfig.inputAudioTranscription
+    ).toBeUndefined();
     expect(connection.sendAudio("AQI=", 16_000)).toBe(false);
 
     socket.receive({ setupComplete: {} });
@@ -119,5 +130,68 @@ describe("GeminiLiveConnection", () => {
 
     expect(socket.close).toHaveBeenCalledOnce();
     expect(connection.isReady).toBe(false);
+  });
+
+  it("uses audio-only response modality when text outputs are disabled", async () => {
+    const socket = new FakeWebSocket();
+    const { connection } = createConnection([socket], {
+      enableTranscription: false,
+      enableInputDiagnostics: false,
+    });
+
+    const connecting = connection.connect();
+    socket.open();
+
+    const setupPayload = JSON.parse(socket.sent[0]);
+    expect(setupPayload.setup.generationConfig.responseModalities).toEqual([
+      "AUDIO",
+    ]);
+    expect(setupPayload.setup.outputAudioTranscription).toBeUndefined();
+    expect(setupPayload.setup.inputAudioTranscription).toBeUndefined();
+
+    socket.receive({ setupComplete: {} });
+    await connecting;
+  });
+
+  it("tries text-only first for text-only sessions", async () => {
+    const socket = new FakeWebSocket();
+    const { connection } = createConnection([socket], {
+      enableAudioTranslation: false,
+    });
+
+    const connecting = connection.connect();
+    socket.open();
+
+    expect(
+      JSON.parse(socket.sent[0]).setup.generationConfig.responseModalities
+    ).toEqual(["TEXT"]);
+
+    socket.receive({ setupComplete: {} });
+    await connecting;
+  });
+
+  it("falls back to audio-only response modality when Gemini rejects text modality setup", async () => {
+    const firstSocket = new FakeWebSocket();
+    const secondSocket = new FakeWebSocket();
+    const { connection } = createConnection([firstSocket, secondSocket]);
+
+    const connecting = connection.connect();
+    firstSocket.open();
+    firstSocket.emit(
+      "close",
+      1007,
+      Buffer.from("Invalid JSON payload received. Unsupported modality TEXT.")
+    );
+
+    await new Promise((resolve) => setImmediate(resolve));
+    secondSocket.open();
+
+    expect(
+      JSON.parse(secondSocket.sent[0]).setup.generationConfig.responseModalities
+    ).toEqual(["AUDIO"]);
+
+    secondSocket.receive({ setupComplete: {} });
+    await connecting;
+    expect(connection.isReady).toBe(true);
   });
 });

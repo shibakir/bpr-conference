@@ -1,5 +1,10 @@
 import WebSocket from "ws";
 
+export type GeminiTranscription = {
+  text?: string;
+  finished?: boolean;
+};
+
 export type GeminiServerMessage = {
   setupComplete?: Record<string, never>;
   sessionResumptionUpdate?: {
@@ -12,25 +17,25 @@ export type GeminiServerMessage = {
   serverContent?: {
     modelTurn?: {
       parts?: Array<{
+        text?: string;
         inlineData?: {
           data?: string;
         };
       }>;
     };
-    outputTranscription?: {
-      text?: string;
-    };
-    inputTranscription?: {
-      text?: string;
-    };
+    outputTranscription?: GeminiTranscription;
+    inputTranscription?: GeminiTranscription;
     turnComplete?: boolean;
   };
+  outputTranscription?: GeminiTranscription;
+  inputTranscription?: GeminiTranscription;
 };
 
 export type GeminiLiveConnectionOptions = {
   apiKey: string;
   model: string;
   targetLanguage: string;
+  enableAudioTranslation: boolean;
   enableTranscription: boolean;
   enableInputDiagnostics: boolean;
   contextCompressionTriggerTokens: number;
@@ -77,16 +82,60 @@ type GeminiSetup = {
  * delegated to the bridge through `onMessage`.
  */
 export class GeminiLiveConnection {
+  private static unsupportedResponseModalitySets = new Set<string>();
+
   private ws: WebSocket | null = null;
   private setupComplete = false;
   private isReconnecting = false;
   private resumptionHandle: string | null = null;
   private isStopped = false;
+  private responseModalities: string[] = ["AUDIO"];
 
   constructor(private readonly options: GeminiLiveConnectionOptions) {}
 
   async connect(): Promise<void> {
     this.isStopped = false;
+
+    const attempts = this.getResponseModalityAttempts();
+    let lastError: unknown;
+
+    for (let index = 0; index < attempts.length; index++) {
+      const modalities = attempts[index];
+      this.responseModalities = modalities;
+
+      try {
+        await this.connectOnce();
+        return;
+      } catch (error) {
+        lastError = error;
+
+        if (
+          this.isStopped ||
+          index === attempts.length - 1 ||
+          !this.shouldRetryWithNextResponseModality(error)
+        ) {
+          throw error;
+        }
+
+        GeminiLiveConnection.unsupportedResponseModalitySets.add(
+          this.getResponseModalityKey(modalities)
+        );
+        this.setupComplete = false;
+        this.ws = null;
+
+        console.warn(
+          `[TranslationBridge:${this.options.targetLanguage}] Gemini rejected setup with responseModalities=${modalities.join(",")}; retrying with responseModalities=${attempts[index + 1].join(",")}`
+        );
+      }
+    }
+
+    throw lastError instanceof Error
+      ? lastError
+      : new Error("Gemini setup failed");
+  }
+
+  private connectOnce(): Promise<void> {
+    this.setupComplete = false;
 
     return new Promise<void>((resolve, reject) => {
       const ws = this.createWebSocket();
@@ -335,7 +384,7 @@ export class GeminiLiveConnection {
     const setup: GeminiSetup = {
       model: `models/${this.options.model}`,
       generationConfig: {
-        responseModalities: ["AUDIO"],
+        responseModalities: this.responseModalities,
         translationConfig: {
           targetLanguageCode: this.options.targetLanguage,
           echoTargetLanguage: true,
@@ -361,6 +410,8 @@ export class GeminiLiveConnection {
       },
     };
 
+    // The raw v1beta WebSocket schema accepts audio transcription config on
+    // the setup root, not inside generationConfig.
     if (this.options.enableTranscription) {
       setup.outputAudioTranscription = {};
     }
@@ -387,5 +438,46 @@ export class GeminiLiveConnection {
 
   private canReconnect(): boolean {
     return !this.isStopped && this.options.shouldReconnect();
+  }
+
+  private getResponseModalityAttempts(): string[][] {
+    const needsTextResponse =
+      this.options.enableTranscription || this.options.enableInputDiagnostics;
+
+    if (!needsTextResponse) {
+      return [["AUDIO"]];
+    }
+
+    const preferredAttempts = this.options.enableAudioTranslation
+      ? [
+          ["AUDIO", "TEXT"],
+          ["AUDIO"],
+        ]
+      : [
+          ["TEXT"],
+          ["AUDIO", "TEXT"],
+          ["AUDIO"],
+        ];
+
+    const attempts = preferredAttempts.filter(
+      (modalities) =>
+        !GeminiLiveConnection.unsupportedResponseModalitySets.has(
+          this.getResponseModalityKey(modalities)
+        )
+    );
+
+    return attempts.length > 0 ? attempts : [["AUDIO"]];
+  }
+
+  private getResponseModalityKey(modalities: string[]): string {
+    return modalities.join(",");
+  }
+
+  private shouldRetryWithNextResponseModality(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error);
+
+    return /code=1007|invalid json|responsemodalit|modality|unsupported|text/i.test(
+      message
+    );
   }
 }

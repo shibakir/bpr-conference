@@ -27,6 +27,7 @@ export interface SessionInfo {
   expiresAt: Date;
   inputLanguageMode: InputLanguageMode;
   sourceLanguage?: string;
+  enableAudioTranslation: boolean;
   enableTranscription: boolean;
   enableInputDiagnostics: boolean;
   allowedLanguages?: string[];
@@ -100,6 +101,7 @@ class TranslationSessionManager {
     options: {
       inputLanguageMode: InputLanguageMode;
       sourceLanguage?: string;
+      enableAudioTranslation: boolean;
       enableTranscription: boolean;
       enableInputDiagnostics: boolean;
       allowedLanguages?: string[];
@@ -117,6 +119,7 @@ class TranslationSessionManager {
       expiresAt: new Date(createdAt.getTime() + durationMinutes * 60_000),
       inputLanguageMode: options.inputLanguageMode,
       sourceLanguage: options.sourceLanguage,
+      enableAudioTranslation: options.enableAudioTranslation,
       enableTranscription: options.enableTranscription,
       enableInputDiagnostics: options.enableInputDiagnostics,
       allowedLanguages: options.allowedLanguages,
@@ -124,7 +127,7 @@ class TranslationSessionManager {
     this.sessions.set(sessionId, info);
     this.scheduleSessionExpiration(info);
     console.log(
-      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with input mode ${options.inputLanguageMode}, source language ${options.sourceLanguage || "auto"}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, input diagnostics ${options.enableInputDiagnostics ? "enabled" : "disabled"}, duration ${durationMinutes}m, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
+      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with input mode ${options.inputLanguageMode}, source language ${options.sourceLanguage || "auto"}, audio translation ${options.enableAudioTranslation ? "enabled" : "disabled"}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, input diagnostics ${options.enableInputDiagnostics ? "enabled" : "disabled"}, duration ${durationMinutes}m, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
     );
     return info;
   }
@@ -151,6 +154,7 @@ class TranslationSessionManager {
     targetLanguage: string,
     organizerIdentity: string,
     options: {
+      enableAudioTranslation?: boolean;
       enableTranscription?: boolean;
     } = {}
   ): Promise<TranslationBridge> {
@@ -193,6 +197,7 @@ class TranslationSessionManager {
       livekitUrl: process.env.LIVEKIT_URL || "ws://localhost:7880",
       livekitApiKey: process.env.LIVEKIT_API_KEY!,
       livekitApiSecret: process.env.LIVEKIT_API_SECRET!,
+      enableAudioTranslation: options.enableAudioTranslation !== false,
       enableTranscription: options.enableTranscription === true,
       enableInputDiagnostics: session.enableInputDiagnostics,
     };
