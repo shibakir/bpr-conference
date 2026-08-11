@@ -8,6 +8,7 @@ import {
   MIN_SESSION_DURATION_MINUTES,
   parseSessionDurationMinutes,
 } from "@/lib/session-duration";
+import type { InputLanguageMode } from "@/lib/session-types";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 interface CreateSessionRequest {
@@ -16,8 +17,10 @@ interface CreateSessionRequest {
   eventId?: unknown;
   locale?: unknown;
   allowedLanguages?: unknown;
+  inputLanguageMode?: unknown;
   sourceLanguage?: unknown;
   enableTranscription?: unknown;
+  enableInputDiagnostics?: unknown;
   durationMinutes?: unknown;
 }
 
@@ -60,8 +63,22 @@ export async function POST(req: NextRequest) {
       locale = body.locale;
     }
 
-    let sourceLanguage: string = routing.defaultLocale;
-    if (body.sourceLanguage !== undefined) {
+    if (
+      body.inputLanguageMode !== undefined &&
+      body.inputLanguageMode !== "single" &&
+      body.inputLanguageMode !== "multi"
+    ) {
+      return NextResponse.json(
+        apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid input language mode"),
+        { status: 400 }
+      );
+    }
+
+    const inputLanguageMode: InputLanguageMode =
+      body.inputLanguageMode === "single" ? "single" : "multi";
+    let sourceLanguage: string | undefined = undefined;
+
+    if (inputLanguageMode === "single") {
       if (typeof body.sourceLanguage !== "string") {
         return NextResponse.json(
           apiError(
@@ -87,6 +104,7 @@ export async function POST(req: NextRequest) {
     }
 
     const enableTranscription = body.enableTranscription === true;
+    const enableInputDiagnostics = body.enableInputDiagnostics === true;
 
     let allowedLanguages: string[] | undefined = undefined;
     if (Array.isArray(body.allowedLanguages)) {
@@ -95,7 +113,8 @@ export async function POST(req: NextRequest) {
         .map((language) => getLanguageByCode(language)?.code)
         .filter(
           (language): language is string =>
-            typeof language === "string" && language !== sourceLanguage
+            typeof language === "string" &&
+            (inputLanguageMode !== "single" || language !== sourceLanguage)
         );
 
       allowedLanguages = Array.from(new Set(normalizedAllowedLanguages));
@@ -136,8 +155,10 @@ export async function POST(req: NextRequest) {
     }
 
     manager.createSession(sessionId, organizerIdentity, {
+      inputLanguageMode,
       sourceLanguage,
       enableTranscription,
+      enableInputDiagnostics,
       allowedLanguages,
       durationMinutes,
     });
@@ -153,8 +174,10 @@ export async function POST(req: NextRequest) {
       sessionId,
       organizerIdentity,
       locale,
+      inputLanguageMode,
       sourceLanguage,
       enableTranscription,
+      enableInputDiagnostics,
       durationMinutes,
       expiresAt: session?.expiresAt.toISOString(),
       joinUrl,

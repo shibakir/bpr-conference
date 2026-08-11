@@ -79,7 +79,18 @@ If you want to verify that the Next.js API logic works independently of Cloud Ru
 
 ---
 
-## 3. Verifying Cloud Run Credentials & Settings
+## 3. Translation latency metrics
+
+Each active translation bridge emits a structured `translation_latency` log every five seconds while it processes audio. The log contains no audio or transcript content.
+
+- `inputSampleRate` must be `16000`.
+- `geminiFirstAudioAfterIdleMs` is the time from the first audio frame after a translated-audio pause to the first audio packet returned by Gemini. It includes Gemini processing and the network path to Gemini.
+- `geminiToLiveKitPublishMs` is the time from receipt of an audio packet from Gemini until it has been accepted by the local LiveKit `AudioSource`; it exposes bridge and output-queue delay.
+- `outputBacklogMs` is queued audio that would make listeners fall behind live speech. A sustained value above 500 ms needs investigation.
+
+These timestamps are measured inside the server bridge. They do not include the final LiveKit-to-listener network and browser playback delay.
+
+## 4. Verifying Cloud Run Credentials & Settings
 
 If the local tests pass but the Cloud Run tests fail, verify the Cloud Run configuration using `gcloud`:
 

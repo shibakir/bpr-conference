@@ -10,6 +10,7 @@
 import { TranslationBridge, BridgeStatus } from "./translation-bridge";
 import { RoomServiceClient, type ParticipantInfo } from "livekit-server-sdk";
 import { DEFAULT_SESSION_DURATION_MINUTES } from "./session-duration";
+import type { InputLanguageMode } from "./session-types";
 
 export interface TranslationInfo {
   language: string;
@@ -24,8 +25,10 @@ export interface SessionInfo {
   createdAt: Date;
   durationMinutes: number;
   expiresAt: Date;
-  sourceLanguage: string;
+  inputLanguageMode: InputLanguageMode;
+  sourceLanguage?: string;
   enableTranscription: boolean;
+  enableInputDiagnostics: boolean;
   allowedLanguages?: string[];
 }
 
@@ -95,8 +98,10 @@ class TranslationSessionManager {
     sessionId: string,
     organizerIdentity: string,
     options: {
-      sourceLanguage: string;
+      inputLanguageMode: InputLanguageMode;
+      sourceLanguage?: string;
       enableTranscription: boolean;
+      enableInputDiagnostics: boolean;
       allowedLanguages?: string[];
       durationMinutes?: number;
     }
@@ -110,14 +115,16 @@ class TranslationSessionManager {
       createdAt,
       durationMinutes,
       expiresAt: new Date(createdAt.getTime() + durationMinutes * 60_000),
+      inputLanguageMode: options.inputLanguageMode,
       sourceLanguage: options.sourceLanguage,
       enableTranscription: options.enableTranscription,
+      enableInputDiagnostics: options.enableInputDiagnostics,
       allowedLanguages: options.allowedLanguages,
     };
     this.sessions.set(sessionId, info);
     this.scheduleSessionExpiration(info);
     console.log(
-      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with source language ${options.sourceLanguage}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, duration ${durationMinutes}m, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
+      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with input mode ${options.inputLanguageMode}, source language ${options.sourceLanguage || "auto"}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, input diagnostics ${options.enableInputDiagnostics ? "enabled" : "disabled"}, duration ${durationMinutes}m, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
     );
     return info;
   }
@@ -147,7 +154,8 @@ class TranslationSessionManager {
       enableTranscription?: boolean;
     } = {}
   ): Promise<TranslationBridge> {
-    if (!this.getSession(sessionId)) {
+    const session = this.getSession(sessionId);
+    if (!session) {
       throw new Error("Session has ended");
     }
 
@@ -186,6 +194,7 @@ class TranslationSessionManager {
       livekitApiKey: process.env.LIVEKIT_API_KEY!,
       livekitApiSecret: process.env.LIVEKIT_API_SECRET!,
       enableTranscription: options.enableTranscription === true,
+      enableInputDiagnostics: session.enableInputDiagnostics,
     };
 
     const bridge = new TranslationBridge(
