@@ -341,7 +341,7 @@ function SubtitleLanguageSelector({
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 {t("subtitleLanguages")}
             </Label>
-            <ScrollArea className="max-h-48 rounded-lg border bg-card/40">
+            <ScrollArea className="max-h-48 rounded-lg bg-muted/20">
                 <div className="grid gap-2 p-3">
                     {languages.length === 0 ? (
                         <p className="text-sm text-muted-foreground">{t("noSubtitleLanguages")}</p>
@@ -351,7 +351,7 @@ function SubtitleLanguageSelector({
                             return (
                                 <div
                                     key={language.code}
-                                    className="flex min-h-9 items-center gap-3 rounded-md border bg-background/70 px-3 py-2"
+                                    className="flex min-h-9 items-center gap-3 rounded-md bg-background/60 px-3 py-2 shadow-xs shadow-foreground/5"
                                 >
                                     <Checkbox
                                         id={id}

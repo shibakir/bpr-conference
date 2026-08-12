@@ -66,7 +66,7 @@ export function TranscriptPanel({
                 </div>
             </div>
 
-            <ScrollArea className="h-80 rounded-lg border bg-card">
+            <ScrollArea className="h-80 rounded-lg bg-card/70 shadow-sm shadow-foreground/5">
                 <div className="p-4">
                     <TranscriptFeed
                         currentLanguage={currentLanguage}

@@ -159,7 +159,7 @@ export function AppHeader() {
 
     return (
         <header className="pointer-events-none sticky top-0 z-40 flex h-(--app-header-height) justify-center px-4 pt-3 sm:px-6">
-            <div className="pointer-events-auto mx-auto grid min-h-16 w-full max-w-xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-lg border bg-background/90 px-3 py-2 shadow-sm backdrop-blur supports-backdrop-filter:bg-background/75">
+            <div className="pointer-events-auto mx-auto grid min-h-16 w-full max-w-xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-lg bg-card/85 px-3 py-2 shadow-sm shadow-foreground/5 backdrop-blur supports-backdrop-filter:bg-card/70">
                 <div className="flex min-w-0 justify-start">
                     <ThemePopover />
                 </div>
@@ -173,7 +173,10 @@ export function AppHeader() {
                         <span className="text-primary">BPR</span>{" "}
                         <span className="text-foreground">Conference</span>
                     </Link>
-                    <Badge variant="outline" className="max-w-full gap-1.5">
+                    <Badge
+                        variant="outline"
+                        className="max-w-full gap-1.5 border-transparent bg-muted/45"
+                    >
                         <LanguagesIcon className="size-3" />
                         <span className="truncate">{t("liveTranslation")}</span>
                     </Badge>

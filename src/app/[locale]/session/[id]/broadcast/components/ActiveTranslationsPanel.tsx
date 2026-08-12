@@ -24,7 +24,7 @@ export function ActiveTranslationsPanel({ translations }: { translations: Transl
             {translations.length === 0 ? (
                 <p className="text-sm italic text-muted-foreground">{t("noTranslations")}</p>
             ) : (
-                <div className="overflow-hidden rounded-lg border bg-card">
+                <div className="overflow-hidden rounded-lg bg-card/70 shadow-sm shadow-foreground/5">
                     <Table>
                         <TableBody>
                             {translations.map((translation) => {

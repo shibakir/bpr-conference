@@ -22,7 +22,7 @@ export function SharePanel({
 
     return (
         <section className="flex flex-col items-center gap-4 text-center">
-            <Badge variant="outline" className="gap-1">
+            <Badge variant="outline" className="gap-1 border-transparent bg-muted/45">
                 <QrCodeIcon className="size-3" />
                 {t("shareWithAttendees")}
             </Badge>

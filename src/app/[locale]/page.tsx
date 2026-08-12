@@ -197,13 +197,13 @@ export default function Home() {
     return (
         <CenteredPage className="sm:px-6">
             <section className="grid w-full max-w-xl gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>{t("createSession")}</CardTitle>
+                <Card className="shadow-md shadow-foreground/5">
+                    <CardHeader className="px-5 pt-5 sm:px-6">
+                        <CardTitle className="text-left">{t("createSession")}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <form className="grid gap-4" onSubmit={handleSubmit(createSession)}>
-                            <FieldGroup>
+                    <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                        <form className="grid gap-6" onSubmit={handleSubmit(createSession)}>
+                            <FieldGroup className="gap-6">
                                 {passwordRequired && (
                                     <Field data-invalid={!!errors.password}>
                                         <FieldLabel htmlFor="broadcast-password">
@@ -222,7 +222,7 @@ export default function Home() {
                                     </Field>
                                 )}
 
-                                <FieldSet className="rounded-lg border bg-muted/30 p-3">
+                                <FieldSet className="gap-3">
                                     <div className="flex items-center justify-between gap-3">
                                         <FieldLabel
                                             htmlFor="session-duration"
@@ -259,7 +259,7 @@ export default function Home() {
                                     <FieldError errors={[errors.durationMinutes]} />
                                 </FieldSet>
 
-                                <FieldSet className="rounded-lg border bg-muted/30 p-3">
+                                <FieldSet className="gap-3 border-t border-border/35 pt-5">
                                     <div className="grid gap-1">
                                         <FieldLegend variant="label">
                                             {t("translationOutputs")}
@@ -306,7 +306,7 @@ export default function Home() {
                                                     key={option.value}
                                                     value={option.value}
                                                     aria-label={option.label}
-                                                    className="h-auto min-h-24 w-full items-start justify-start gap-3 whitespace-normal border bg-background p-3 text-left data-[state=on]:border-primary data-[state=on]:bg-primary/10"
+                                                    className="h-auto min-h-24 w-full items-start justify-start gap-3 whitespace-normal border-transparent bg-muted/35 p-3 text-left shadow-none data-[state=on]:border-primary/70 data-[state=on]:bg-primary/12"
                                                 >
                                                     <span
                                                         className={cn(
@@ -343,8 +343,8 @@ export default function Home() {
                                     <FieldError errors={[errors.translationOutputs]} />
                                 </FieldSet>
 
-                                <FieldSet className="rounded-lg border bg-muted/30 p-3">
-                                    <FieldLabel className="items-start gap-3">
+                                <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                                    <FieldLabel className="items-start gap-3 has-data-checked:!border-transparent has-data-checked:!bg-transparent">
                                         <Checkbox
                                             checked={restrictLanguages}
                                             onCheckedChange={(checked) =>
@@ -375,7 +375,7 @@ export default function Home() {
                                     {restrictLanguages && (
                                         <div className="grid gap-3">
                                             {selectedLanguages.length > 0 && (
-                                                <ScrollArea className="max-h-40 rounded-lg border border-dashed bg-background">
+                                                <ScrollArea className="max-h-40 rounded-lg bg-muted/25">
                                                     <div className="flex flex-wrap gap-1.5 p-2 pr-3">
                                                         {selectedLanguages.map((code) => {
                                                             const lang = languageOptions.find(
@@ -410,7 +410,7 @@ export default function Home() {
 
                                             <Command
                                                 shouldFilter={false}
-                                                className="rounded-lg border bg-background"
+                                                className="rounded-lg bg-muted/20"
                                             >
                                                 <CommandInput
                                                     placeholder={t("searchLanguages")}
