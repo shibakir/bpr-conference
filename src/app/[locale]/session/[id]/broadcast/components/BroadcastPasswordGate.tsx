@@ -8,8 +8,8 @@ import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 
 export function BroadcastPasswordGate({
@@ -31,53 +31,57 @@ export function BroadcastPasswordGate({
 
     return (
         <CenteredPage>
-            <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <CardTitle className="flex items-center justify-center gap-2 text-3xl">
+            <Card className="w-full max-w-xl shadow-md shadow-foreground/5">
+                <CardHeader className="px-5 pt-5 sm:px-6">
+                    <CardTitle className="flex items-center gap-2 text-left">
                         <LockKeyholeIcon className="size-5" />
-                        {t("password")} {t("required")}
+                        {t("passwordRequiredTitle")}
                     </CardTitle>
                     <CardDescription>{t("passwordProtected")}</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <form className="grid gap-4" onSubmit={onSubmit}>
-                        <div className="grid gap-2">
-                            <Label htmlFor="broadcast-password">{t("passwordPlaceholder")}</Label>
-                            <Input
-                                id="broadcast-password"
-                                type="password"
-                                autoComplete="new-password"
-                                placeholder={t("passwordPlaceholder")}
-                                value={localPassword}
-                                onChange={(e) => onPasswordChange(e.target.value)}
-                                disabled={verifying}
-                                required
-                            />
-                        </div>
+                <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                    <FieldGroup className="gap-4">
+                        <form className="grid gap-4" onSubmit={onSubmit}>
+                            <Field data-invalid={!!passwordError}>
+                                <FieldLabel htmlFor="broadcast-password">
+                                    {t("passwordPlaceholder")}
+                                </FieldLabel>
+                                <Input
+                                    id="broadcast-password"
+                                    type="password"
+                                    autoComplete="new-password"
+                                    placeholder={t("passwordPlaceholder")}
+                                    value={localPassword}
+                                    onChange={(e) => onPasswordChange(e.target.value)}
+                                    disabled={verifying}
+                                    required
+                                />
+                            </Field>
 
-                        {passwordError && (
-                            <Alert variant="destructive">
-                                <AlertDescription>{passwordError}</AlertDescription>
-                            </Alert>
-                        )}
-
-                        <Button type="submit" disabled={verifying} className="w-full">
-                            {verifying ? (
-                                <>
-                                    <Spinner />
-                                    {t("verifying")}
-                                </>
-                            ) : (
-                                <>
-                                    <LogInIcon />
-                                    {t("submit")}
-                                </>
+                            {passwordError && (
+                                <Alert variant="destructive">
+                                    <AlertDescription>{passwordError}</AlertDescription>
+                                </Alert>
                             )}
+
+                            <Button type="submit" disabled={verifying} className="w-full">
+                                {verifying ? (
+                                    <>
+                                        <Spinner />
+                                        {t("verifying")}
+                                    </>
+                                ) : (
+                                    <>
+                                        <LogInIcon />
+                                        {t("submit")}
+                                    </>
+                                )}
+                            </Button>
+                        </form>
+                        <Button variant="ghost" onClick={onCancel} className="w-full">
+                            {t("cancel")}
                         </Button>
-                    </form>
-                    <Button variant="ghost" onClick={onCancel} className="mt-2 w-full">
-                        {t("cancel")}
-                    </Button>
+                    </FieldGroup>
                 </CardContent>
             </Card>
         </CenteredPage>

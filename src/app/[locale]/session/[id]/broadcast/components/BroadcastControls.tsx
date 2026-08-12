@@ -1,11 +1,13 @@
 "use client";
 
 import { useRoomContext } from "@livekit/components-react";
-import { MicIcon, ScreenShareIcon } from "lucide-react";
+import { MicIcon, RadioTowerIcon, ScreenShareIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import useSWRMutation from "swr/mutation";
 
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { useRouter } from "@/i18n/navigation";
 import { fetchValidatedJson } from "@/lib/api-client";
@@ -71,62 +73,82 @@ export function BroadcastControls({
     };
 
     return (
-        <div className="w-full max-w-xl space-y-6">
-            <header className="space-y-1">
-                <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-                    {t("title")} {sessionId}
-                </h1>
-            </header>
+        <section className="grid w-full max-w-xl gap-6">
+            <Card className="shadow-md shadow-foreground/5">
+                <CardHeader className="px-5 pt-5 sm:px-6">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="grid min-w-0 gap-1">
+                            <CardTitle className="flex items-center gap-2 text-left">
+                                <RadioTowerIcon className="size-5 text-primary" />
+                                {t("title")}
+                            </CardTitle>
+                            <CardDescription className="font-mono text-xs">
+                                {t("session", { sessionId })}
+                            </CardDescription>
+                        </div>
+                        <Badge variant="outline" className="gap-1">
+                            {t("listenerCount", { count: listenerCount })}
+                        </Badge>
+                    </div>
+                </CardHeader>
+                <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                    <FieldGroup className="gap-6">
+                        <BroadcastStatus
+                            expiresAt={expiresAt}
+                            isAudioActive={audioMixer.isAudioActive}
+                            isMicEnabled={audioMixer.isMicEnabled}
+                            isTabAudioEnabled={audioMixer.isTabAudioEnabled}
+                            isWakeLockActive={isWakeLockActive}
+                            onSessionExpired={onSessionExpired}
+                        />
 
-            <BroadcastStatus
-                expiresAt={expiresAt}
-                isAudioActive={audioMixer.isAudioActive}
-                isMicEnabled={audioMixer.isMicEnabled}
-                isTabAudioEnabled={audioMixer.isTabAudioEnabled}
-                isWakeLockActive={isWakeLockActive}
-                listenerCount={listenerCount}
-                onSessionExpired={onSessionExpired}
-            />
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <FieldLegend variant="label">{t("audioSources")}</FieldLegend>
+                            <div className="grid gap-3">
+                                <AudioInputCard
+                                    title={t("microphone")}
+                                    enabled={audioMixer.isMicEnabled}
+                                    volume={audioMixer.micVolume}
+                                    actionLabel={t("enable")}
+                                    stopLabel={t("disable")}
+                                    icon={<MicIcon className="size-4 text-muted-foreground" />}
+                                    onToggle={audioMixer.toggleMicrophone}
+                                    onVolumeChange={audioMixer.handleMicVolumeChange}
+                                />
+                                <AudioInputCard
+                                    title={t("browserTabAudio")}
+                                    enabled={audioMixer.isTabAudioEnabled}
+                                    volume={audioMixer.tabVolume}
+                                    actionLabel={t("shareTab")}
+                                    stopLabel={t("stopSharing")}
+                                    icon={
+                                        <ScreenShareIcon className="size-4 text-muted-foreground" />
+                                    }
+                                    onToggle={audioMixer.toggleTabAudio}
+                                    onVolumeChange={audioMixer.handleTabVolumeChange}
+                                />
+                            </div>
+                        </FieldSet>
 
-            <div className="grid gap-3">
-                <AudioInputCard
-                    title={t("microphone")}
-                    enabled={audioMixer.isMicEnabled}
-                    volume={audioMixer.micVolume}
-                    actionLabel={t("enable")}
-                    stopLabel={t("disable")}
-                    icon={<MicIcon className="size-4 text-muted-foreground" />}
-                    onToggle={audioMixer.toggleMicrophone}
-                    onVolumeChange={audioMixer.handleMicVolumeChange}
-                />
-                <AudioInputCard
-                    title={t("browserTabAudio")}
-                    enabled={audioMixer.isTabAudioEnabled}
-                    volume={audioMixer.tabVolume}
-                    actionLabel={t("shareTab")}
-                    stopLabel={t("stopSharing")}
-                    icon={<ScreenShareIcon className="size-4 text-muted-foreground" />}
-                    onToggle={audioMixer.toggleTabAudio}
-                    onVolumeChange={audioMixer.handleTabVolumeChange}
-                />
-            </div>
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <SharePanel
+                                isJoinUrlCopied={join.isCopied}
+                                joinPath={join.joinPath}
+                                joinUrl={join.joinUrl}
+                                onCopyJoinUrl={join.copyJoinUrl}
+                            />
+                        </FieldSet>
 
-            <Separator />
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <ActiveTranslationsPanel translations={translations} />
+                        </FieldSet>
 
-            <SharePanel
-                isJoinUrlCopied={join.isCopied}
-                joinPath={join.joinPath}
-                joinUrl={join.joinUrl}
-                onCopyJoinUrl={join.copyJoinUrl}
-            />
-
-            <Separator />
-
-            <ActiveTranslationsPanel translations={translations} />
-
-            <Separator />
-
-            <EndBroadcastControl onEnd={handleEndBroadcast} />
-        </div>
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <EndBroadcastControl onEnd={handleEndBroadcast} />
+                        </FieldSet>
+                    </FieldGroup>
+                </CardContent>
+            </Card>
+        </section>
     );
 }

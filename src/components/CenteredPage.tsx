@@ -7,7 +7,7 @@ export function CenteredPage({ children, className }: { children: ReactNode; cla
     return (
         <main
             className={cn(
-                "flex min-h-[calc(100svh-var(--app-header-height))] items-center justify-center px-4 py-10",
+                "flex min-h-[calc(100svh-var(--app-header-height))] items-start justify-center px-4 py-10",
                 className,
             )}
         >

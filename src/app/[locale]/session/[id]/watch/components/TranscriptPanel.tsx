@@ -34,39 +34,37 @@ export function TranscriptPanel({
     const t = useTranslations("Watch");
 
     return (
-        <section className="space-y-4">
+        <section className="grid gap-3">
             <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {t("transcription")}
-                </span>
+                <span className="text-sm font-medium">{t("transcription")}</span>
                 <div className="flex items-center gap-1">
                     {floatingWindowControl}
                     <Button
                         type="button"
                         variant="outline"
-                        size="xs"
+                        size="icon-xs"
                         onClick={onDecreaseFontSize}
                         disabled={!canDecreaseFontSize}
                         title={t("decreaseFontSize")}
                         aria-label={t("decreaseFontSize")}
                     >
-                        <MinusIcon className="size-3" />A
+                        <MinusIcon className="size-3" />
                     </Button>
                     <Button
                         type="button"
                         variant="outline"
-                        size="xs"
+                        size="icon-xs"
                         onClick={onIncreaseFontSize}
                         disabled={!canIncreaseFontSize}
                         title={t("increaseFontSize")}
                         aria-label={t("increaseFontSize")}
                     >
-                        <PlusIcon className="size-3" />A
+                        <PlusIcon className="size-3" />
                     </Button>
                 </div>
             </div>
 
-            <ScrollArea className="h-80 rounded-lg bg-card/70 shadow-sm shadow-foreground/5">
+            <ScrollArea className="h-80 rounded-lg bg-muted/20">
                 <div className="p-4">
                     <TranscriptFeed
                         currentLanguage={currentLanguage}

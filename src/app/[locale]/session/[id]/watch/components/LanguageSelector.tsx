@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
+import { FieldLabel } from "@/components/ui/field";
 import {
     NativeSelect,
     NativeSelectOptGroup,
@@ -86,12 +86,7 @@ export default function LanguageSelector({
 
     return (
         <div className="grid gap-2">
-            <Label
-                htmlFor="language-select"
-                className="text-xs uppercase tracking-wide text-muted-foreground"
-            >
-                {t("voiceLanguage")}
-            </Label>
+            <FieldLabel htmlFor="language-select">{t("voiceLanguage")}</FieldLabel>
 
             <div className="flex items-center gap-2">
                 <div className="relative min-w-0 flex-1">
@@ -138,7 +133,9 @@ export default function LanguageSelector({
                     ) : (
                         <VolumeXIcon className="size-3.5" />
                     )}
-                    <span>{audioMuted ? t("unmuteAudio") : t("muteAudio")}</span>
+                    <span className="hidden sm:inline">
+                        {audioMuted ? t("unmuteAudio") : t("muteAudio")}
+                    </span>
                 </Toggle>
             </div>
 

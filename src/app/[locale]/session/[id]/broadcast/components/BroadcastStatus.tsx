@@ -1,6 +1,6 @@
 "use client";
 
-import { LockKeyholeIcon, UsersIcon } from "lucide-react";
+import { LockKeyholeIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 import SessionCountdown from "@/components/SessionCountdown";
@@ -13,7 +13,6 @@ export function BroadcastStatus({
     isMicEnabled,
     isTabAudioEnabled,
     isWakeLockActive,
-    listenerCount,
     onSessionExpired,
 }: {
     expiresAt: string | null;
@@ -21,7 +20,6 @@ export function BroadcastStatus({
     isMicEnabled: boolean;
     isTabAudioEnabled: boolean;
     isWakeLockActive: boolean;
-    listenerCount: number;
     onSessionExpired: () => void;
 }) {
     const t = useTranslations("Broadcast");
@@ -35,7 +33,7 @@ export function BroadcastStatus({
     }
 
     return (
-        <section className="flex flex-wrap items-center justify-between gap-3">
+        <section className="rounded-lg bg-muted/20 p-3">
             <div className="flex flex-wrap items-center gap-3">
                 <div className={`waveform ${isAudioActive ? "active" : "idle"}`}>
                     {Array.from({ length: 5 }).map((_, i) => (
@@ -72,11 +70,6 @@ export function BroadcastStatus({
                     onExpire={onSessionExpired}
                 />
             </div>
-
-            <Badge variant="outline" className="gap-1">
-                <UsersIcon className="size-3" />
-                {t("listenerCount", { count: listenerCount })}
-            </Badge>
         </section>
     );
 }

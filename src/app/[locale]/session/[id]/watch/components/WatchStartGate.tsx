@@ -23,17 +23,19 @@ export function WatchStartGate({
 
     return (
         <CenteredPage>
-            <Card className="w-full max-w-md text-center">
-                <CardHeader>
-                    <CardTitle className="text-3xl">{t("ready")}</CardTitle>
+            <Card className="w-full max-w-xl shadow-md shadow-foreground/5">
+                <CardHeader className="px-5 pt-5 sm:px-6">
+                    <CardTitle className="flex items-center gap-2 text-left">
+                        <Volume2Icon className="size-5 text-primary" />
+                        {t("ready")}
+                    </CardTitle>
                     <CardDescription>{t("readyCopy")}</CardDescription>
                 </CardHeader>
-                <CardContent className="grid gap-4">
+                <CardContent className="grid gap-4 px-5 pb-5 sm:px-6 sm:pb-6">
                     <SessionCountdown
                         expiresAt={expiresAt}
                         timeRemainingLabel={t("timeRemaining")}
                         endedLabel={t("sessionEnded")}
-                        className="mx-auto"
                         onExpire={onSessionExpired}
                     />
                     <Button onClick={onStart} className="w-full">

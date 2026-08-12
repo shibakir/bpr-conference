@@ -15,7 +15,7 @@ import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { ColorPicker } from "@/components/ui/color-picker";
-import { Label } from "@/components/ui/label";
+import { FieldLabel } from "@/components/ui/field";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
@@ -377,7 +377,7 @@ function SettingRow({
     return (
         <div className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
-                <Label className="text-xs text-muted-foreground">{label}</Label>
+                <FieldLabel className="text-xs text-muted-foreground">{label}</FieldLabel>
                 <span className="font-mono text-xs text-muted-foreground">{value}</span>
             </div>
             {children}
@@ -481,7 +481,7 @@ export function FloatingTranscriptWindow({
             <Button
                 type="button"
                 variant={mode ? "secondary" : "outline"}
-                size="xs"
+                size="icon-xs"
                 onClick={toggleFloatingWindow}
                 title={mode ? t("closeFloatingCaptions") : t("openFloatingCaptions")}
                 aria-label={mode ? t("closeFloatingCaptions") : t("openFloatingCaptions")}
@@ -491,9 +491,6 @@ export function FloatingTranscriptWindow({
                 ) : (
                     <CaptionsIcon className="size-3" />
                 )}
-                <span className="hidden sm:inline">
-                    {mode ? t("closeFloatingCaptions") : t("openFloatingCaptions")}
-                </span>
             </Button>
 
             {mode === "inline" && (
@@ -604,9 +601,12 @@ function CaptionSettingsPanel({
                 />
 
                 <div className="grid gap-2">
-                    <Label htmlFor="caption-font-family" className="text-xs text-muted-foreground">
+                    <FieldLabel
+                        htmlFor="caption-font-family"
+                        className="text-xs text-muted-foreground"
+                    >
                         {t("captionFontFamily")}
-                    </Label>
+                    </FieldLabel>
                     <NativeSelect
                         id="caption-font-family"
                         value={settings.fontFamily}

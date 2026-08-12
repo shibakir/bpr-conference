@@ -6,7 +6,7 @@ import { LiveKitRoom, RoomAudioRenderer, StartAudio } from "@livekit/components-
 import { useTranslations } from "next-intl";
 import { use, useState } from "react";
 
-import { CenteredLoadingState } from "@/components/CenteredPage";
+import { CenteredLoadingState, CenteredPage } from "@/components/CenteredPage";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export default function WatchPage({ params }: { params: Promise<{ locale: string
     }
 
     return (
-        <main className="min-h-[calc(100svh-var(--app-header-height))] px-4 py-10 sm:px-6">
+        <CenteredPage className="sm:px-6">
             <LiveKitRoom
                 video={false}
                 audio={false}
@@ -59,6 +59,6 @@ export default function WatchPage({ params }: { params: Promise<{ locale: string
                     onSessionExpired={markExpired}
                 />
             </LiveKitRoom>
-        </main>
+        </CenteredPage>
     );
 }

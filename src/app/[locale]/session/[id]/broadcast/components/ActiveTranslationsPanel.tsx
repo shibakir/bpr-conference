@@ -14,17 +14,19 @@ export function ActiveTranslationsPanel({ translations }: { translations: Transl
     const locale = useLocale();
 
     return (
-        <section className="space-y-3">
+        <section className="grid gap-3">
             <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <span className="text-sm font-medium">
                     {t("translationsCount", { count: translations.length })}
                 </span>
             </div>
 
             {translations.length === 0 ? (
-                <p className="text-sm italic text-muted-foreground">{t("noTranslations")}</p>
+                <p className="rounded-lg bg-muted/20 p-3 text-sm text-muted-foreground">
+                    {t("noTranslations")}
+                </p>
             ) : (
-                <div className="overflow-hidden rounded-lg bg-card/70 shadow-sm shadow-foreground/5">
+                <div className="overflow-hidden rounded-lg bg-muted/20">
                     <Table>
                         <TableBody>
                             {translations.map((translation) => {

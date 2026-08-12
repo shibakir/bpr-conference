@@ -6,7 +6,7 @@ import { LiveKitRoom } from "@livekit/components-react";
 import { useTranslations } from "next-intl";
 import { use, useCallback, useRef } from "react";
 
-import { CenteredLoadingState } from "@/components/CenteredPage";
+import { CenteredLoadingState, CenteredPage } from "@/components/CenteredPage";
 import { useRouter } from "@/i18n/navigation";
 
 import { BroadcastControls } from "./components/BroadcastControls";
@@ -58,7 +58,7 @@ export default function BroadcastPage({
     }
 
     return (
-        <main className="min-h-[calc(100svh-var(--app-header-height))] px-4 py-10 sm:px-6">
+        <CenteredPage className="sm:px-6">
             <LiveKitRoom
                 video={false}
                 audio={false}
@@ -79,6 +79,6 @@ export default function BroadcastPage({
                     onSessionExpired={handleSessionExpired}
                 />
             </LiveKitRoom>
-        </main>
+        </CenteredPage>
     );
 }

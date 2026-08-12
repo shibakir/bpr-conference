@@ -61,23 +61,17 @@ export const successResponseSchema = z
     })
     .passthrough();
 
-export const createSessionFormSchema = z
-    .object({
-        durationMinutes: z
-            .number()
-            .int()
-            .min(MIN_SESSION_DURATION_MINUTES)
-            .max(MAX_SESSION_DURATION_MINUTES),
-        langSearch: z.string(),
-        password: z.string(),
-        restrictLanguages: z.boolean(),
-        selectedLanguages: z.array(z.string()),
-        translationOutputs: z.array(translationOutputModeSchema),
-    })
-    .refine((values) => !values.restrictLanguages || values.selectedLanguages.length > 0, {
-        message: "Select at least one language.",
-        path: ["selectedLanguages"],
-    });
+export const createSessionFormSchema = z.object({
+    durationMinutes: z
+        .number()
+        .int()
+        .min(MIN_SESSION_DURATION_MINUTES)
+        .max(MAX_SESSION_DURATION_MINUTES),
+    langSearch: z.string(),
+    password: z.string(),
+    selectedLanguages: z.array(z.string()).min(1),
+    translationOutputs: z.array(translationOutputModeSchema).min(1),
+});
 
 export type CreateSessionFormValues = z.infer<typeof createSessionFormSchema>;
 

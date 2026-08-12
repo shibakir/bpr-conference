@@ -2,13 +2,14 @@
 
 import { useRoomContext, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
+import { HeadphonesIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
+import { FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
@@ -257,68 +258,74 @@ export function AttendeeView({
     );
 
     return (
-        <div className="w-full max-w-xl space-y-6">
-            <header className="space-y-1">
-                <h1 className="font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-                    {t("title")}
-                </h1>
-                <p className="font-mono text-xs text-muted-foreground">{sessionId}</p>
-            </header>
+        <section className="grid w-full max-w-xl gap-6">
+            <Card className="shadow-md shadow-foreground/5">
+                <CardHeader className="px-5 pt-5 sm:px-6">
+                    <CardTitle className="flex items-center gap-2 text-left">
+                        <HeadphonesIcon className="size-5 text-primary" />
+                        {t("title")}
+                    </CardTitle>
+                    <CardDescription className="font-mono text-xs">
+                        {t("session", { sessionId })}
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                    <FieldGroup className="gap-6">
+                        <ListenerStatus
+                            audioMuted={audioMuted}
+                            currentLanguage={currentLanguage}
+                            expiresAt={expiresAt}
+                            isConnected={isConnected}
+                            isReceivingAudio={!!isReceivingAudio}
+                            isWakeLockActive={isWakeLockActive}
+                            onSessionExpired={onSessionExpired}
+                        />
 
-            <ListenerStatus
-                audioMuted={audioMuted}
-                currentLanguage={currentLanguage}
-                expiresAt={expiresAt}
-                isConnected={isConnected}
-                isReceivingAudio={!!isReceivingAudio}
-                isWakeLockActive={isWakeLockActive}
-                onSessionExpired={onSessionExpired}
-            />
+                        <FieldSet className="gap-4 border-t border-border/35 pt-5">
+                            <LanguageSelector
+                                audioMuted={audioMuted}
+                                currentLanguage={currentLanguage}
+                                onLanguageChange={handleLanguageChange}
+                                onAudioMutedChange={setAudioMuted}
+                                disabled={!isConnected || !sessionDetails.loaded}
+                                translationError={currentTranslationState?.error ?? null}
+                                translationLoading={currentTranslationLoading}
+                                translationsEnabled={sessionDetails.enableAudioTranslation}
+                                {...(sessionDetails.allowedLanguages
+                                    ? { allowedLanguages: sessionDetails.allowedLanguages }
+                                    : {})}
+                            />
+                            {sessionDetails.enableTranscription && (
+                                <SubtitleLanguageSelector
+                                    disabled={!sessionDetails.loaded}
+                                    languages={availableCaptionLanguages}
+                                    onLanguageToggle={handleCaptionLanguageToggle}
+                                    selectedLanguages={visibleSelectedCaptionLanguages}
+                                />
+                            )}
+                        </FieldSet>
 
-            <Separator />
-
-            <section className="space-y-4 py-1">
-                <LanguageSelector
-                    audioMuted={audioMuted}
-                    currentLanguage={currentLanguage}
-                    onLanguageChange={handleLanguageChange}
-                    onAudioMutedChange={setAudioMuted}
-                    disabled={!isConnected || !sessionDetails.loaded}
-                    translationError={currentTranslationState?.error ?? null}
-                    translationLoading={currentTranslationLoading}
-                    translationsEnabled={sessionDetails.enableAudioTranslation}
-                    {...(sessionDetails.allowedLanguages
-                        ? { allowedLanguages: sessionDetails.allowedLanguages }
-                        : {})}
-                />
-                {sessionDetails.enableTranscription && (
-                    <SubtitleLanguageSelector
-                        disabled={!sessionDetails.loaded}
-                        languages={availableCaptionLanguages}
-                        onLanguageToggle={handleCaptionLanguageToggle}
-                        selectedLanguages={visibleSelectedCaptionLanguages}
-                    />
-                )}
-            </section>
-
-            {sessionDetails.enableTranscription && (
-                <>
-                    <Separator />
-
-                    <TranscriptPanel
-                        canDecreaseFontSize={fontSizePreference.canDecreaseFontSize}
-                        canIncreaseFontSize={fontSizePreference.canIncreaseFontSize}
-                        currentLanguage={primaryTranscriptLanguage}
-                        floatingWindowControl={<FloatingTranscriptWindow panels={captionPanels} />}
-                        fontSize={fontSizePreference.fontSize}
-                        onDecreaseFontSize={fontSizePreference.decreaseFontSize}
-                        onIncreaseFontSize={fontSizePreference.increaseFontSize}
-                        transcriptEndRef={transcriptEndRef}
-                        transcripts={transcripts}
-                    />
-                </>
-            )}
-        </div>
+                        {sessionDetails.enableTranscription && (
+                            <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                                <TranscriptPanel
+                                    canDecreaseFontSize={fontSizePreference.canDecreaseFontSize}
+                                    canIncreaseFontSize={fontSizePreference.canIncreaseFontSize}
+                                    currentLanguage={primaryTranscriptLanguage}
+                                    floatingWindowControl={
+                                        <FloatingTranscriptWindow panels={captionPanels} />
+                                    }
+                                    fontSize={fontSizePreference.fontSize}
+                                    onDecreaseFontSize={fontSizePreference.decreaseFontSize}
+                                    onIncreaseFontSize={fontSizePreference.increaseFontSize}
+                                    transcriptEndRef={transcriptEndRef}
+                                    transcripts={transcripts}
+                                />
+                            </FieldSet>
+                        )}
+                    </FieldGroup>
+                </CardContent>
+            </Card>
+        </section>
     );
 }
 
@@ -338,9 +345,7 @@ function SubtitleLanguageSelector({
 
     return (
         <div className="grid gap-2">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                {t("subtitleLanguages")}
-            </Label>
+            <FieldLabel>{t("subtitleLanguages")}</FieldLabel>
             <ScrollArea className="max-h-48 rounded-lg bg-muted/20">
                 <div className="grid gap-2 p-3">
                     {languages.length === 0 ? (
@@ -351,7 +356,7 @@ function SubtitleLanguageSelector({
                             return (
                                 <div
                                     key={language.code}
-                                    className="flex min-h-9 items-center gap-3 rounded-md bg-background/60 px-3 py-2 shadow-xs shadow-foreground/5"
+                                    className="flex min-h-9 items-center gap-3 rounded-lg bg-background/60 px-3 py-2 shadow-xs shadow-foreground/5"
                                 >
                                     <Checkbox
                                         id={id}
@@ -361,14 +366,14 @@ function SubtitleLanguageSelector({
                                             onLanguageToggle(language.code, checked === true)
                                         }
                                     />
-                                    <Label
+                                    <FieldLabel
                                         htmlFor={id}
                                         className="min-w-0 flex-1 cursor-pointer text-sm font-normal"
                                     >
                                         <span className="truncate">
                                             {language.flag} {language.label}
                                         </span>
-                                    </Label>
+                                    </FieldLabel>
                                 </div>
                             );
                         })
