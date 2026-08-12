@@ -48,10 +48,11 @@ type WindowWithDocumentPictureInPicture = Window & {
   documentPictureInPicture?: DocumentPictureInPictureController;
 };
 
-type CaptionParagraph = {
-  id: string;
-  text: string;
-  final: boolean;
+export type FloatingCaptionPanel = {
+  emptyMessage: string;
+  language: string;
+  title: string;
+  transcripts: TranscriptEntry[];
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -90,6 +91,107 @@ function prepareDocumentPipWindow(
   return root;
 }
 
+function CaptionPanelContent({
+  maxHeight,
+  panel,
+  settings,
+}: {
+  maxHeight: string;
+  panel: FloatingCaptionPanel;
+  settings: CaptionWindowSettings;
+}) {
+  const textWrapRef = useRef<HTMLDivElement | null>(null);
+  const paragraphs = useMemo(
+    () => getTranscriptParagraphs(panel.transcripts, 1).slice(-settings.maxLines),
+    [panel.transcripts, settings.maxLines]
+  );
+
+  useEffect(() => {
+    const node = textWrapRef.current;
+    if (!node) return;
+    node.scrollTop = node.scrollHeight;
+  }, [
+    panel.emptyMessage,
+    paragraphs,
+    settings.fontSize,
+    settings.lineHeight,
+    settings.maxLines,
+  ]);
+
+  const panelStyle: CSSProperties = {
+    background: "rgba(255, 255, 255, 0.08)",
+    border: "1px solid rgba(255, 255, 255, 0.14)",
+    borderRadius: 8,
+    display: "flex",
+    flexDirection: "column",
+    minHeight: 0,
+    minWidth: 0,
+    overflow: "hidden",
+  };
+  const panelHeaderStyle: CSSProperties = {
+    alignItems: "center",
+    color: hexToRgba(settings.textColor, 0.7),
+    display: "flex",
+    flex: "0 0 auto",
+    fontSize: 11,
+    fontWeight: 700,
+    gap: 8,
+    justifyContent: "space-between",
+    letterSpacing: 0,
+    padding: "8px 10px 0",
+    textTransform: "uppercase",
+  };
+  const textWrapStyle: CSSProperties = {
+    display: "block",
+    maxHeight,
+    overflowX: "hidden",
+    overflowY: "hidden",
+    padding: "10px 12px 12px",
+    scrollBehavior: "auto",
+    width: "100%",
+  };
+  const paragraphStyle: CSSProperties = {
+    fontSize: settings.fontSize,
+    fontWeight: 650,
+    lineHeight: settings.lineHeight,
+    margin: `0 0 ${Math.max(8, Math.round(settings.fontSize * 0.3))}px`,
+    overflowWrap: "anywhere",
+    textShadow: "0 2px 8px rgba(0, 0, 0, 0.45)",
+  };
+  const emptyStyle: CSSProperties = {
+    ...paragraphStyle,
+    color: hexToRgba(settings.textColor, 0.68),
+    fontStyle: "italic",
+  };
+
+  return (
+    <section style={panelStyle} aria-label={panel.title}>
+      <div style={panelHeaderStyle}>
+        <span>{panel.title}</span>
+      </div>
+      <div ref={textWrapRef} style={textWrapStyle}>
+        {paragraphs.length === 0 ? (
+          <p style={emptyStyle}>{panel.emptyMessage}</p>
+        ) : (
+          paragraphs.map((paragraph) => (
+            <p
+              key={paragraph.id}
+              style={{
+                ...paragraphStyle,
+                color: paragraph.final
+                  ? settings.textColor
+                  : hexToRgba(settings.textColor, 0.72),
+              }}
+            >
+              {paragraph.text}
+            </p>
+          ))
+        )}
+      </div>
+    </section>
+  );
+}
+
 function CaptionSurface({
   emptyMessage,
   fill,
@@ -98,7 +200,7 @@ function CaptionSurface({
   onClose,
   onReset,
   onSettingsChange,
-  paragraphs,
+  panels,
   settings,
   title,
 }: {
@@ -109,7 +211,7 @@ function CaptionSurface({
   onClose?: () => void;
   onReset: () => void;
   onSettingsChange: (patch: Partial<CaptionWindowSettings>) => void;
-  paragraphs: CaptionParagraph[];
+  panels: FloatingCaptionPanel[];
   settings: CaptionWindowSettings;
   title: string;
 }) {
@@ -117,22 +219,9 @@ function CaptionSurface({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const lineHeightPx = settings.fontSize * settings.lineHeight;
   const maxLinesHeight = settings.maxLines * lineHeightPx;
-  const textWrapRef = useRef<HTMLDivElement | null>(null);
   const maxCaptionHeight = fill
     ? `min(${maxLinesHeight}px, calc(100vh - 72px))`
     : `min(${maxLinesHeight}px, calc(100vh - 104px))`;
-
-  useEffect(() => {
-    const node = textWrapRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [
-    emptyMessage,
-    paragraphs,
-    settings.fontSize,
-    settings.lineHeight,
-    settings.maxLines,
-  ]);
 
   const surfaceStyle: CSSProperties = {
     width: fill ? "100vw" : "100%",
@@ -172,12 +261,16 @@ function CaptionSurface({
     overflow: "hidden",
     padding: "14px 24px 24px",
   };
-  const textWrapStyle: CSSProperties = {
-    display: "block",
+  const panelGridStyle: CSSProperties = {
+    alignItems: "stretch",
+    display: "grid",
+    gap: 12,
+    gridAutoRows: panels.length > 1 ? "minmax(0, 1fr)" : "auto",
+    gridTemplateColumns: "1fr",
+    height: panels.length > 1 ? maxCaptionHeight : "auto",
     maxHeight: maxCaptionHeight,
-    overflowX: "hidden",
-    overflowY: "hidden",
-    scrollBehavior: "auto",
+    minHeight: 0,
+    overflow: "hidden",
     width: "100%",
   };
   const paragraphStyle: CSSProperties = {
@@ -250,25 +343,20 @@ function CaptionSurface({
         />
       )}
       <div style={bodyStyle}>
-        <div ref={textWrapRef} style={textWrapStyle}>
-          {paragraphs.length === 0 ? (
-            <p style={emptyStyle}>{emptyMessage}</p>
-          ) : (
-            paragraphs.slice(-settings.maxLines).map((paragraph) => (
-              <p
-                key={paragraph.id}
-                style={{
-                  ...paragraphStyle,
-                  color: paragraph.final
-                    ? settings.textColor
-                    : hexToRgba(settings.textColor, 0.72),
-                }}
-              >
-                {paragraph.text}
-              </p>
-            ))
-          )}
-        </div>
+        {panels.length === 0 ? (
+          <p style={emptyStyle}>{emptyMessage}</p>
+        ) : (
+          <div style={panelGridStyle}>
+            {panels.map((panel) => (
+              <CaptionPanelContent
+                key={panel.language}
+                maxHeight={maxCaptionHeight}
+                panel={panel}
+                settings={settings}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -295,11 +383,11 @@ function SettingRow({
 }
 
 export function FloatingTranscriptWindow({
-  currentLanguage,
-  transcripts,
+  onOpenChange,
+  panels,
 }: {
-  currentLanguage: string;
-  transcripts: TranscriptEntry[];
+  onOpenChange?: (open: boolean) => void;
+  panels: FloatingCaptionPanel[];
 }) {
   const t = useTranslations("Watch");
   const {
@@ -318,18 +406,18 @@ export function FloatingTranscriptWindow({
   const documentPipWindowRef = useRef<Window | null>(null);
 
   const emptyMessage =
-    currentLanguage === "original"
+    panels.length === 0
       ? t("selectLanguageForTranscription")
       : t("waitingForSpeech");
   const title = t("floatingCaptions");
-  const paragraphs = useMemo(
-    () => getTranscriptParagraphs(transcripts, 1).slice(-settings.maxLines),
-    [settings.maxLines, transcripts]
-  );
 
   useEffect(() => {
     documentPipWindowRef.current = documentPipWindow;
   }, [documentPipWindow]);
+
+  useEffect(() => {
+    onOpenChange?.(mode !== null);
+  }, [mode, onOpenChange]);
 
   const closeFloatingWindow = useCallback(async () => {
     const pipWindow = documentPipWindowRef.current;
@@ -428,7 +516,7 @@ export function FloatingTranscriptWindow({
             onClose={() => void closeFloatingWindow()}
             onReset={resetSettings}
             onSettingsChange={updateSettings}
-            paragraphs={paragraphs}
+            panels={panels}
             settings={settings}
             title={title}
           />
@@ -446,7 +534,7 @@ export function FloatingTranscriptWindow({
             onClose={() => void closeFloatingWindow()}
             onReset={resetSettings}
             onSettingsChange={updateSettings}
-            paragraphs={paragraphs}
+            panels={panels}
             settings={settings}
             title={title}
           />,

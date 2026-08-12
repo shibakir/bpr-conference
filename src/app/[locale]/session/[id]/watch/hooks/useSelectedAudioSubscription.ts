@@ -11,11 +11,13 @@ import {
 } from "livekit-client";
 
 export function useSelectedAudioSubscription({
+  audioMuted,
   enableTranslatedAudio,
   room,
   currentLanguage,
   translatorIdentity,
 }: {
+  audioMuted: boolean;
   enableTranslatedAudio: boolean;
   room: Room | undefined;
   currentLanguage: string;
@@ -35,14 +37,16 @@ export function useSelectedAudioSubscription({
         for (const [, pub] of participant.trackPublications) {
           if (pub.kind === Track.Kind.Audio) {
             const shouldSubscribe =
-              currentLanguage === "original"
+              !audioMuted &&
+              (currentLanguage === "original"
                 ? isOrganizer
-                : enableTranslatedAudio && !!isSelectedTranslator;
+                : enableTranslatedAudio && !!isSelectedTranslator);
             const key = `${participant.identity}:${pub.trackSid}`;
 
             if (desiredSubscriptionRef.current.get(key) !== shouldSubscribe) {
               desiredSubscriptionRef.current.set(key, shouldSubscribe);
               console.info("[WatchAudio] subscription target changed", {
+                audioMuted,
                 currentLanguage,
                 enableTranslatedAudio,
                 participant: participant.identity,
@@ -70,7 +74,11 @@ export function useSelectedAudioSubscription({
       const isOrganizer = participant.identity.startsWith("organizer-");
       const isSelectedTranslator =
         translatorIdentity && participant.identity === translatorIdentity;
-      if (isOrganizer || (enableTranslatedAudio && isSelectedTranslator)) {
+      if (
+        audioMuted ||
+        isOrganizer ||
+        (enableTranslatedAudio && isSelectedTranslator)
+      ) {
         updateSubscriptions();
       }
     };
@@ -85,6 +93,7 @@ export function useSelectedAudioSubscription({
       if (pub.kind !== Track.Kind.Audio) return;
 
       console.info("[WatchAudio] track subscribed", {
+        audioMuted,
         currentLanguage,
         enableTranslatedAudio,
         participant: participant.identity,
@@ -103,6 +112,7 @@ export function useSelectedAudioSubscription({
       if (pub.kind !== Track.Kind.Audio) return;
 
       console.info("[WatchAudio] track unsubscribed", {
+        audioMuted,
         currentLanguage,
         enableTranslatedAudio,
         participant: participant.identity,
@@ -119,6 +129,7 @@ export function useSelectedAudioSubscription({
       error?: unknown
     ) => {
       console.warn("[WatchAudio] track subscription failed", {
+        audioMuted,
         currentLanguage,
         enableTranslatedAudio,
         error: error instanceof Error ? error.message : String(error),
@@ -131,6 +142,7 @@ export function useSelectedAudioSubscription({
     const handleAudioPlaybackStatusChanged = (playing: boolean) => {
       const log = playing ? console.info : console.warn;
       log("[WatchAudio] playback status changed", {
+        audioMuted,
         currentLanguage,
         enableTranslatedAudio,
         playing,
@@ -159,5 +171,11 @@ export function useSelectedAudioSubscription({
         handleAudioPlaybackStatusChanged
       );
     };
-  }, [enableTranslatedAudio, room, currentLanguage, translatorIdentity]);
+  }, [
+    audioMuted,
+    enableTranslatedAudio,
+    room,
+    currentLanguage,
+    translatorIdentity,
+  ]);
 }

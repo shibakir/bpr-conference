@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useCallback, useMemo } from "react";
+import { Volume2Icon, VolumeXIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   NativeSelect,
@@ -11,11 +13,6 @@ import {
 } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  API_ERROR_CODES,
-  getApiErrorCode,
-  type ApiErrorCode,
-} from "@/lib/api-errors";
-import {
   SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLanguageDisplayName,
@@ -23,123 +20,52 @@ import {
 import type { InputLanguageMode } from "@/lib/session-types";
 
 interface LanguageSelectorProps {
-  sessionId: string;
+  audioMuted: boolean;
   currentLanguage: string;
-  onLanguageChange: (
-    languageCode: string,
-    translatorIdentity: string | null
-  ) => void;
+  onLanguageChange: (languageCode: string) => void;
+  onAudioMutedChange: (muted: boolean) => void;
   disabled?: boolean;
   allowedLanguages?: string[];
   inputLanguageMode?: InputLanguageMode;
   sourceLanguage?: string;
+  translationError?: string | null;
+  translationLoading?: boolean;
   translationsEnabled: boolean;
 }
 
 export default function LanguageSelector({
-  sessionId,
+  audioMuted,
   currentLanguage,
   onLanguageChange,
+  onAudioMutedChange,
   disabled = false,
   allowedLanguages,
   inputLanguageMode = "multi",
   sourceLanguage,
+  translationError,
+  translationLoading = false,
   translationsEnabled,
 }: LanguageSelectorProps) {
   const t = useTranslations("LanguageSelector");
   const locale = useLocale();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const activeLanguageRef = useRef(currentLanguage);
-
-  useEffect(() => {
-    activeLanguageRef.current = currentLanguage;
-  }, [currentLanguage]);
-
-  const getTranslationRequestErrorMessage = useCallback(
-    (code: ApiErrorCode | undefined) => {
-      switch (code) {
-        case API_ERROR_CODES.SESSION_INACTIVE:
-        case API_ERROR_CODES.SESSION_NOT_FOUND:
-          return t("sessionUnavailable");
-        case API_ERROR_CODES.UNSUPPORTED_TARGET_LANGUAGE:
-          return t("unsupportedTargetLanguage");
-        case API_ERROR_CODES.TARGET_LANGUAGE_MATCHES_SOURCE:
-          return t("targetLanguageIsSource");
-        case API_ERROR_CODES.LANGUAGE_NOT_ALLOWED:
-          return t("languageNotAllowed");
-        case API_ERROR_CODES.TRANSLATION_OUTPUTS_DISABLED:
-          return t("translationsDisabled");
-        case API_ERROR_CODES.INVALID_REQUEST:
-          return t("invalidRequest");
-        default:
-          return t("translationError");
-      }
-    },
-    [t]
-  );
 
   const handleChange = useCallback(
-    async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    (e: React.ChangeEvent<HTMLSelectElement>) => {
       const langCode = e.target.value;
-      const previousLanguage = activeLanguageRef.current;
-      setError(null);
 
       if (langCode === "original") {
-        if (previousLanguage && previousLanguage !== "original") {
-          fetch("/api/translate", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              sessionId,
-              targetLanguage: previousLanguage,
-            }),
-          }).catch(() => {});
-        }
-        onLanguageChange("original", null);
+        onLanguageChange("original");
         return;
       }
 
       if (!translationsEnabled) {
-        onLanguageChange("original", null);
+        onLanguageChange("original");
         return;
       }
 
-      setLoading(true);
-      try {
-        const res = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sessionId,
-            targetLanguage: langCode,
-            previousLanguage:
-              previousLanguage !== "original" ? previousLanguage : undefined,
-          }),
-        });
-
-        const data = await res.json();
-
-        if (!res.ok) {
-          setError(getTranslationRequestErrorMessage(getApiErrorCode(data)));
-          return;
-        }
-
-        onLanguageChange(langCode, data.translatorIdentity);
-      } catch (err) {
-        setError(t("translationError"));
-        console.error("Translation request error:", err);
-      } finally {
-        setLoading(false);
-      }
+      onLanguageChange(langCode);
     },
-    [
-      getTranslationRequestErrorMessage,
-      sessionId,
-      onLanguageChange,
-      t,
-      translationsEnabled,
-    ]
+    [onLanguageChange, translationsEnabled]
   );
 
   const currentLang = getLanguageByCode(currentLanguage);
@@ -180,63 +106,102 @@ export default function LanguageSelector({
 
   return (
     <div className="grid gap-2">
-      <Label htmlFor="language-select" className="text-xs uppercase tracking-wide text-muted-foreground">
-        {t("language")}
+      <Label
+        htmlFor="language-select"
+        className="text-xs uppercase tracking-wide text-muted-foreground"
+      >
+        {t("voiceLanguage")}
       </Label>
 
-      <div className="relative">
-        <NativeSelect
-          id="language-select"
-          className="w-full"
-          value={currentLanguage}
-          onChange={handleChange}
-          disabled={loading || disabled}
-        >
-          <NativeSelectOption value="original">
-            {t("originalAudio")}
-          </NativeSelectOption>
-          {translationsEnabled && (
-            <NativeSelectOptGroup label={t("translations")}>
-              {visibleLanguages.map((lang) => (
-                <NativeSelectOption key={lang.code} value={lang.code}>
-                  {lang.displayName} {lang.flag}
-                </NativeSelectOption>
-              ))}
-            </NativeSelectOptGroup>
-          )}
-        </NativeSelect>
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <NativeSelect
+            id="language-select"
+            className="w-full"
+            value={currentLanguage}
+            onChange={handleChange}
+            disabled={translationLoading || disabled}
+          >
+            <NativeSelectOption value="original">
+              {t("originalAudio")}
+            </NativeSelectOption>
+            {translationsEnabled && (
+              <NativeSelectOptGroup label={t("translations")}>
+                {visibleLanguages.map((lang) => (
+                  <NativeSelectOption key={lang.code} value={lang.code}>
+                    {lang.displayName} {lang.flag}
+                  </NativeSelectOption>
+                ))}
+              </NativeSelectOptGroup>
+            )}
+          </NativeSelect>
 
-        {loading && (
-          <div className="absolute right-9 top-1/2 -translate-y-1/2">
-            <Spinner className="size-3.5 text-muted-foreground" />
-          </div>
-        )}
+          {translationLoading && (
+            <div className="absolute right-9 top-1/2 -translate-y-1/2">
+              <Spinner className="size-3.5 text-muted-foreground" />
+            </div>
+          )}
+        </div>
+
+        <Button
+          type="button"
+          variant={audioMuted ? "secondary" : "outline"}
+          size="sm"
+          onClick={() => onAudioMutedChange(!audioMuted)}
+          disabled={disabled}
+          aria-pressed={audioMuted}
+          title={audioMuted ? t("unmuteAudio") : t("muteAudio")}
+        >
+          {audioMuted ? (
+            <Volume2Icon className="size-3.5" />
+          ) : (
+            <VolumeXIcon className="size-3.5" />
+          )}
+          <span>{audioMuted ? t("unmuteAudio") : t("muteAudio")}</span>
+        </Button>
       </div>
 
       <div className="min-h-5">
-        {currentLanguage !== "original" && currentLang && !loading && (
-          <Badge variant="outline" className="gap-1 border-success/30 text-success">
-            <span className="size-1.5 rounded-full bg-current animate-pulse" />
-            {t("translatingTo", { language: currentLangName })}
+        {audioMuted && (
+          <Badge variant="outline" className="gap-1">
+            <span className="size-1.5 rounded-full bg-current" />
+            {t("audioMuted")}
           </Badge>
         )}
 
-        {loading && (
-          <Badge variant="outline" className="gap-1 border-warning/30 text-warning">
+        {!audioMuted &&
+          currentLanguage !== "original" &&
+          currentLang &&
+          !translationLoading &&
+          !translationError && (
+            <Badge
+              variant="outline"
+              className="gap-1 border-success/30 text-success"
+            >
+              <span className="size-1.5 rounded-full bg-current animate-pulse" />
+              {t("translatingTo", { language: currentLangName })}
+            </Badge>
+          )}
+
+        {!audioMuted && translationLoading && (
+          <Badge
+            variant="outline"
+            className="gap-1 border-warning/30 text-warning"
+          >
             <span className="size-1.5 rounded-full bg-current animate-pulse" />
             {t("startingTranslation")}
           </Badge>
         )}
 
-        {!translationsEnabled && !loading && (
+        {!audioMuted && !translationsEnabled && !translationLoading && (
           <Badge variant="outline" className="max-w-full whitespace-normal">
             {t("translationsDisabled")}
           </Badge>
         )}
 
-        {error && (
+        {!audioMuted && translationError && (
           <Badge variant="destructive" className="max-w-full whitespace-normal">
-            {error}
+            {translationError}
           </Badge>
         )}
       </div>

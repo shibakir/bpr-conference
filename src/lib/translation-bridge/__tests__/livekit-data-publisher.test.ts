@@ -2,7 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { Room } from "@livekit/rtc-node";
 import { TranslationDataPublisher } from "../livekit-data-publisher";
 
-function createRoom(participants: Array<{ identity: string; language?: string }>) {
+function createRoom(
+  participants: Array<{
+    captionLanguages?: string;
+    identity: string;
+    language?: string;
+  }>
+) {
   const publishData = vi.fn().mockResolvedValue(undefined);
   const room = {
     localParticipant: { publishData },
@@ -11,9 +17,12 @@ function createRoom(participants: Array<{ identity: string; language?: string }>
         participant.identity,
         {
           identity: participant.identity,
-          attributes: participant.language
-            ? { language: participant.language }
-            : {},
+          attributes: {
+            ...(participant.language ? { language: participant.language } : {}),
+            ...(participant.captionLanguages
+              ? { captionLanguages: participant.captionLanguages }
+              : {}),
+          },
         },
       ])
     ),
@@ -47,6 +56,30 @@ describe("TranslationDataPublisher", () => {
       reliable: true,
       topic: "transcription",
       destination_identities: ["listener-cs"],
+    });
+  });
+
+  it("sends transcription to listeners whose floating caption panels include the target language", async () => {
+    const { room, publishData } = createRoom([
+      { identity: "listener-audio-en", language: "en" },
+      {
+        identity: "listener-floating-cs",
+        language: "en",
+        captionLanguages: "cs,ru",
+      },
+    ]);
+    const publisher = new TranslationDataPublisher({
+      targetLanguage: "cs",
+      organizerIdentity: "organizer-host",
+    });
+
+    await publisher.publishTranscription(room, "Ahoj", false, 4);
+
+    const [, options] = publishData.mock.calls[0];
+    expect(options).toEqual({
+      reliable: true,
+      topic: "transcription",
+      destination_identities: ["listener-floating-cs"],
     });
   });
 

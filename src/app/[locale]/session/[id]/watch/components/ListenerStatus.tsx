@@ -6,6 +6,7 @@ import SessionCountdown from "@/components/SessionCountdown";
 import { Badge } from "@/components/ui/badge";
 
 export function ListenerStatus({
+  audioMuted,
   currentLanguage,
   expiresAt,
   isConnected,
@@ -13,6 +14,7 @@ export function ListenerStatus({
   isWakeLockActive,
   onSessionExpired,
 }: {
+  audioMuted: boolean;
   currentLanguage: string;
   expiresAt: string | null;
   isConnected: boolean;
@@ -32,14 +34,22 @@ export function ListenerStatus({
         </div>
 
         {isConnected ? (
-          <Badge variant="outline" className="gap-1 border-success/30 text-success">
+          <Badge
+            variant="outline"
+            className="gap-1 border-success/30 text-success"
+          >
             <span className="size-1.5 rounded-full bg-current animate-pulse" />
-            {currentLanguage === "original"
+            {audioMuted
+              ? t("audioMuted")
+              : currentLanguage === "original"
               ? t("original")
               : currentLanguage.toUpperCase()}
           </Badge>
         ) : (
-          <Badge variant="outline" className="gap-1 border-warning/30 text-warning">
+          <Badge
+            variant="outline"
+            className="gap-1 border-warning/30 text-warning"
+          >
             <span className="size-1.5 rounded-full bg-current animate-pulse" />
             {t("waitingForBroadcast")}
           </Badge>

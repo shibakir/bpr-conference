@@ -5,6 +5,27 @@ export type TranslationDataPublisherOptions = {
   organizerIdentity: string;
 };
 
+function parseCaptionLanguages(value: unknown): string[] {
+  if (typeof value !== "string") return [];
+
+  return value
+    .split(",")
+    .map((language) => language.trim())
+    .filter(Boolean);
+}
+
+function participantWantsTranscription(
+  participantAttributes: Record<string, string> | undefined,
+  targetLanguage: string
+) {
+  return (
+    participantAttributes?.language === targetLanguage ||
+    parseCaptionLanguages(participantAttributes?.captionLanguages).includes(
+      targetLanguage
+    )
+  );
+}
+
 /** Publishes translated text and organizer diagnostics through LiveKit data channels. */
 export class TranslationDataPublisher {
   constructor(private readonly options: TranslationDataPublisherOptions) {}
@@ -19,7 +40,12 @@ export class TranslationDataPublisher {
 
     try {
       const destinationIdentities = Array.from(room.remoteParticipants.values())
-        .filter((participant) => participant.attributes?.language === this.options.targetLanguage)
+        .filter((participant) =>
+          participantWantsTranscription(
+            participant.attributes,
+            this.options.targetLanguage
+          )
+        )
         .map((participant) => participant.identity);
 
       const payload = JSON.stringify({

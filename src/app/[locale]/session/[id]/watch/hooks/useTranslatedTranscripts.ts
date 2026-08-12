@@ -1,22 +1,32 @@
 "use client";
 
-import { MutableRefObject, RefObject, useEffect, useState } from "react";
+import { RefObject, useEffect, useMemo, useState } from "react";
 import { RoomEvent, type Room } from "livekit-client";
 import type { TranscriptEntry } from "../types";
 
 export function useTranslatedTranscripts({
   room,
   enabled,
-  currentLanguageRef,
+  languages,
 }: {
   room: Room | undefined;
   enabled: boolean;
-  currentLanguageRef: MutableRefObject<string>;
+  languages: string[];
 }) {
-  const [transcripts, setTranscripts] = useState<TranscriptEntry[]>([]);
+  const [transcriptsByLanguage, setTranscriptsByLanguage] = useState<
+    Record<string, TranscriptEntry[]>
+  >({});
+  const languageKey = useMemo(
+    () =>
+      Array.from(new Set(languages.filter((language) => language !== "original")))
+        .sort()
+        .join("|"),
+    [languages]
+  );
 
   useEffect(() => {
     if (!room || !enabled) return;
+    const allowedLanguages = new Set(languageKey ? languageKey.split("|") : []);
 
     const handleData = (
       payload: Uint8Array,
@@ -31,10 +41,11 @@ export function useTranslatedTranscripts({
       try {
         const data = JSON.parse(new TextDecoder().decode(payload));
         if (data.type !== "transcription") return;
-        if (data.language !== currentLanguageRef.current) return;
+        if (!allowedLanguages.has(data.language)) return;
 
-        setTranscripts((prev) => {
-          const existing = prev.findIndex(
+        setTranscriptsByLanguage((prev) => {
+          const languageTranscripts = prev[data.language] ?? [];
+          const existing = languageTranscripts.findIndex(
             (entry) => entry.id === data.segmentId
           );
           const entry: TranscriptEntry = {
@@ -46,17 +57,23 @@ export function useTranslatedTranscripts({
           };
 
           if (existing >= 0) {
-            const updated = [...prev];
+            const updated = [...languageTranscripts];
             updated[existing] = {
               ...updated[existing],
               text: updated[existing].text + data.text,
               final: data.final,
             };
-            return updated;
+            return {
+              ...prev,
+              [data.language]: updated,
+            };
           }
 
-          const next = [...prev, entry];
-          return next.slice(-50);
+          const next = [...languageTranscripts, entry];
+          return {
+            ...prev,
+            [data.language]: next.slice(-50),
+          };
         });
       } catch {
         // Ignore non-transcription data messages.
@@ -67,11 +84,22 @@ export function useTranslatedTranscripts({
     return () => {
       room.off(RoomEvent.DataReceived, handleData);
     };
-  }, [room, enabled, currentLanguageRef]);
+  }, [room, enabled, languageKey]);
 
   return {
-    transcripts,
-    clearTranscripts: () => setTranscripts([]),
+    transcriptsByLanguage,
+    clearTranscripts: (language?: string) => {
+      if (!language) {
+        setTranscriptsByLanguage({});
+        return;
+      }
+
+      setTranscriptsByLanguage((prev) => {
+        const next = { ...prev };
+        delete next[language];
+        return next;
+      });
+    },
   };
 }
 
@@ -80,6 +108,15 @@ export function useTranscriptAutoScroll(
   transcriptEndRef: RefObject<HTMLDivElement | null>
 ) {
   useEffect(() => {
-    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const frame = window.requestAnimationFrame(() => {
+      const viewport = transcriptEndRef.current?.closest<HTMLElement>(
+        '[data-slot="scroll-area-viewport"]'
+      );
+      if (!viewport) return;
+
+      viewport.scrollTop = viewport.scrollHeight;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [transcripts, transcriptEndRef]);
 }
