@@ -67,24 +67,13 @@ export function AttendeeView({
             : SUPPORTED_LANGUAGES;
 
         return baseTranslationLanguages
-            .filter(
-                (lang) =>
-                    sessionDetails.inputLanguageMode !== "single" ||
-                    lang.code !== sessionDetails.sourceLanguage,
-            )
             .map((lang) => ({
                 code: lang.code,
                 flag: lang.flag,
                 label: getLanguageDisplayName(lang, locale),
             }))
             .sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
-    }, [
-        locale,
-        sessionDetails.allowedLanguages,
-        sessionDetails.inputLanguageMode,
-        sessionDetails.loaded,
-        sessionDetails.sourceLanguage,
-    ]);
+    }, [locale, sessionDetails.allowedLanguages, sessionDetails.loaded]);
     const availableCaptionLanguages = useMemo(
         () => (sessionDetails.enableTranscription ? availableTranslationLanguages : []),
         [availableTranslationLanguages, sessionDetails.enableTranscription],
@@ -295,15 +284,11 @@ export function AttendeeView({
                     onLanguageChange={handleLanguageChange}
                     onAudioMutedChange={setAudioMuted}
                     disabled={!isConnected || !sessionDetails.loaded}
-                    inputLanguageMode={sessionDetails.inputLanguageMode}
                     translationError={currentTranslationState?.error ?? null}
                     translationLoading={currentTranslationLoading}
                     translationsEnabled={sessionDetails.enableAudioTranslation}
                     {...(sessionDetails.allowedLanguages
                         ? { allowedLanguages: sessionDetails.allowedLanguages }
-                        : {})}
-                    {...(sessionDetails.sourceLanguage
-                        ? { sourceLanguage: sessionDetails.sourceLanguage }
                         : {})}
                 />
                 {sessionDetails.enableTranscription && (

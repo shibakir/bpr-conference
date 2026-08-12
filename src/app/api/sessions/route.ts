@@ -72,31 +72,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = parsed.data;
-        const { durationMinutes, eventId, inputLanguageMode, locale, organizerName, password } =
-            body;
-        let sourceLanguage: string | undefined = undefined;
-
-        if (inputLanguageMode === "single") {
-            if (!body.sourceLanguage) {
-                return NextResponse.json(
-                    apiError(API_ERROR_CODES.INVALID_SOURCE_LANGUAGE, "Invalid source language"),
-                    { status: 400 },
-                );
-            }
-
-            const source = getLanguageByCode(body.sourceLanguage);
-            if (!source) {
-                return NextResponse.json(
-                    apiError(
-                        API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE,
-                        "Unsupported source language",
-                    ),
-                    { status: 400 },
-                );
-            }
-
-            sourceLanguage = source.code;
-        }
+        const { durationMinutes, eventId, locale, organizerName, password } = body;
 
         let enableAudioTranslation = body.enableAudioTranslation !== false;
         let enableTranscription = body.enableTranscription === true;
@@ -113,11 +89,7 @@ export async function POST(req: NextRequest) {
             const normalizedAllowedLanguages = body.allowedLanguages
                 .filter((language): language is string => typeof language === "string")
                 .map((language) => getLanguageByCode(language)?.code)
-                .filter(
-                    (language): language is string =>
-                        typeof language === "string" &&
-                        (inputLanguageMode !== "single" || language !== sourceLanguage),
-                );
+                .filter((language): language is string => typeof language === "string");
 
             allowedLanguages = Array.from(new Set(normalizedAllowedLanguages));
         }
@@ -157,11 +129,9 @@ export async function POST(req: NextRequest) {
         }
 
         manager.createSession(sessionId, organizerIdentity, {
-            inputLanguageMode,
             enableAudioTranslation,
             enableTranscription,
             durationMinutes,
-            ...(sourceLanguage ? { sourceLanguage } : {}),
             ...(allowedLanguages ? { allowedLanguages } : {}),
         });
         const session = manager.getSession(sessionId);
@@ -174,8 +144,6 @@ export async function POST(req: NextRequest) {
             sessionId,
             organizerIdentity,
             locale,
-            inputLanguageMode,
-            sourceLanguage,
             enableAudioTranslation,
             enableTranscription,
             translationOutputs: [

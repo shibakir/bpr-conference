@@ -28,8 +28,6 @@ function getTranslationRequestErrorMessage(
             return t("sessionUnavailable");
         case API_ERROR_CODES.UNSUPPORTED_TARGET_LANGUAGE:
             return t("unsupportedTargetLanguage");
-        case API_ERROR_CODES.TARGET_LANGUAGE_MATCHES_SOURCE:
-            return t("targetLanguageIsSource");
         case API_ERROR_CODES.LANGUAGE_NOT_ALLOWED:
             return t("languageNotAllowed");
         case API_ERROR_CODES.TRANSLATION_OUTPUTS_DISABLED:

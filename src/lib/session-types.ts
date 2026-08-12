@@ -1,5 +1,3 @@
-export type InputLanguageMode = "single" | "multi";
-
 export const TRANSLATION_OUTPUT_MODES = ["audio", "text"] as const;
 
 export type TranslationOutputMode = (typeof TRANSLATION_OUTPUT_MODES)[number];

@@ -51,21 +51,7 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Validate targetLanguage against source language and allowedLanguages allowlist
-        if (
-            session.inputLanguageMode === "single" &&
-            normalizedTargetLanguage !== "original" &&
-            normalizedTargetLanguage === session.sourceLanguage
-        ) {
-            return NextResponse.json(
-                apiError(
-                    API_ERROR_CODES.TARGET_LANGUAGE_MATCHES_SOURCE,
-                    "Target language matches the original audio language",
-                ),
-                { status: 400 },
-            );
-        }
-
+        // Validate targetLanguage against allowedLanguages allowlist
         if (
             normalizedTargetLanguage !== "original" &&
             session.allowedLanguages &&

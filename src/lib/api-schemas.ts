@@ -19,7 +19,6 @@ export const apiErrorResponseSchema = z
     })
     .passthrough();
 
-export const inputLanguageModeSchema = z.enum(["single", "multi"]);
 export const localeSchema = z.enum(locales);
 export const translationOutputModeSchema = z.enum(TRANSLATION_OUTPUT_MODES);
 
@@ -42,11 +41,9 @@ export const createSessionRequestSchema = z.object({
     enableAudioTranslation: z.boolean().optional(),
     enableTranscription: z.boolean().optional(),
     eventId: z.string().optional(),
-    inputLanguageMode: inputLanguageModeSchema.optional().default("multi"),
     locale: localeSchema.optional().default(routing.defaultLocale),
     organizerName: organizerNameSchema,
     password: z.string().optional(),
-    sourceLanguage: z.string().optional(),
     translationOutputs: z.array(translationOutputModeSchema).optional(),
 });
 
@@ -70,12 +67,10 @@ export const createSessionFormSchema = z.object({
         .int()
         .min(MIN_SESSION_DURATION_MINUTES)
         .max(MAX_SESSION_DURATION_MINUTES),
-    inputLanguageMode: inputLanguageModeSchema,
     langSearch: z.string(),
     password: z.string(),
     restrictLanguages: z.boolean(),
     selectedLanguages: z.array(z.string()),
-    sourceLanguage: z.string().min(1),
     translationOutputs: z.array(translationOutputModeSchema),
 });
 
@@ -115,8 +110,6 @@ export const sessionDetailsResponseSchema = z
         allowedLanguages: z.array(z.string()).optional(),
         enableAudioTranslation: z.boolean().optional(),
         enableTranscription: z.boolean().optional(),
-        inputLanguageMode: inputLanguageModeSchema.optional(),
-        sourceLanguage: z.string().optional(),
     })
     .passthrough();
 

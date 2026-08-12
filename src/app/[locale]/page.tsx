@@ -32,7 +32,6 @@ import {
     FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
@@ -53,27 +52,20 @@ import {
     MAX_SESSION_DURATION_MINUTES,
     MIN_SESSION_DURATION_MINUTES,
 } from "@/lib/session-duration";
-import {
-    type InputLanguageMode,
-    TRANSLATION_OUTPUT_MODES,
-    type TranslationOutputMode,
-} from "@/lib/session-types";
+import { TRANSLATION_OUTPUT_MODES, type TranslationOutputMode } from "@/lib/session-types";
 import { cn } from "@/lib/utils";
 
 const DEFAULT_LANGUAGES = ["en", "zh-Hans", "fr", "de", "it", "ar", "ru", "vi"];
 
-const DEFAULT_SOURCE_LANGUAGE = "cs";
 const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
 
 function getDefaultFormValues(): CreateSessionFormValues {
     return {
         durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
-        inputLanguageMode: "multi",
         langSearch: "",
         password: "",
         restrictLanguages: true,
         selectedLanguages: [...DEFAULT_LANGUAGES],
-        sourceLanguage: DEFAULT_SOURCE_LANGUAGE,
         translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
     };
 }
@@ -109,8 +101,6 @@ export default function Home() {
     });
     const durationMinutes =
         useWatch({ control, name: "durationMinutes" }) ?? DEFAULT_SESSION_DURATION_MINUTES;
-    const inputLanguageMode = useWatch({ control, name: "inputLanguageMode" }) ?? "multi";
-    const sourceLanguage = useWatch({ control, name: "sourceLanguage" }) ?? DEFAULT_SOURCE_LANGUAGE;
     const translationOutputs =
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const restrictLanguages = useWatch({ control, name: "restrictLanguages" }) ?? true;
@@ -138,23 +128,7 @@ export default function Home() {
         [locale],
     );
 
-    const translationLanguageOptions = useMemo(
-        () =>
-            languageOptions.filter(
-                (lang) => inputLanguageMode !== "single" || lang.code !== sourceLanguage,
-            ),
-        [inputLanguageMode, languageOptions, sourceLanguage],
-    );
-
-    const selectedTranslationLanguages = useMemo(
-        () =>
-            selectedLanguages.filter(
-                (code) => inputLanguageMode !== "single" || code !== sourceLanguage,
-            ),
-        [inputLanguageMode, selectedLanguages, sourceLanguage],
-    );
-
-    const filteredLanguages = translationLanguageOptions.filter((lang) => {
+    const filteredLanguages = languageOptions.filter((lang) => {
         const query = langSearch.trim().toLocaleLowerCase(locale);
         return (
             lang.displayName.toLocaleLowerCase(locale).includes(query) ||
@@ -162,21 +136,6 @@ export default function Home() {
             lang.code.toLowerCase().includes(query.toLowerCase())
         );
     });
-    function handleSourceLanguageChange(nextSourceLanguage: string) {
-        setValue("sourceLanguage", nextSourceLanguage, FORM_UPDATE_OPTIONS);
-        if (inputLanguageMode === "single") {
-            setSelectedLanguagesValue(
-                selectedLanguages.filter((code) => code !== nextSourceLanguage),
-            );
-        }
-    }
-
-    function handleInputLanguageModeChange(nextMode: InputLanguageMode) {
-        setValue("inputLanguageMode", nextMode, FORM_UPDATE_OPTIONS);
-        if (nextMode === "single") {
-            setSelectedLanguagesValue(selectedLanguages.filter((code) => code !== sourceLanguage));
-        }
-    }
 
     function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
         switch (code) {
@@ -186,8 +145,6 @@ export default function Home() {
                 return t("invalidSessionDuration");
             case API_ERROR_CODES.INVALID_LOCALE:
             case API_ERROR_CODES.INVALID_REQUEST:
-            case API_ERROR_CODES.INVALID_SOURCE_LANGUAGE:
-            case API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE:
                 return t("invalidSessionSettings");
             default:
                 return t("createError");
@@ -198,9 +155,6 @@ export default function Home() {
         setError(null);
         const valuesEnableAudioTranslation = values.translationOutputs.includes("audio");
         const valuesEnableTranscription = values.translationOutputs.includes("text");
-        const selectedLanguagesForSubmit = values.selectedLanguages.filter(
-            (code) => values.inputLanguageMode !== "single" || code !== values.sourceLanguage,
-        );
 
         try {
             const data = await fetchValidatedJson(
@@ -212,17 +166,12 @@ export default function Home() {
                         organizerName: "host",
                         password: values.password,
                         locale,
-                        inputLanguageMode: values.inputLanguageMode,
-                        sourceLanguage:
-                            values.inputLanguageMode === "single"
-                                ? values.sourceLanguage
-                                : undefined,
                         translationOutputs: values.translationOutputs,
                         enableAudioTranslation: valuesEnableAudioTranslation,
                         enableTranscription: valuesEnableTranscription,
                         durationMinutes: values.durationMinutes,
                         allowedLanguages: values.restrictLanguages
-                            ? selectedLanguagesForSubmit
+                            ? values.selectedLanguages
                             : undefined,
                     }),
                 },
@@ -308,67 +257,6 @@ export default function Home() {
                                     <FieldDescription>{t("durationDescription")}</FieldDescription>
                                     <FieldError errors={[errors.durationMinutes]} />
                                 </FieldSet>
-
-                                <Field data-invalid={!!errors.inputLanguageMode}>
-                                    <FieldLabel htmlFor="input-language-mode">
-                                        {t("inputLanguageMode")}
-                                    </FieldLabel>
-                                    <NativeSelect
-                                        id="input-language-mode"
-                                        className="w-full"
-                                        value={inputLanguageMode}
-                                        onChange={(event) =>
-                                            handleInputLanguageModeChange(
-                                                event.target.value === "single"
-                                                    ? "single"
-                                                    : "multi",
-                                            )
-                                        }
-                                        disabled={isSubmitting}
-                                        aria-invalid={!!errors.inputLanguageMode}
-                                    >
-                                        <NativeSelectOption value="multi">
-                                            {t("inputLanguageModeMulti")}
-                                        </NativeSelectOption>
-                                        <NativeSelectOption value="single">
-                                            {t("inputLanguageModeSingle")}
-                                        </NativeSelectOption>
-                                    </NativeSelect>
-                                    <FieldDescription>
-                                        {inputLanguageMode === "multi"
-                                            ? t("inputLanguageModeMultiDescription")
-                                            : t("inputLanguageModeSingleDescription")}
-                                    </FieldDescription>
-                                    <FieldError errors={[errors.inputLanguageMode]} />
-                                </Field>
-
-                                {inputLanguageMode === "single" && (
-                                    <Field data-invalid={!!errors.sourceLanguage}>
-                                        <FieldLabel htmlFor="source-language">
-                                            {t("sourceLanguage")}
-                                        </FieldLabel>
-                                        <NativeSelect
-                                            id="source-language"
-                                            className="w-full"
-                                            value={sourceLanguage}
-                                            onChange={(event) =>
-                                                handleSourceLanguageChange(event.target.value)
-                                            }
-                                            disabled={isSubmitting}
-                                            aria-invalid={!!errors.sourceLanguage}
-                                        >
-                                            {languageOptions.map((lang) => (
-                                                <NativeSelectOption
-                                                    key={lang.code}
-                                                    value={lang.code}
-                                                >
-                                                    {lang.displayName} {lang.flag}
-                                                </NativeSelectOption>
-                                            ))}
-                                        </NativeSelect>
-                                        <FieldError errors={[errors.sourceLanguage]} />
-                                    </Field>
-                                )}
 
                                 <FieldSet className="rounded-lg border bg-muted/30 p-3">
                                     <div className="grid gap-1">
@@ -473,7 +361,7 @@ export default function Home() {
                                             <span>{t("restrictLanguages")}</span>
                                             <span className="text-xs font-normal leading-5 text-muted-foreground">
                                                 {t("selectedCount", {
-                                                    count: selectedTranslationLanguages.length,
+                                                    count: selectedLanguages.length,
                                                 })}
                                             </span>
                                         </FieldContent>
@@ -482,41 +370,36 @@ export default function Home() {
 
                                     {restrictLanguages && (
                                         <div className="grid gap-3">
-                                            {selectedTranslationLanguages.length > 0 && (
+                                            {selectedLanguages.length > 0 && (
                                                 <ScrollArea className="max-h-40 rounded-lg border border-dashed bg-background">
                                                     <div className="flex flex-wrap gap-1.5 p-2 pr-3">
-                                                        {selectedTranslationLanguages.map(
-                                                            (code) => {
-                                                                const lang = languageOptions.find(
-                                                                    (item) => item.code === code,
-                                                                );
-                                                                if (!lang) return null;
-                                                                return (
-                                                                    <Button
-                                                                        key={code}
-                                                                        type="button"
-                                                                        variant="secondary"
-                                                                        size="xs"
-                                                                        title={t("removeLanguage")}
-                                                                        onClick={() =>
-                                                                            setSelectedLanguagesValue(
-                                                                                selectedLanguages.filter(
-                                                                                    (item) =>
-                                                                                        item !==
-                                                                                        code,
-                                                                                ),
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <span>{lang.flag}</span>
-                                                                        <span>
-                                                                            {lang.displayName}
-                                                                        </span>
-                                                                        <XIcon className="size-3" />
-                                                                    </Button>
-                                                                );
-                                                            },
-                                                        )}
+                                                        {selectedLanguages.map((code) => {
+                                                            const lang = languageOptions.find(
+                                                                (item) => item.code === code,
+                                                            );
+                                                            if (!lang) return null;
+                                                            return (
+                                                                <Button
+                                                                    key={code}
+                                                                    type="button"
+                                                                    variant="secondary"
+                                                                    size="xs"
+                                                                    title={t("removeLanguage")}
+                                                                    onClick={() =>
+                                                                        setSelectedLanguagesValue(
+                                                                            selectedLanguages.filter(
+                                                                                (item) =>
+                                                                                    item !== code,
+                                                                            ),
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <span>{lang.flag}</span>
+                                                                    <span>{lang.displayName}</span>
+                                                                    <XIcon className="size-3" />
+                                                                </Button>
+                                                            );
+                                                        })}
                                                     </div>
                                                 </ScrollArea>
                                             )}
@@ -585,7 +468,7 @@ export default function Home() {
                                             <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
                                                 <span>
                                                     {t("selectedCount", {
-                                                        count: selectedTranslationLanguages.length,
+                                                        count: selectedLanguages.length,
                                                     })}
                                                 </span>
                                                 <div className="flex gap-1">
@@ -595,7 +478,7 @@ export default function Home() {
                                                         size="xs"
                                                         onClick={() =>
                                                             setSelectedLanguagesValue(
-                                                                translationLanguageOptions.map(
+                                                                languageOptions.map(
                                                                     (lang) => lang.code,
                                                                 ),
                                                             )

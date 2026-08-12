@@ -17,7 +17,6 @@ import {
     getPositiveNumberEnv,
 } from "./server-env";
 import { DEFAULT_SESSION_DURATION_MINUTES } from "./session-duration";
-import type { InputLanguageMode } from "./session-types";
 import { type BridgeStatus, TranslationBridge } from "./translation-bridge";
 
 export interface TranslationInfo {
@@ -33,8 +32,6 @@ export interface SessionInfo {
     createdAt: Date;
     durationMinutes: number;
     expiresAt: Date;
-    inputLanguageMode: InputLanguageMode;
-    sourceLanguage?: string;
     enableAudioTranslation: boolean;
     enableTranscription: boolean;
     allowedLanguages?: string[];
@@ -99,8 +96,6 @@ class TranslationSessionManager {
         sessionId: string,
         organizerIdentity: string,
         options: {
-            inputLanguageMode: InputLanguageMode;
-            sourceLanguage?: string;
             enableAudioTranslation: boolean;
             enableTranscription: boolean;
             allowedLanguages?: string[];
@@ -115,10 +110,8 @@ class TranslationSessionManager {
             createdAt,
             durationMinutes,
             expiresAt: new Date(createdAt.getTime() + durationMinutes * 60_000),
-            inputLanguageMode: options.inputLanguageMode,
             enableAudioTranslation: options.enableAudioTranslation,
             enableTranscription: options.enableTranscription,
-            ...(options.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : {}),
             ...(options.allowedLanguages ? { allowedLanguages: options.allowedLanguages } : {}),
         };
         this.sessions.set(sessionId, info);
@@ -129,10 +122,8 @@ class TranslationSessionManager {
                 durationMinutes,
                 enableAudioTranslation: options.enableAudioTranslation,
                 enableTranscription: options.enableTranscription,
-                inputLanguageMode: options.inputLanguageMode,
                 organizerIdentity,
                 sessionId,
-                sourceLanguage: options.sourceLanguage ?? "auto",
             },
             "Created session",
         );

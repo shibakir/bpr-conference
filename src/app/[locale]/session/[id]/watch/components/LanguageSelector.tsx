@@ -14,7 +14,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Toggle } from "@/components/ui/toggle";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
-import type { InputLanguageMode } from "@/lib/session-types";
 
 interface LanguageSelectorProps {
     audioMuted: boolean;
@@ -23,8 +22,6 @@ interface LanguageSelectorProps {
     onAudioMutedChange: (muted: boolean) => void;
     disabled?: boolean;
     allowedLanguages?: string[];
-    inputLanguageMode?: InputLanguageMode;
-    sourceLanguage?: string;
     translationError?: string | null;
     translationLoading?: boolean;
     translationsEnabled: boolean;
@@ -37,8 +34,6 @@ export default function LanguageSelector({
     onAudioMutedChange,
     disabled = false,
     allowedLanguages,
-    inputLanguageMode = "multi",
-    sourceLanguage,
     translationError,
     translationLoading = false,
     translationsEnabled,
@@ -78,7 +73,6 @@ export default function LanguageSelector({
             : [];
 
         return baseTranslationLanguages
-            .filter((lang) => inputLanguageMode !== "single" || lang.code !== sourceLanguage)
             .map((lang) => ({
                 ...lang,
                 displayName: getLanguageDisplayName(lang, locale),
@@ -88,7 +82,7 @@ export default function LanguageSelector({
                     sensitivity: "base",
                 }),
             );
-    }, [allowedLanguages, inputLanguageMode, locale, sourceLanguage, translationsEnabled]);
+    }, [allowedLanguages, locale, translationsEnabled]);
 
     return (
         <div className="grid gap-2">
