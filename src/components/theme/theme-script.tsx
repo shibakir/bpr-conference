@@ -6,22 +6,33 @@ import { DARK_MODE_QUERY, DEFAULT_THEME_PREFERENCE, THEME_STORAGE_KEY } from "./
 
 const themeScript = `
 (function() {
+    var preference = null;
+    var storageKey = ${JSON.stringify(THEME_STORAGE_KEY)};
+
     try {
-        var storageKey = ${JSON.stringify(THEME_STORAGE_KEY)};
-        var preference = localStorage.getItem(storageKey);
-        if (preference !== "light" && preference !== "dark" && preference !== "system") {
+        var storedPreference = localStorage.getItem(storageKey);
+        if (storedPreference === "light" || storedPreference === "dark") {
+            preference = storedPreference;
+        }
+    } catch (_) {}
+
+    if (preference !== "light" && preference !== "dark") {
+        try {
+            preference = window.matchMedia(${JSON.stringify(DARK_MODE_QUERY)}).matches
+                ? "dark"
+                : ${JSON.stringify(DEFAULT_THEME_PREFERENCE)};
+        } catch (_) {
             preference = ${JSON.stringify(DEFAULT_THEME_PREFERENCE)};
         }
+    }
 
-        var resolvedTheme = preference === "system"
-            ? (window.matchMedia(${JSON.stringify(DARK_MODE_QUERY)}).matches ? "dark" : "light")
-            : preference;
+    try {
         var root = document.documentElement;
 
-        root.classList.toggle("dark", resolvedTheme === "dark");
-        root.dataset.theme = resolvedTheme;
+        root.classList.toggle("dark", preference === "dark");
+        root.dataset.theme = preference;
         root.dataset.themePreference = preference;
-        root.style.colorScheme = resolvedTheme;
+        root.style.colorScheme = preference;
     } catch (_) {}
 })();
 `;

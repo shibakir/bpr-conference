@@ -4,12 +4,9 @@
         "description": "Překlad vysílání v reálném čase pomocí Gemini Live API."
     },
     "Theme": {
-        "system": "systémový",
         "light": "světlý",
         "dark": "tmavý",
-        "theme": "Motiv",
-        "switchTheme": "Přepnout motiv na {theme}",
-        "currentTheme": "Aktuální motiv: {theme}"
+        "switchTheme": "Přepnout motiv na {theme}"
     },
     "Header": {
         "liveTranslation": "Živý překlad",

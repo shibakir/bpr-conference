@@ -45,23 +45,23 @@ function useIsHydrated() {
 }
 
 function getSystemTheme(): ResolvedTheme {
+    if (typeof window.matchMedia !== "function") {
+        return DEFAULT_THEME_PREFERENCE;
+    }
+
     return window.matchMedia(DARK_MODE_QUERY).matches ? "dark" : "light";
 }
 
-function resolveThemePreference(theme: ThemePreference): ResolvedTheme {
-    return theme === "system" ? getSystemTheme() : theme;
-}
-
-function getStoredThemePreference(): ThemePreference {
+function getStoredThemePreference(): ThemePreference | null {
     if (typeof window === "undefined") {
-        return DEFAULT_THEME_PREFERENCE;
+        return null;
     }
 
     try {
         const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-        return isThemePreference(storedTheme) ? storedTheme : DEFAULT_THEME_PREFERENCE;
+        return isThemePreference(storedTheme) ? storedTheme : null;
     } catch {
-        return DEFAULT_THEME_PREFERENCE;
+        return null;
     }
 }
 
@@ -73,30 +73,29 @@ function persistThemePreference(theme: ThemePreference) {
     }
 }
 
-function getInitialResolvedTheme(): ResolvedTheme {
+function getInitialThemePreference(): ThemePreference {
     if (typeof window === "undefined") {
-        return "light";
+        return DEFAULT_THEME_PREFERENCE;
     }
 
-    return resolveThemePreference(getStoredThemePreference());
+    return getStoredThemePreference() ?? getSystemTheme();
 }
 
 function applyThemePreference(theme: ThemePreference): ResolvedTheme {
-    const resolvedTheme = resolveThemePreference(theme);
     const root = document.documentElement;
 
-    root.classList.toggle("dark", resolvedTheme === "dark");
-    root.dataset["theme"] = resolvedTheme;
+    root.classList.toggle("dark", theme === "dark");
+    root.dataset["theme"] = theme;
     root.dataset["themePreference"] = theme;
-    root.style.colorScheme = resolvedTheme;
+    root.style.colorScheme = theme;
 
-    return resolvedTheme;
+    return theme;
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const mounted = useIsHydrated();
-    const [theme, setThemeState] = useState<ThemePreference>(getStoredThemePreference);
-    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(getInitialResolvedTheme);
+    const [theme, setThemeState] = useState<ThemePreference>(getInitialThemePreference);
+    const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(getInitialThemePreference);
 
     const setTheme = useCallback((nextTheme: ThemePreference) => {
         persistThemePreference(nextTheme);
@@ -105,17 +104,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     useEffect(() => {
-        if (theme !== "system") {
-            return;
-        }
-
-        const mediaQuery = window.matchMedia(DARK_MODE_QUERY);
-        const handleChange = () => {
-            setResolvedTheme(applyThemePreference("system"));
-        };
-
-        mediaQuery.addEventListener("change", handleChange);
-        return () => mediaQuery.removeEventListener("change", handleChange);
+        applyThemePreference(theme);
     }, [theme]);
 
     const value = useMemo(

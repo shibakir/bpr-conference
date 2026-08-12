@@ -4,12 +4,9 @@
         "description": "Real-time broadcast translation powered by the Gemini Live API."
     },
     "Theme": {
-        "system": "system",
         "light": "light",
         "dark": "dark",
-        "theme": "Theme",
-        "switchTheme": "Switch theme to {theme}",
-        "currentTheme": "Current theme: {theme}"
+        "switchTheme": "Switch theme to {theme}"
     },
     "Header": {
         "liveTranslation": "Live translation",

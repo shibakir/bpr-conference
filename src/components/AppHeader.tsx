@@ -5,12 +5,10 @@ import {
     ChevronDownIcon,
     Globe2Icon,
     LanguagesIcon,
-    LaptopIcon,
     MoonIcon,
     SunIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,18 +19,22 @@ import {
     PopoverTitle,
     PopoverTrigger,
 } from "@/components/ui/popover";
+import { Toggle } from "@/components/ui/toggle";
 import { Link, usePathname } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
 
 import { useTheme } from "./theme/theme-provider";
-import { THEME_PREFERENCES, type ThemePreference } from "./theme/theme-runtime";
+import {
+    DEFAULT_THEME_PREFERENCE,
+    getNextThemePreference,
+    type ThemePreference,
+} from "./theme/theme-runtime";
 
 const THEME_ICONS = {
     dark: MoonIcon,
     light: SunIcon,
-    system: LaptopIcon,
-} satisfies Record<ThemePreference, typeof LaptopIcon>;
+} satisfies Record<ThemePreference, typeof SunIcon>;
 
 function LanguagePopover() {
     const locale = useLocale();
@@ -95,62 +97,26 @@ function LanguagePopover() {
     );
 }
 
-function ThemePopover() {
+function ThemeToggle() {
     const t = useTranslations("Theme");
-    const { mounted, resolvedTheme, setTheme, theme } = useTheme();
-    const [open, setOpen] = useState(false);
-    const currentTheme = mounted ? theme : "system";
-    const TriggerIcon = THEME_ICONS[mounted ? resolvedTheme : "system"];
+    const { mounted, resolvedTheme, setTheme } = useTheme();
+    const currentTheme = mounted ? resolvedTheme : DEFAULT_THEME_PREFERENCE;
+    const nextTheme = getNextThemePreference(currentTheme);
+    const Icon = THEME_ICONS[currentTheme];
 
     return (
-        <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="max-w-28 gap-1.5 px-2 sm:max-w-none"
-                    aria-label={t("currentTheme", { theme: t(currentTheme) })}
-                >
-                    <TriggerIcon />
-                    <span className="hidden truncate sm:inline">{t(currentTheme)}</span>
-                    <ChevronDownIcon className="hidden size-3.5 sm:block" />
-                </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-52">
-                <PopoverHeader>
-                    <PopoverTitle>{t("theme")}</PopoverTitle>
-                </PopoverHeader>
-                <div className="grid gap-1">
-                    {THEME_PREFERENCES.map((item) => {
-                        const Icon = THEME_ICONS[item];
-                        const selected = item === currentTheme;
-
-                        return (
-                            <Button
-                                key={item}
-                                type="button"
-                                variant="ghost"
-                                className="w-full justify-between"
-                                aria-label={t("switchTheme", { theme: t(item) })}
-                                onClick={() => {
-                                    setTheme(item);
-                                    setOpen(false);
-                                }}
-                            >
-                                <span className="flex min-w-0 items-center gap-2">
-                                    <Icon className="size-4" />
-                                    <span className="truncate">{t(item)}</span>
-                                </span>
-                                <CheckIcon
-                                    className={cn("size-4", selected ? "opacity-100" : "opacity-0")}
-                                />
-                            </Button>
-                        );
-                    })}
-                </div>
-            </PopoverContent>
-        </Popover>
+        <Toggle
+            type="button"
+            variant="outline"
+            size="sm"
+            pressed={currentTheme === "dark"}
+            className="max-w-28 gap-1.5 px-2 sm:max-w-none"
+            aria-label={t("switchTheme", { theme: t(nextTheme) })}
+            onPressedChange={(pressed) => setTheme(pressed ? "dark" : "light")}
+        >
+            <Icon />
+            <span className="hidden truncate sm:inline">{t(currentTheme)}</span>
+        </Toggle>
     );
 }
 
@@ -161,7 +127,7 @@ export function AppHeader() {
         <header className="pointer-events-none sticky top-0 z-40 flex h-(--app-header-height) justify-center px-4 pt-3 sm:px-6">
             <div className="pointer-events-auto mx-auto grid min-h-16 w-full max-w-xl grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 rounded-lg bg-card/85 px-3 py-2 shadow-sm shadow-foreground/5 backdrop-blur supports-backdrop-filter:bg-card/70">
                 <div className="flex min-w-0 justify-start">
-                    <ThemePopover />
+                    <ThemeToggle />
                 </div>
 
                 <div className="flex min-w-0 flex-col items-center gap-1">
