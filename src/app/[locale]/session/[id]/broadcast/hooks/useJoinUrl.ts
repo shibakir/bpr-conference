@@ -4,6 +4,7 @@ import { useLocale } from "next-intl";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { getPathname } from "@/i18n/navigation";
+import { clientLogger } from "@/lib/client-logger";
 
 import { copyTextToClipboard, getClientOrigin, getServerOrigin, subscribeToOrigin } from "../utils";
 
@@ -43,7 +44,7 @@ export function useJoinUrl(sessionId: string) {
                 copyResetTimeoutRef.current = null;
             }, 2000);
         } catch (err) {
-            console.error("Failed to copy attendee link:", err);
+            clientLogger.error("Failed to copy attendee link:", err);
         }
     }
 

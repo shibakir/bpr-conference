@@ -59,6 +59,12 @@ export const createSessionResponseSchema = z
     })
     .passthrough();
 
+export const successResponseSchema = z
+    .object({
+        success: z.literal(true),
+    })
+    .passthrough();
+
 export const createSessionFormSchema = z.object({
     durationMinutes: z
         .number()

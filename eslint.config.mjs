@@ -16,6 +16,7 @@ const typescriptFiles = ["**/*.{ts,tsx,mts,cts}"];
 const testFiles = ["**/__tests__/**/*.{ts,tsx}", "**/*.{test,spec}.{ts,tsx}"];
 const appRouteFiles = ["src/app/**/route.ts"];
 const clientRuntimeFiles = [
+    "src/app/**/page.tsx",
     "src/app/**/components/**/*.{ts,tsx}",
     "src/app/**/hooks/**/*.{ts,tsx}",
     "src/components/**/*.{ts,tsx}",
@@ -147,6 +148,7 @@ const eslintConfig = defineConfig([
         ignores: [
             "src/env/**/*.{ts,tsx}",
             "src/instrumentation.ts",
+            "src/lib/client-logger.ts",
             "src/lib/logger.ts",
             "src/lib/public-origin.ts",
             "src/lib/server-env.ts",
@@ -166,12 +168,7 @@ const eslintConfig = defineConfig([
     {
         files: clientRuntimeFiles,
         rules: {
-            "no-console": [
-                "error",
-                {
-                    allow: ["error", "info", "warn"],
-                },
-            ],
+            "no-console": "error",
             "no-restricted-imports": [
                 "error",
                 {

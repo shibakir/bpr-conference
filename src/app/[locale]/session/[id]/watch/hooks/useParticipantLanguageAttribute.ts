@@ -3,6 +3,8 @@
 import { type Room, RoomEvent } from "livekit-client";
 import { useEffect, useMemo } from "react";
 
+import { clientLogger } from "@/lib/client-logger";
+
 export function useParticipantLanguageAttribute({
     captionLanguages,
     room,
@@ -30,7 +32,9 @@ export function useParticipantLanguageAttribute({
                         language: currentLanguage,
                         captionLanguages: captionLanguageValue,
                     })
-                    .catch((err) => console.error("Failed to set participant attributes:", err));
+                    .catch((err) =>
+                        clientLogger.error("Failed to set participant attributes:", err),
+                    );
             }
         };
 

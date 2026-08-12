@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { clientLogger } from "@/lib/client-logger";
+
 type NavigatorWithWakeLock = Navigator & {
     wakeLock: {
         request: (type: "screen") => Promise<WakeLockSentinel>;
@@ -27,7 +29,7 @@ export function useWakeLock() {
                     setIsWakeLockActive(false);
                 });
             } catch (err) {
-                console.error("Failed to acquire Screen Wake Lock:", err);
+                clientLogger.error("Failed to acquire Screen Wake Lock:", err);
             }
         }
 
@@ -45,7 +47,7 @@ export function useWakeLock() {
             document.removeEventListener("visibilitychange", handleVisibilityChange);
             if (wakeLock) {
                 wakeLock.release().catch((err: unknown) => {
-                    console.error("Failed to release Screen Wake Lock:", err);
+                    clientLogger.error("Failed to release Screen Wake Lock:", err);
                 });
             }
         };

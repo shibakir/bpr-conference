@@ -3,6 +3,8 @@
 import { type LocalTrackPublication, type Room, Track } from "livekit-client";
 import { type MutableRefObject, useEffect, useRef, useState } from "react";
 
+import { clientLogger } from "@/lib/client-logger";
+
 type WindowWithWebkitAudioContext = Window &
     typeof globalThis & {
         webkitAudioContext?: typeof AudioContext;
@@ -75,12 +77,12 @@ async function unpublishBroadcastAudioPublication(
 
     try {
         await room.localParticipant.unpublishTrack(pub.track, true);
-        console.info(
+        clientLogger.info(
             `[BroadcastControls] Unpublished ${reason} ${BROADCAST_AUDIO_TRACK_NAME} track:`,
             pub.trackSid,
         );
     } catch (err) {
-        console.error(
+        clientLogger.error(
             `[BroadcastControls] Failed to unpublish ${reason} ${BROADCAST_AUDIO_TRACK_NAME} track:`,
             err,
         );
@@ -92,7 +94,7 @@ async function unpublishExtraBroadcastAudioPublications(room: Room, keep?: Local
 
     if (extraPublications.length === 0) return;
 
-    console.warn(
+    clientLogger.warn(
         `[BroadcastControls] Removing ${extraPublications.length} stale ${BROADCAST_AUDIO_TRACK_NAME} publication(s)`,
         extraPublications.map((pub) => ({
             muted: pub.isMuted,
@@ -220,10 +222,10 @@ export function useBroadcastAudioMixer({
                     }
                     await unpublishExtraBroadcastAudioPublications(localRoom, pub);
 
-                    console.info("Published mixed audio track:", pub.trackSid);
+                    clientLogger.info("Published mixed audio track:", pub.trackSid);
                 }
             } catch (err) {
-                console.error("Failed to initialize client audio mixer:", err);
+                clientLogger.error("Failed to initialize client audio mixer:", err);
             }
         }
 
@@ -268,12 +270,12 @@ export function useBroadcastAudioMixer({
         const hasActiveInput = isMicEnabled || isTabAudioEnabled;
         if (hasActiveInput) {
             pub.unmute()
-                .then(() => console.info("[BroadcastControls] Unmuted broadcast-audio track"))
-                .catch((err: unknown) => console.error("Failed to unmute track:", err));
+                .then(() => clientLogger.info("[BroadcastControls] Unmuted broadcast-audio track"))
+                .catch((err: unknown) => clientLogger.error("Failed to unmute track:", err));
         } else {
             pub.mute()
-                .then(() => console.info("[BroadcastControls] Muted broadcast-audio track"))
-                .catch((err: unknown) => console.error("Failed to mute track:", err));
+                .then(() => clientLogger.info("[BroadcastControls] Muted broadcast-audio track"))
+                .catch((err: unknown) => clientLogger.error("Failed to mute track:", err));
         }
     }, [isMicEnabled, isTabAudioEnabled]);
 
@@ -313,7 +315,7 @@ export function useBroadcastAudioMixer({
 
             setIsMicEnabled(true);
         } catch (err) {
-            console.error("Failed to access microphone:", err);
+            clientLogger.error("Failed to access microphone:", err);
             alert(micAccessErrorMessage((err as Error).message));
         }
     };
@@ -386,7 +388,7 @@ export function useBroadcastAudioMixer({
                 videoTrack.onended = handleTrackEnded;
             }
         } catch (err) {
-            console.error("Failed to capture tab audio:", err);
+            clientLogger.error("Failed to capture tab audio:", err);
             if ((err as Error).name !== "NotAllowedError") {
                 alert(tabAudioErrorMessage((err as Error).message));
             }

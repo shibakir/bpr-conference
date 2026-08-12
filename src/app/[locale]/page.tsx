@@ -37,6 +37,7 @@ import {
     type CreateSessionFormValues,
     createSessionResponseSchema,
 } from "@/lib/api-schemas";
+import { clientLogger } from "@/lib/client-logger";
 import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
     DEFAULT_SESSION_DURATION_MINUTES,
@@ -241,7 +242,7 @@ export default function Home() {
                 return;
             }
 
-            console.error("Failed to create session:", requestError);
+            clientLogger.error("Failed to create session:", requestError);
             setError(t("createError"));
         }
     }

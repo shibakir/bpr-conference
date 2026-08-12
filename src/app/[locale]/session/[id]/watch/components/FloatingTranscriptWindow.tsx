@@ -18,6 +18,7 @@ import { ColorPicker } from "@/components/ui/color-picker";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
+import { clientLogger } from "@/lib/client-logger";
 
 import {
     CAPTION_FONT_OPTIONS,
@@ -429,7 +430,7 @@ export function FloatingTranscriptWindow({
         try {
             if (await openDocumentPip()) return;
         } catch (error) {
-            console.warn("[WatchCaptions] Document PiP failed:", error);
+            clientLogger.warn("[WatchCaptions] Document PiP failed:", error);
         }
 
         setMode("inline");

@@ -6,7 +6,7 @@ import useSWRMutation from "swr/mutation";
 
 import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
 import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
-import { translationStartResponseSchema } from "@/lib/api-schemas";
+import { successResponseSchema, translationStartResponseSchema } from "@/lib/api-schemas";
 
 export type TranslationSubscriptionStatus = "active" | "error";
 
@@ -70,6 +70,24 @@ function startTranslationRequest(
     );
 }
 
+function unsubscribeTranslationRequest({
+    sessionId,
+    targetLanguage,
+}: {
+    sessionId: string;
+    targetLanguage: string;
+}) {
+    return fetchValidatedJson(
+        "/api/translate",
+        {
+            body: createUnsubscribePayload(sessionId, targetLanguage),
+            headers: { "Content-Type": "application/json" },
+            method: "DELETE",
+        },
+        successResponseSchema,
+    );
+}
+
 export function useTranslationSubscriptions({
     enabled,
     languages,
@@ -115,11 +133,7 @@ export function useTranslationSubscriptions({
                 return;
             }
 
-            fetch("/api/translate", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: payload,
-            }).catch(() => {});
+            unsubscribeTranslationRequest({ sessionId, targetLanguage: language }).catch(() => {});
         },
         [sessionId],
     );

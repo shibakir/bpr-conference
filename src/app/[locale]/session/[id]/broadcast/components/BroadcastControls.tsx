@@ -3,10 +3,14 @@
 import { useRoomContext } from "@livekit/components-react";
 import { MicIcon, ScreenShareIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import useSWRMutation from "swr/mutation";
 
 import { Separator } from "@/components/ui/separator";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { useRouter } from "@/i18n/navigation";
+import { fetchValidatedJson } from "@/lib/api-client";
+import { successResponseSchema } from "@/lib/api-schemas";
+import { clientLogger } from "@/lib/client-logger";
 
 import { useActiveTranslations } from "../hooks/useActiveTranslations";
 import { useBroadcastAudioMixer } from "../hooks/useBroadcastAudioMixer";
@@ -19,6 +23,10 @@ import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { InputDiagnosticsPanel } from "./InputDiagnosticsPanel";
 import { SharePanel } from "./SharePanel";
+
+function deleteSessionRequest(url: string) {
+    return fetchValidatedJson(url, { method: "DELETE" }, successResponseSchema);
+}
 
 export function BroadcastControls({
     sessionId,
@@ -39,6 +47,10 @@ export function BroadcastControls({
     const diagnostics = useTranslationDiagnostics(room);
     const isWakeLockActive = useWakeLock();
     const join = useJoinUrl(sessionId);
+    const { trigger: deleteSession } = useSWRMutation(
+        `/api/sessions/${sessionId}`,
+        deleteSessionRequest,
+    );
     const audioMixer = useBroadcastAudioMixer({
         room,
         noTabAudioMessage: t("noTabAudio"),
@@ -49,9 +61,9 @@ export function BroadcastControls({
     const endBroadcast = async () => {
         onEndBroadcast();
         try {
-            await fetch(`/api/sessions/${sessionId}`, { method: "DELETE" });
+            await deleteSession();
         } catch (err) {
-            console.error("Failed to explicitly delete session on broadcast end:", err);
+            clientLogger.error("Failed to explicitly delete session on broadcast end:", err);
         }
         void room.disconnect();
         void router.push("/");

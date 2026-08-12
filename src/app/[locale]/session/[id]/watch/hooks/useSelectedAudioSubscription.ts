@@ -10,6 +10,8 @@ import {
 } from "livekit-client";
 import { useEffect, useRef } from "react";
 
+import { clientLogger } from "@/lib/client-logger";
+
 export function useSelectedAudioSubscription({
     audioMuted,
     enableTranslatedAudio,
@@ -45,7 +47,7 @@ export function useSelectedAudioSubscription({
 
                         if (desiredSubscriptionRef.current.get(key) !== shouldSubscribe) {
                             desiredSubscriptionRef.current.set(key, shouldSubscribe);
-                            console.info("[WatchAudio] subscription target changed", {
+                            clientLogger.info("[WatchAudio] subscription target changed", {
                                 audioMuted,
                                 currentLanguage,
                                 enableTranslatedAudio,
@@ -88,7 +90,7 @@ export function useSelectedAudioSubscription({
         ) => {
             if (pub.kind !== Track.Kind.Audio) return;
 
-            console.info("[WatchAudio] track subscribed", {
+            clientLogger.info("[WatchAudio] track subscribed", {
                 audioMuted,
                 currentLanguage,
                 enableTranslatedAudio,
@@ -107,7 +109,7 @@ export function useSelectedAudioSubscription({
         ) => {
             if (pub.kind !== Track.Kind.Audio) return;
 
-            console.info("[WatchAudio] track unsubscribed", {
+            clientLogger.info("[WatchAudio] track unsubscribed", {
                 audioMuted,
                 currentLanguage,
                 enableTranslatedAudio,
@@ -124,7 +126,7 @@ export function useSelectedAudioSubscription({
             participant: RemoteParticipant,
             error?: unknown,
         ) => {
-            console.warn("[WatchAudio] track subscription failed", {
+            clientLogger.warn("[WatchAudio] track subscription failed", {
                 audioMuted,
                 currentLanguage,
                 enableTranslatedAudio,
@@ -136,7 +138,7 @@ export function useSelectedAudioSubscription({
         };
 
         const handleAudioPlaybackStatusChanged = (playing: boolean) => {
-            const log = playing ? console.info : console.warn;
+            const log = playing ? clientLogger.info : clientLogger.warn;
             log("[WatchAudio] playback status changed", {
                 audioMuted,
                 currentLanguage,
