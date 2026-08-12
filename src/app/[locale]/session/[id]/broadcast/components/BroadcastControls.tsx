@@ -16,12 +16,10 @@ import { useActiveTranslations } from "../hooks/useActiveTranslations";
 import { useBroadcastAudioMixer } from "../hooks/useBroadcastAudioMixer";
 import { useJoinUrl } from "../hooks/useJoinUrl";
 import { useListenerCount } from "../hooks/useListenerCount";
-import { useTranslationDiagnostics } from "../hooks/useTranslationDiagnostics";
 import { ActiveTranslationsPanel } from "./ActiveTranslationsPanel";
 import { AudioInputCard } from "./AudioInputCard";
 import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
-import { InputDiagnosticsPanel } from "./InputDiagnosticsPanel";
 import { SharePanel } from "./SharePanel";
 
 function deleteSessionRequest(url: string) {
@@ -44,7 +42,6 @@ export function BroadcastControls({
     const room = useRoomContext();
     const listenerCount = useListenerCount(room);
     const translations = useActiveTranslations(sessionId);
-    const diagnostics = useTranslationDiagnostics(room);
     const isWakeLockActive = useWakeLock();
     const join = useJoinUrl(sessionId);
     const { trigger: deleteSession } = useSWRMutation(
@@ -122,10 +119,6 @@ export function BroadcastControls({
                 joinUrl={join.joinUrl}
                 onCopyJoinUrl={join.copyJoinUrl}
             />
-
-            <Separator />
-
-            <InputDiagnosticsPanel diagnostics={diagnostics} />
 
             <Separator />
 

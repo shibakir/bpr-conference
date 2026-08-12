@@ -40,7 +40,6 @@ export const createSessionRequestSchema = z.object({
     allowedLanguages: z.array(z.string()).optional(),
     durationMinutes: sessionDurationMinutesSchema,
     enableAudioTranslation: z.boolean().optional(),
-    enableInputDiagnostics: z.boolean().optional().default(false),
     enableTranscription: z.boolean().optional(),
     eventId: z.string().optional(),
     inputLanguageMode: inputLanguageModeSchema.optional().default("multi"),

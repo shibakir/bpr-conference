@@ -108,8 +108,6 @@ export async function POST(req: NextRequest) {
             enableTranscription = translationOutputs.includes("text");
         }
 
-        const enableInputDiagnostics = body.enableInputDiagnostics === true;
-
         let allowedLanguages: string[] | undefined = undefined;
         if (Array.isArray(body.allowedLanguages)) {
             const normalizedAllowedLanguages = body.allowedLanguages
@@ -162,7 +160,6 @@ export async function POST(req: NextRequest) {
             inputLanguageMode,
             enableAudioTranslation,
             enableTranscription,
-            enableInputDiagnostics,
             durationMinutes,
             ...(sourceLanguage ? { sourceLanguage } : {}),
             ...(allowedLanguages ? { allowedLanguages } : {}),
@@ -181,7 +178,6 @@ export async function POST(req: NextRequest) {
             sourceLanguage,
             enableAudioTranslation,
             enableTranscription,
-            enableInputDiagnostics,
             translationOutputs: [
                 ...(enableAudioTranslation ? ["audio"] : []),
                 ...(enableTranscription ? ["text"] : []),

@@ -37,7 +37,6 @@ export interface SessionInfo {
     sourceLanguage?: string;
     enableAudioTranslation: boolean;
     enableTranscription: boolean;
-    enableInputDiagnostics: boolean;
     allowedLanguages?: string[];
 }
 
@@ -104,7 +103,6 @@ class TranslationSessionManager {
             sourceLanguage?: string;
             enableAudioTranslation: boolean;
             enableTranscription: boolean;
-            enableInputDiagnostics: boolean;
             allowedLanguages?: string[];
             durationMinutes?: number;
         },
@@ -120,7 +118,6 @@ class TranslationSessionManager {
             inputLanguageMode: options.inputLanguageMode,
             enableAudioTranslation: options.enableAudioTranslation,
             enableTranscription: options.enableTranscription,
-            enableInputDiagnostics: options.enableInputDiagnostics,
             ...(options.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : {}),
             ...(options.allowedLanguages ? { allowedLanguages: options.allowedLanguages } : {}),
         };
@@ -131,7 +128,6 @@ class TranslationSessionManager {
                 allowedLanguages: options.allowedLanguages ?? "all",
                 durationMinutes,
                 enableAudioTranslation: options.enableAudioTranslation,
-                enableInputDiagnostics: options.enableInputDiagnostics,
                 enableTranscription: options.enableTranscription,
                 inputLanguageMode: options.inputLanguageMode,
                 organizerIdentity,
@@ -217,7 +213,6 @@ class TranslationSessionManager {
             livekitApiSecret: liveKitCredentials.apiSecret,
             enableAudioTranslation: options.enableAudioTranslation !== false,
             enableTranscription: options.enableTranscription === true,
-            enableInputDiagnostics: session.enableInputDiagnostics,
         };
 
         const bridge = new TranslationBridge(sessionId, targetLanguage, organizerIdentity, config);

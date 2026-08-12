@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
 import { clientLogger } from "@/lib/client-logger";
 
@@ -204,6 +205,7 @@ function CaptionSurface({
 }) {
     const t = useTranslations("Watch");
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [popoverContainer, setPopoverContainer] = useState<HTMLElement | null>(null);
     const lineHeightPx = settings.fontSize * settings.lineHeight;
     const maxLinesHeight = settings.maxLines * lineHeightPx;
     const maxCaptionHeight = fill
@@ -291,22 +293,46 @@ function CaptionSurface({
         display: "flex",
         gap: 6,
     };
+    const settingsPanel = (
+        <CaptionSettingsPanel
+            limits={limits}
+            modeLabel={modeLabel}
+            onClose={() => setSettingsOpen(false)}
+            onReset={onReset}
+            onSettingsChange={onSettingsChange}
+            settings={settings}
+        />
+    );
+    const setSurfaceNode = useCallback((node: HTMLDivElement | null) => {
+        setPopoverContainer(node?.ownerDocument.body ?? null);
+    }, []);
 
     return (
-        <div style={surfaceStyle}>
+        <div ref={setSurfaceNode} style={surfaceStyle}>
             <div style={headerStyle}>
                 <span>{title}</span>
                 <span style={actionGroupStyle}>
-                    <button
-                        type="button"
-                        onClick={() => setSettingsOpen((open) => !open)}
-                        aria-expanded={settingsOpen}
-                        aria-label={t("captionSettings")}
-                        title={t("captionSettings")}
-                        style={closeStyle}
-                    >
-                        <Settings2Icon size={14} />
-                    </button>
+                    <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
+                        <PopoverTrigger asChild>
+                            <button
+                                type="button"
+                                aria-expanded={settingsOpen}
+                                aria-label={t("captionSettings")}
+                                title={t("captionSettings")}
+                                style={closeStyle}
+                            >
+                                <Settings2Icon size={14} />
+                            </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="end"
+                            container={popoverContainer}
+                            sideOffset={8}
+                            className="max-h-[calc(100vh-4rem)] w-[min(88vw,22rem)] overflow-y-auto p-3"
+                        >
+                            {settingsPanel}
+                        </PopoverContent>
+                    </Popover>
                     {onClose && (
                         <button
                             type="button"
@@ -319,16 +345,6 @@ function CaptionSurface({
                     )}
                 </span>
             </div>
-            {settingsOpen && (
-                <CaptionSettingsPanel
-                    limits={limits}
-                    modeLabel={modeLabel}
-                    onClose={() => setSettingsOpen(false)}
-                    onReset={onReset}
-                    onSettingsChange={onSettingsChange}
-                    settings={settings}
-                />
-            )}
             <div style={bodyStyle}>
                 {panels.length === 0 ? (
                     <p style={emptyStyle}>{emptyMessage}</p>
@@ -536,7 +552,7 @@ function CaptionSettingsPanel({
     const [openColorPicker, setOpenColorPicker] = useState<"background" | "text" | null>(null);
 
     return (
-        <div className="absolute top-10 right-3 z-50 max-h-[calc(100vh-4rem)] w-[min(88vw,22rem)] overflow-y-auto rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl">
+        <div className="grid gap-4">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="grid gap-0.5">
                     <span className="text-sm font-medium">{t("captionSettings")}</span>

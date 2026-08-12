@@ -4,7 +4,6 @@ import { createLogger } from "../logger";
 
 export type TranslationDataPublisherOptions = {
     targetLanguage: string;
-    organizerIdentity: string;
 };
 
 function parseCaptionLanguages(value: unknown): string[] {
@@ -26,7 +25,7 @@ function participantWantsTranscription(
     );
 }
 
-/** Publishes translated text and organizer diagnostics through LiveKit data channels. */
+/** Publishes translated text through LiveKit data channels. */
 export class TranslationDataPublisher {
     private readonly log;
     private readonly options: TranslationDataPublisherOptions;
@@ -75,40 +74,6 @@ export class TranslationDataPublisher {
             });
         } catch (error) {
             this.log.error({ err: error }, "Error publishing transcription");
-        }
-    }
-
-    async publishInputDiagnostic(
-        room: Room | null,
-        text: string,
-        interim: boolean,
-        segmentId: number,
-    ): Promise<void> {
-        if (!room?.localParticipant) return;
-
-        try {
-            const destinationIdentities = Array.from(room.remoteParticipants.values())
-                .filter((participant) => participant.identity === this.options.organizerIdentity)
-                .map((participant) => participant.identity);
-
-            if (destinationIdentities.length === 0) return;
-
-            const payload = JSON.stringify({
-                type: "input-diagnostic",
-                targetLanguage: this.options.targetLanguage,
-                segmentId: `${this.options.targetLanguage}-input-${segmentId}`,
-                text,
-                final: !interim,
-                timestamp: Date.now(),
-            });
-
-            await room.localParticipant.publishData(new TextEncoder().encode(payload), {
-                reliable: !interim,
-                topic: "translation-diagnostics",
-                destination_identities: destinationIdentities,
-            });
-        } catch (error) {
-            this.log.error({ err: error }, "Error publishing input diagnostic");
         }
     }
 }

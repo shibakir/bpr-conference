@@ -3,6 +3,7 @@
 import { useLocale, useTranslations } from "next-intl";
 
 import { Badge } from "@/components/ui/badge";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
 import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
 import { cn } from "@/lib/utils";
 
@@ -23,50 +24,54 @@ export function ActiveTranslationsPanel({ translations }: { translations: Transl
             {translations.length === 0 ? (
                 <p className="text-sm italic text-muted-foreground">{t("noTranslations")}</p>
             ) : (
-                <div className="rounded-lg border bg-card">
-                    {translations.map((translation, index) => {
-                        const lang = getLanguageByCode(translation.language);
-                        const languageName = lang
-                            ? getLanguageDisplayName(lang, locale)
-                            : translation.language.toUpperCase();
-                        const active = translation.status === "active";
+                <div className="overflow-hidden rounded-lg border bg-card">
+                    <Table>
+                        <TableBody>
+                            {translations.map((translation) => {
+                                const lang = getLanguageByCode(translation.language);
+                                const languageName = lang
+                                    ? getLanguageDisplayName(lang, locale)
+                                    : translation.language.toUpperCase();
+                                const active = translation.status === "active";
 
-                        return (
-                            <div
-                                key={translation.language}
-                                className={cn(
-                                    "flex items-center justify-between gap-3 p-3",
-                                    index !== translations.length - 1 && "border-b",
-                                )}
-                            >
-                                <div className="flex min-w-0 items-center gap-2">
-                                    {lang?.flag && <span className="text-base">{lang.flag}</span>}
-                                    <span className="truncate text-sm font-medium">
-                                        {languageName}
-                                    </span>
-                                </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                    <span className="font-mono text-xs text-muted-foreground">
-                                        {t("listenerCount", {
-                                            count: translation.subscriberCount,
-                                        })}
-                                    </span>
-                                    <Badge
-                                        variant="outline"
-                                        className={cn(
-                                            "gap-1",
-                                            active
-                                                ? "border-success/30 text-success"
-                                                : "border-warning/30 text-warning",
-                                        )}
-                                    >
-                                        <span className="size-1.5 rounded-full bg-current animate-pulse" />
-                                        {translation.status}
-                                    </Badge>
-                                </div>
-                            </div>
-                        );
-                    })}
+                                return (
+                                    <TableRow key={translation.language}>
+                                        <TableCell className="min-w-0 p-3">
+                                            <div className="flex min-w-0 items-center gap-2">
+                                                {lang?.flag && (
+                                                    <span className="text-base">{lang.flag}</span>
+                                                )}
+                                                <span className="truncate text-sm font-medium">
+                                                    {languageName}
+                                                </span>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="p-3 text-right">
+                                            <span className="font-mono text-xs text-muted-foreground">
+                                                {t("listenerCount", {
+                                                    count: translation.subscriberCount,
+                                                })}
+                                            </span>
+                                        </TableCell>
+                                        <TableCell className="w-0 p-3">
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "gap-1",
+                                                    active
+                                                        ? "border-success/30 text-success"
+                                                        : "border-warning/30 text-warning",
+                                                )}
+                                            >
+                                                <span className="size-1.5 rounded-full bg-current animate-pulse" />
+                                                {translation.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
+                        </TableBody>
+                    </Table>
                 </div>
             )}
         </section>

@@ -6,6 +6,7 @@ import { HexColorPicker } from "react-colorful";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 const HEX_COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
@@ -37,7 +38,12 @@ function ColorPicker({
     value: string;
 }) {
     const [draftValue, setDraftValue] = React.useState<string | null>(null);
+    const [popoverContainer, setPopoverContainer] = React.useState<HTMLElement | null>(null);
     const inputValue = draftValue ?? value;
+
+    const setRootNode = React.useCallback((node: HTMLDivElement | null) => {
+        setPopoverContainer(node?.ownerDocument.body ?? null);
+    }, []);
 
     const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         const nextInputValue = event.target.value;
@@ -54,7 +60,7 @@ function ColorPicker({
     };
 
     return (
-        <div className={cn("relative grid gap-2", className)}>
+        <div ref={setRootNode} className={cn("grid gap-2", className)}>
             <div className="flex items-center justify-between gap-3">
                 <Label htmlFor={id} className="text-xs text-muted-foreground">
                     {label}
@@ -69,33 +75,38 @@ function ColorPicker({
                         className="h-7 w-24 font-mono text-xs uppercase"
                         maxLength={7}
                     />
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon-sm"
-                        aria-expanded={open}
-                        aria-label={label}
-                        title={label}
-                        onClick={() => onOpenChange(!open)}
-                        className="overflow-hidden p-0"
-                    >
-                        <span
-                            className="size-full rounded-[inherit]"
-                            style={{ backgroundColor: value }}
-                            aria-hidden="true"
-                        />
-                    </Button>
+                    <Popover open={open} onOpenChange={onOpenChange}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="icon-sm"
+                                aria-label={label}
+                                title={label}
+                                className="overflow-hidden p-0"
+                            >
+                                <span
+                                    className="size-full rounded-[inherit]"
+                                    style={{ backgroundColor: value }}
+                                    aria-hidden="true"
+                                />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="end"
+                            container={popoverContainer}
+                            className="w-auto p-3"
+                            onPointerDown={(event) => event.stopPropagation()}
+                        >
+                            <HexColorPicker
+                                color={value}
+                                onChange={onChange}
+                                className="!h-36 !w-56"
+                            />
+                        </PopoverContent>
+                    </Popover>
                 </div>
             </div>
-
-            {open && (
-                <div
-                    className="absolute top-full right-0 z-20 mt-2 rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl"
-                    onPointerDown={(event) => event.stopPropagation()}
-                >
-                    <HexColorPicker color={value} onChange={onChange} className="!h-36 !w-56" />
-                </div>
-            )}
         </div>
     );
 }

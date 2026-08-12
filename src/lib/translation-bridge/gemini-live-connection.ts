@@ -26,11 +26,9 @@ export type GeminiServerMessage = {
             }>;
         };
         outputTranscription?: GeminiTranscription;
-        inputTranscription?: GeminiTranscription;
         turnComplete?: boolean;
     };
     outputTranscription?: GeminiTranscription;
-    inputTranscription?: GeminiTranscription;
 };
 
 export type GeminiLiveConnectionOptions = {
@@ -39,7 +37,6 @@ export type GeminiLiveConnectionOptions = {
     targetLanguage: string;
     enableAudioTranslation: boolean;
     enableTranscription: boolean;
-    enableInputDiagnostics: boolean;
     contextCompressionTriggerTokens: number;
     contextCompressionTargetTokens: number;
     shouldReconnect: () => boolean;
@@ -49,7 +46,6 @@ export type GeminiLiveConnectionOptions = {
 
 type GeminiSetup = {
     model: string;
-    inputAudioTranscription?: Record<string, never>;
     outputAudioTranscription?: Record<string, never>;
     generationConfig: {
         responseModalities: string[];
@@ -390,9 +386,6 @@ export class GeminiLiveConnection {
         if (this.options.enableTranscription) {
             setup.outputAudioTranscription = {};
         }
-        if (this.options.enableInputDiagnostics) {
-            setup.inputAudioTranscription = {};
-        }
 
         const setupMessage = { setup };
         this.log.info(
@@ -426,10 +419,7 @@ export class GeminiLiveConnection {
     }
 
     private getResponseModalityAttempts(): string[][] {
-        const needsTextResponse =
-            this.options.enableTranscription || this.options.enableInputDiagnostics;
-
-        if (!needsTextResponse) {
+        if (!this.options.enableTranscription) {
             return [["AUDIO"]];
         }
 

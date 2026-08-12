@@ -9,11 +9,9 @@ import { GeminiLiveConnection, type GeminiLiveConnectionOptions } from "../gemin
 type GeminiSetupPayload = {
     setup: {
         generationConfig: {
-            inputAudioTranscription?: unknown;
             outputAudioTranscription?: unknown;
             responseModalities: string[];
         };
-        inputAudioTranscription?: unknown;
         model: string;
         outputAudioTranscription?: unknown;
         sessionResumption?: unknown;
@@ -54,7 +52,6 @@ function createConnection(
         targetLanguage: "cs",
         enableAudioTranslation: true,
         enableTranscription: true,
-        enableInputDiagnostics: true,
         contextCompressionTriggerTokens: 25_000,
         contextCompressionTargetTokens: 8_000,
         shouldReconnect: () => true,
@@ -86,10 +83,8 @@ describe("GeminiLiveConnection", () => {
         const setupPayload = parseSentPayload<GeminiSetupPayload>(socket, 0);
         expect(setupPayload.setup.model).toBe("models/gemini-test-model");
         expect(setupPayload.setup.outputAudioTranscription).toEqual({});
-        expect(setupPayload.setup.inputAudioTranscription).toEqual({});
         expect(setupPayload.setup.generationConfig.responseModalities).toEqual(["AUDIO", "TEXT"]);
         expect(setupPayload.setup.generationConfig.outputAudioTranscription).toBeUndefined();
-        expect(setupPayload.setup.generationConfig.inputAudioTranscription).toBeUndefined();
         expect(connection.sendAudio("AQI=", 16_000)).toBe(false);
 
         socket.receive({ setupComplete: {} });
@@ -151,7 +146,6 @@ describe("GeminiLiveConnection", () => {
         const socket = new FakeWebSocket();
         const { connection } = createConnection([socket], {
             enableTranscription: false,
-            enableInputDiagnostics: false,
         });
 
         const connecting = connection.connect();
@@ -160,7 +154,6 @@ describe("GeminiLiveConnection", () => {
         const setupPayload = parseSentPayload<GeminiSetupPayload>(socket, 0);
         expect(setupPayload.setup.generationConfig.responseModalities).toEqual(["AUDIO"]);
         expect(setupPayload.setup.outputAudioTranscription).toBeUndefined();
-        expect(setupPayload.setup.inputAudioTranscription).toBeUndefined();
 
         socket.receive({ setupComplete: {} });
         await connecting;

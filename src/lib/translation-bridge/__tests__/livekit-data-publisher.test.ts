@@ -52,7 +52,6 @@ describe("TranslationDataPublisher", () => {
         ]);
         const publisher = new TranslationDataPublisher({
             targetLanguage: "cs",
-            organizerIdentity: "organizer-host",
         });
 
         await publisher.publishTranscription(room, "Ahoj", false, 4);
@@ -83,7 +82,6 @@ describe("TranslationDataPublisher", () => {
         ]);
         const publisher = new TranslationDataPublisher({
             targetLanguage: "cs",
-            organizerIdentity: "organizer-host",
         });
 
         await publisher.publishTranscription(room, "Ahoj", false, 4);
@@ -100,7 +98,6 @@ describe("TranslationDataPublisher", () => {
         const { room, publishData } = createRoom([{ identity: "listener-cs", language: "cs" }]);
         const publisher = new TranslationDataPublisher({
             targetLanguage: "cs",
-            organizerIdentity: "organizer-host",
         });
 
         await publisher.publishTranscription(room, " průběžný text", true, 4);
@@ -124,7 +121,6 @@ describe("TranslationDataPublisher", () => {
         const { room, publishData } = createRoom([{ identity: "listener-pending" }]);
         const publisher = new TranslationDataPublisher({
             targetLanguage: "cs",
-            organizerIdentity: "organizer-host",
         });
 
         await publisher.publishTranscription(room, "Ahoj", true, 4);
@@ -133,33 +129,6 @@ describe("TranslationDataPublisher", () => {
         expect(options).toEqual({
             reliable: true,
             topic: "transcription",
-        });
-    });
-
-    it("sends input diagnostics only to the organizer as lossy interim data", async () => {
-        const { room, publishData } = createRoom([
-            { identity: "organizer-host" },
-            { identity: "listener-cs", language: "cs" },
-        ]);
-        const publisher = new TranslationDataPublisher({
-            targetLanguage: "cs",
-            organizerIdentity: "organizer-host",
-        });
-
-        await publisher.publishInputDiagnostic(room, "Dobrý den", true, 2);
-
-        const [encodedPayload, options] = getPublishCall(publishData);
-        expect(parseJson(new TextDecoder().decode(encodedPayload))).toMatchObject({
-            type: "input-diagnostic",
-            targetLanguage: "cs",
-            segmentId: "cs-input-2",
-            text: "Dobrý den",
-            final: false,
-        });
-        expect(options).toEqual({
-            reliable: false,
-            topic: "translation-diagnostics",
-            destination_identities: ["organizer-host"],
         });
     });
 });

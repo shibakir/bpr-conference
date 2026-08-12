@@ -85,15 +85,11 @@ export class TranslationBridge {
     private localTrack: LocalAudioTrack | null = null;
     private publishedTrackSid: string = "";
     private transcriptionSegmentId: number = 0;
-    private inputDiagnosticSegmentId: number = 0;
     private framesSentToGemini: number = 0;
     private framesReceivedFromGemini: number = 0;
     private pendingInterimText: string = "";
-    private pendingInputDiagnosticText: string = "";
     private transcriptionSegmentHasText = false;
-    private inputDiagnosticSegmentHasText = false;
     private interimTimeout: NodeJS.Timeout | null = null;
-    private inputDiagnosticTimeout: NodeJS.Timeout | null = null;
     private geminiDebugMessageCount = 0;
 
     public readonly targetLanguage: string;
@@ -126,7 +122,6 @@ export class TranslationBridge {
     private readonly livekitApiSecret: string;
     private readonly enableAudioTranslation: boolean;
     private readonly enableTranscription: boolean;
-    private readonly enableInputDiagnostics: boolean;
     private readonly geminiConnection: GeminiLiveConnection;
     private readonly latencyMetrics: TranslationLatencyMetrics;
     private readonly dataPublisher: TranslationDataPublisher;
@@ -147,7 +142,6 @@ export class TranslationBridge {
             livekitApiSecret: string;
             enableAudioTranslation?: boolean;
             enableTranscription?: boolean;
-            enableInputDiagnostics?: boolean;
         },
     ) {
         this.sessionId = sessionId;
@@ -160,7 +154,6 @@ export class TranslationBridge {
         this.livekitApiSecret = config.livekitApiSecret;
         this.enableAudioTranslation = config.enableAudioTranslation !== false;
         this.enableTranscription = config.enableTranscription === true;
-        this.enableInputDiagnostics = config.enableInputDiagnostics === true;
         this.log = createLogger({
             component: "translation-bridge",
             sessionId,
@@ -172,7 +165,6 @@ export class TranslationBridge {
             targetLanguage,
             enableAudioTranslation: this.enableAudioTranslation,
             enableTranscription: this.enableTranscription,
-            enableInputDiagnostics: this.enableInputDiagnostics,
             contextCompressionTriggerTokens: this.contextCompressionTriggerTokens,
             contextCompressionTargetTokens: this.contextCompressionTargetTokens,
             shouldReconnect: () => this.status === "active",
@@ -180,7 +172,6 @@ export class TranslationBridge {
         });
         this.dataPublisher = new TranslationDataPublisher({
             targetLanguage,
-            organizerIdentity,
         });
         this.latencyMetrics = new TranslationLatencyMetrics({
             sessionId,
@@ -239,11 +230,6 @@ export class TranslationBridge {
             this.interimTimeout = null;
         }
         this.pendingInterimText = "";
-        if (this.inputDiagnosticTimeout) {
-            clearTimeout(this.inputDiagnosticTimeout);
-            this.inputDiagnosticTimeout = null;
-        }
-        this.pendingInputDiagnosticText = "";
 
         this.geminiConnection.stop();
 
@@ -385,12 +371,8 @@ export class TranslationBridge {
                 .join("");
             const outputTranscription =
                 serverContent?.outputTranscription ?? message.outputTranscription;
-            const inputTranscription =
-                serverContent?.inputTranscription ?? message.inputTranscription;
             const isOutputTranscriptionComplete =
                 outputTranscription?.finished === true || serverContent?.turnComplete === true;
-            const isInputTranscriptionComplete =
-                inputTranscription?.finished === true || serverContent?.turnComplete === true;
 
             if (parts?.length) {
                 for (const part of parts) {
@@ -452,36 +434,6 @@ export class TranslationBridge {
                 }
             }
 
-            let publishedFinalInputDiagnostic = false;
-            if (this.enableInputDiagnostics && inputTranscription?.text) {
-                const text = inputTranscription.text;
-                const isInterim = !isInputTranscriptionComplete;
-
-                this.log.info(
-                    { interim: isInterim, textPreview: text.slice(0, 160) },
-                    "Input diagnostic transcription received",
-                );
-
-                if (isInterim) {
-                    this.handleInputDiagnosticInterim(text);
-                } else {
-                    if (this.inputDiagnosticTimeout) {
-                        clearTimeout(this.inputDiagnosticTimeout);
-                        this.inputDiagnosticTimeout = null;
-                    }
-                    const finalText = this.pendingInputDiagnosticText + text;
-                    this.pendingInputDiagnosticText = "";
-                    this.inputDiagnosticSegmentHasText = true;
-                    void this.dataPublisher.publishInputDiagnostic(
-                        this.room,
-                        finalText,
-                        false,
-                        this.inputDiagnosticSegmentId,
-                    );
-                    publishedFinalInputDiagnostic = true;
-                }
-            }
-
             // If turn is complete, flush remaining interim buffer and advance the segment id
             if (
                 this.enableTranscription &&
@@ -509,35 +461,6 @@ export class TranslationBridge {
                     );
                 }
                 this.completeCurrentTranscriptionSegment();
-            }
-
-            if (
-                this.enableInputDiagnostics &&
-                (serverContent?.turnComplete || inputTranscription?.finished)
-            ) {
-                if (this.inputDiagnosticTimeout) {
-                    clearTimeout(this.inputDiagnosticTimeout);
-                    this.inputDiagnosticTimeout = null;
-                }
-                if (this.pendingInputDiagnosticText) {
-                    void this.dataPublisher.publishInputDiagnostic(
-                        this.room,
-                        this.pendingInputDiagnosticText,
-                        false,
-                        this.inputDiagnosticSegmentId,
-                    );
-                    this.pendingInputDiagnosticText = "";
-                    this.inputDiagnosticSegmentHasText = true;
-                } else if (this.inputDiagnosticSegmentHasText && !publishedFinalInputDiagnostic) {
-                    void this.dataPublisher.publishInputDiagnostic(
-                        this.room,
-                        "",
-                        false,
-                        this.inputDiagnosticSegmentId,
-                    );
-                }
-                this.inputDiagnosticSegmentHasText = false;
-                this.inputDiagnosticSegmentId++;
             }
         } catch (error) {
             this.log.error({ err: error }, "Error handling Gemini message");
@@ -820,36 +743,6 @@ export class TranslationBridge {
                 this.transcriptionSegmentId,
             );
             this.pendingInterimText = "";
-        }
-    }
-
-    private handleInputDiagnosticInterim(text: string): void {
-        if (!this.enableInputDiagnostics) return;
-
-        this.pendingInputDiagnosticText += text;
-
-        if (!this.inputDiagnosticTimeout) {
-            this.inputDiagnosticTimeout = setTimeout(() => {
-                this.flushInputDiagnostic();
-            }, 250);
-        }
-    }
-
-    private flushInputDiagnostic(): void {
-        this.inputDiagnosticTimeout = null;
-        if (
-            this.enableInputDiagnostics &&
-            this.pendingInputDiagnosticText &&
-            this.status === "active"
-        ) {
-            this.inputDiagnosticSegmentHasText = true;
-            void this.dataPublisher.publishInputDiagnostic(
-                this.room,
-                this.pendingInputDiagnosticText,
-                true,
-                this.inputDiagnosticSegmentId,
-            );
-            this.pendingInputDiagnosticText = "";
         }
     }
 }

@@ -5,7 +5,6 @@ import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
     NativeSelect,
@@ -13,6 +12,7 @@ import {
     NativeSelectOption,
 } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
+import { Toggle } from "@/components/ui/toggle";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import type { InputLanguageMode } from "@/lib/session-types";
 
@@ -129,14 +129,15 @@ export default function LanguageSelector({
                     )}
                 </div>
 
-                <Button
+                <Toggle
                     type="button"
-                    variant={audioMuted ? "secondary" : "outline"}
+                    pressed={audioMuted}
+                    variant="outline"
                     size="sm"
-                    onClick={() => onAudioMutedChange(!audioMuted)}
+                    onPressedChange={onAudioMutedChange}
                     disabled={disabled}
-                    aria-pressed={audioMuted}
                     title={audioMuted ? t("unmuteAudio") : t("muteAudio")}
+                    className="data-[state=on]:bg-secondary data-[state=on]:text-secondary-foreground"
                 >
                     {audioMuted ? (
                         <Volume2Icon className="size-3.5" />
@@ -144,7 +145,7 @@ export default function LanguageSelector({
                         <VolumeXIcon className="size-3.5" />
                     )}
                     <span>{audioMuted ? t("unmuteAudio") : t("muteAudio")}</span>
-                </Button>
+                </Toggle>
             </div>
 
             <div className="min-h-5">
