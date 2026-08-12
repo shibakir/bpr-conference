@@ -1,17 +1,20 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
-import { isLocale, routing, type Locale } from "@/i18n/routing";
+
+import { isLocale, type Locale,routing } from "@/i18n/routing";
 import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
+import { readJsonObject } from "@/lib/api-request";
 import { getLanguageByCode } from "@/lib/languages";
+import { getConfiguredAttendeeOrigin } from "@/lib/public-origin";
+import { getBroadcastPassword } from "@/lib/server-env";
 import {
   MAX_SESSION_DURATION_MINUTES,
   MIN_SESSION_DURATION_MINUTES,
   parseSessionDurationMinutes,
 } from "@/lib/session-duration";
 import {
-  isTranslationOutputMode,
   type InputLanguageMode,
-  type TranslationOutputMode,
+  isTranslationOutputMode,
 } from "@/lib/session-types";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
@@ -34,10 +37,17 @@ function getSessionPath(locale: Locale, sessionId: string, mode: "watch" | "broa
   return `/${locale}/session/${sessionId}/${mode}`;
 }
 
+function getRequestOrigin(req: NextRequest) {
+  const protocol = req.headers.get("x-forwarded-proto") || "http";
+  const host = req.headers.get("host") || "localhost:3000";
+
+  return `${protocol}://${host}`;
+}
+
 // POST /api/sessions — Create a new broadcast session
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({})) as CreateSessionRequest;
+    const body: CreateSessionRequest = await readJsonObject(req);
     const organizerName = typeof body.organizerName === "string" ? body.organizerName : "organizer";
     const password = body.password;
     const eventId = body.eventId;
@@ -129,7 +139,7 @@ export async function POST(req: NextRequest) {
 
       const translationOutputs = Array.from(
         new Set(body.translationOutputs)
-      ) as TranslationOutputMode[];
+      );
 
       enableAudioTranslation = translationOutputs.includes("audio");
       enableTranscription = translationOutputs.includes("text");
@@ -151,7 +161,7 @@ export async function POST(req: NextRequest) {
       allowedLanguages = Array.from(new Set(normalizedAllowedLanguages));
     }
 
-    const expectedPassword = process.env.BROADCAST_PASSWORD;
+    const expectedPassword = getBroadcastPassword();
     if (expectedPassword && password !== expectedPassword) {
       return NextResponse.json(
         apiError(API_ERROR_CODES.INCORRECT_PASSWORD, "Incorrect password"),
@@ -187,20 +197,18 @@ export async function POST(req: NextRequest) {
 
     manager.createSession(sessionId, organizerIdentity, {
       inputLanguageMode,
-      sourceLanguage,
       enableAudioTranslation,
       enableTranscription,
       enableInputDiagnostics,
-      allowedLanguages,
       durationMinutes,
+      ...(sourceLanguage ? { sourceLanguage } : {}),
+      ...(allowedLanguages ? { allowedLanguages } : {}),
     });
     const session = manager.getSession(sessionId);
 
-    // Build the attendee join URL
-    const protocol = req.headers.get("x-forwarded-proto") || "http";
-    const host = req.headers.get("host") || "localhost:3000";
-    const origin = `${protocol}://${host}`;
-    const joinUrl = `${origin}${getSessionPath(locale, sessionId, "watch")}`;
+    const requestOrigin = getRequestOrigin(req);
+    const attendeeOrigin = getConfiguredAttendeeOrigin() || requestOrigin;
+    const joinUrl = `${attendeeOrigin}${getSessionPath(locale, sessionId, "watch")}`;
 
     return NextResponse.json({
       sessionId,
@@ -218,7 +226,7 @@ export async function POST(req: NextRequest) {
       durationMinutes,
       expiresAt: session?.expiresAt.toISOString(),
       joinUrl,
-      broadcastUrl: `${origin}${getSessionPath(locale, sessionId, "broadcast")}`,
+      broadcastUrl: `${requestOrigin}${getSessionPath(locale, sessionId, "broadcast")}`,
     });
   } catch (error) {
     console.error("Error creating session:", error);

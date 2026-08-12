@@ -7,10 +7,17 @@
  *   const bridge = await manager.getOrCreate(sessionId, targetLanguage, organizerIdentity);
  */
 
-import { TranslationBridge, BridgeStatus } from "./translation-bridge";
-import { RoomServiceClient, type ParticipantInfo } from "livekit-server-sdk";
+import { type ParticipantInfo,RoomServiceClient } from "livekit-server-sdk";
+
+import {
+  getGeminiApiKey,
+  getLiveKitCredentials,
+  getLiveKitUrl,
+  getPositiveNumberEnv,
+} from "./server-env";
 import { DEFAULT_SESSION_DURATION_MINUTES } from "./session-duration";
 import type { InputLanguageMode } from "./session-types";
+import { type BridgeStatus,TranslationBridge } from "./translation-bridge";
 
 export interface TranslationInfo {
   language: string;
@@ -37,16 +44,8 @@ const globalForSessionManager = global as unknown as {
   sessionManagerInstance: TranslationSessionManager;
 };
 
-function getPositiveNumberEnv(name: string, fallback: number): number {
-  const rawValue = process.env[name];
-  if (!rawValue) return fallback;
-
-  const value = Number(rawValue);
-  return Number.isFinite(value) && value > 0 ? value : fallback;
-}
-
 function getLiveKitApiUrl(): string {
-  const configuredUrl = process.env.LIVEKIT_URL || "ws://localhost:7880";
+  const configuredUrl = getLiveKitUrl();
 
   if (configuredUrl.startsWith("wss://")) {
     return `https://${configuredUrl.slice("wss://".length)}`;
@@ -118,11 +117,11 @@ class TranslationSessionManager {
       durationMinutes,
       expiresAt: new Date(createdAt.getTime() + durationMinutes * 60_000),
       inputLanguageMode: options.inputLanguageMode,
-      sourceLanguage: options.sourceLanguage,
       enableAudioTranslation: options.enableAudioTranslation,
       enableTranscription: options.enableTranscription,
       enableInputDiagnostics: options.enableInputDiagnostics,
-      allowedLanguages: options.allowedLanguages,
+      ...(options.sourceLanguage ? { sourceLanguage: options.sourceLanguage } : {}),
+      ...(options.allowedLanguages ? { allowedLanguages: options.allowedLanguages } : {}),
     };
     this.sessions.set(sessionId, info);
     this.scheduleSessionExpiration(info);
@@ -192,11 +191,18 @@ class TranslationSessionManager {
       `[SessionManager] Creating new bridge for ${targetLanguage} in session ${sessionId}`
     );
 
+    const geminiApiKey = getGeminiApiKey();
+    const liveKitCredentials = getLiveKitCredentials();
+
+    if (!geminiApiKey || !liveKitCredentials) {
+      throw new Error("Translation service credentials are not configured");
+    }
+
     const config = {
-      geminiApiKey: process.env.GEMINI_API_KEY!,
-      livekitUrl: process.env.LIVEKIT_URL || "ws://localhost:7880",
-      livekitApiKey: process.env.LIVEKIT_API_KEY!,
-      livekitApiSecret: process.env.LIVEKIT_API_SECRET!,
+      geminiApiKey,
+      livekitUrl: getLiveKitUrl(),
+      livekitApiKey: liveKitCredentials.apiKey,
+      livekitApiSecret: liveKitCredentials.apiSecret,
       enableAudioTranslation: options.enableAudioTranslation !== false,
       enableTranscription: options.enableTranscription === true,
       enableInputDiagnostics: session.enableInputDiagnostics,
@@ -402,10 +408,9 @@ class TranslationSessionManager {
   }
 
   private getRoomServiceClient(): RoomServiceClient | null {
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const credentials = getLiveKitCredentials();
 
-    if (!apiKey || !apiSecret) {
+    if (!credentials) {
       console.warn(
         "[SessionManager] LiveKit credentials are not configured; skipping LiveKit room operation."
       );
@@ -415,8 +420,8 @@ class TranslationSessionManager {
     if (!this.roomServiceClient) {
       this.roomServiceClient = new RoomServiceClient(
         getLiveKitApiUrl(),
-        apiKey,
-        apiSecret
+        credentials.apiKey,
+        credentials.apiSecret
       );
     }
 
@@ -543,7 +548,7 @@ class TranslationSessionManager {
         return false;
       }
 
-      return participant.attributes?.language === targetLanguage;
+      return participant.attributes?.["language"] === targetLanguage;
     }).length;
   }
 

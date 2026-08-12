@@ -1,8 +1,10 @@
 "use client";
 
-import { RefObject } from "react";
 import { useTranslations } from "next-intl";
+import { type RefObject } from "react";
+
 import { cn } from "@/lib/utils";
+
 import type { TranscriptEntry } from "../types";
 import { getTranscriptParagraphs } from "../utils";
 

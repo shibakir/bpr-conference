@@ -1,20 +1,23 @@
 "use client";
 
-import { use, useState } from "react";
+import "@livekit/components-styles";
+
 import {
   LiveKitRoom,
   RoomAudioRenderer,
   StartAudio,
 } from "@livekit/components-react";
-import "@livekit/components-styles";
+import { useTranslations } from "next-intl";
+import { use, useState } from "react";
+
 import { CenteredLoadingState } from "@/components/CenteredPage";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { useWatchToken } from "./hooks/useWatchToken";
+
 import { AttendeeView } from "./components/AttendeeView";
 import { WatchErrorState } from "./components/WatchErrorState";
 import { WatchStartGate } from "./components/WatchStartGate";
-import { useTranslations } from "next-intl";
+import { useWatchToken } from "./hooks/useWatchToken";
 
 export default function WatchPage({
   params,

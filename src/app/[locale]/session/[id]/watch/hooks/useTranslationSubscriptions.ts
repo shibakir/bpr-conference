@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
 import {
   API_ERROR_CODES,
-  getApiErrorCode,
   type ApiErrorCode,
+  getApiErrorCode,
 } from "@/lib/api-errors";
+import { readJsonResponse } from "@/lib/api-request";
 
 export type TranslationSubscriptionStatus = "active" | "error";
 
@@ -20,6 +22,10 @@ type TranslationSubscriptionsByLanguage = Record<
   string,
   TranslationSubscriptionState | undefined
 >;
+
+type TranslationStartResponse = {
+  translatorIdentity?: unknown;
+};
 
 function getTranslationRequestErrorMessage(
   code: ApiErrorCode | undefined,
@@ -152,7 +158,7 @@ export function useTranslationSubscriptions({
         }),
       })
         .then(async (res) => {
-          const data = await res.json();
+          const data = await readJsonResponse<TranslationStartResponse>(res);
           if (!res.ok) {
             throw new Error(
               getTranslationRequestErrorMessage(getApiErrorCode(data), t)

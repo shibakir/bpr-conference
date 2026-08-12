@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent } from "react";
 import { LockKeyholeIcon, LogInIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { type FormEvent } from "react";
+
 import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";

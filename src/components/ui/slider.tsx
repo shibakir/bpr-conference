@@ -1,7 +1,7 @@
 "use client"
 
-import * as React from "react"
 import { Slider as SliderPrimitive } from "radix-ui"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
 
@@ -26,14 +26,14 @@ function Slider({
   return (
     <SliderPrimitive.Root
       data-slot="slider"
-      defaultValue={defaultValue}
-      value={value}
       min={min}
       max={max}
       className={cn(
         "relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:min-h-40 data-vertical:w-auto data-vertical:flex-col",
         className
       )}
+      {...(defaultValue !== undefined ? { defaultValue } : {})}
+      {...(value !== undefined ? { value } : {})}
       {...props}
     >
       <SliderPrimitive.Track

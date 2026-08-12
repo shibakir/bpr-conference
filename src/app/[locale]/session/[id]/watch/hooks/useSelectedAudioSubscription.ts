@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useRef } from "react";
 import {
-  RoomEvent,
-  Track,
   type RemoteParticipant,
   type RemoteTrack,
   type RemoteTrackPublication,
   type Room,
+  RoomEvent,
+  Track,
 } from "livekit-client";
+import { useEffect, useRef } from "react";
 
 export function useSelectedAudioSubscription({
   audioMuted,

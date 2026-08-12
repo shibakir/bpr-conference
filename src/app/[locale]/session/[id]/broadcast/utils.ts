@@ -1,13 +1,15 @@
+import { getConfiguredAttendeeOrigin } from "@/lib/public-origin";
+
 export function subscribeToOrigin() {
   return () => {};
 }
 
 export function getClientOrigin() {
-  return window.location.origin;
+  return getConfiguredAttendeeOrigin() || window.location.origin;
 }
 
 export function getServerOrigin() {
-  return "";
+  return getConfiguredAttendeeOrigin();
 }
 
 export async function copyTextToClipboard(text: string) {

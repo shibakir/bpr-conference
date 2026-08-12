@@ -7,6 +7,7 @@ import {
   QrCodeIcon,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
+
 import SessionQRCode from "@/components/SessionQRCode";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

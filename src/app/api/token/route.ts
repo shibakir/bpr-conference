@@ -1,6 +1,12 @@
-import { NextRequest, NextResponse } from "next/server";
 import { AccessToken } from "livekit-server-sdk";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
+import {
+  getBroadcastPassword,
+  getLiveKitCredentials,
+  getLiveKitUrl,
+} from "@/lib/server-env";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
 // GET /api/token — Generate a LiveKit access token
@@ -21,7 +27,7 @@ export async function GET(req: NextRequest) {
 
   const isOrganizer = role === "organizer";
 
-  const expectedPassword = process.env.BROADCAST_PASSWORD;
+  const expectedPassword = getBroadcastPassword();
   if (isOrganizer && expectedPassword) {
     const password = req.nextUrl.searchParams.get("password");
     if (password !== expectedPassword) {
@@ -45,10 +51,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const apiKey = process.env.LIVEKIT_API_KEY;
-  const apiSecret = process.env.LIVEKIT_API_SECRET;
+  const credentials = getLiveKitCredentials();
 
-  if (!apiKey || !apiSecret) {
+  if (!credentials) {
     return NextResponse.json(
       apiError(
         API_ERROR_CODES.LIVEKIT_NOT_CONFIGURED,
@@ -62,7 +67,7 @@ export async function GET(req: NextRequest) {
     1,
     Math.ceil((session.expiresAt.getTime() - Date.now()) / 1000)
   );
-  const at = new AccessToken(apiKey, apiSecret, {
+  const at = new AccessToken(credentials.apiKey, credentials.apiSecret, {
     identity,
     name: identity,
     ttl: remainingSeconds,
@@ -78,7 +83,7 @@ export async function GET(req: NextRequest) {
   });
 
   const token = await at.toJwt();
-  const serverUrl = process.env.LIVEKIT_URL || "ws://localhost:7880";
+  const serverUrl = getLiveKitUrl();
 
   return NextResponse.json({
     token,

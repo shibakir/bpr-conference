@@ -1,10 +1,12 @@
 "use client";
 
-import { ReactNode, RefObject } from "react";
 import { MinusIcon, PlusIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { type ReactNode, type RefObject } from "react";
+
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+
 import type { TranscriptEntry } from "../types";
 import { TranscriptFeed } from "./TranscriptFeed";
 

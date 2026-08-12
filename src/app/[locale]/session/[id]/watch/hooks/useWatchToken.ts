@@ -1,13 +1,23 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useCallback, useEffect, useState } from "react";
+
 import {
   API_ERROR_CODES,
-  getApiErrorCode,
   type ApiErrorCode,
+  getApiErrorCode,
 } from "@/lib/api-errors";
+import { readJsonResponse } from "@/lib/api-request";
+
 import type { WatchError } from "../types";
+
+type TokenResponse = {
+  error?: unknown;
+  expiresAt?: unknown;
+  serverUrl?: unknown;
+  token?: unknown;
+};
 
 function getJoinErrorMessage(
   code: ApiErrorCode | undefined,
@@ -44,11 +54,17 @@ export function useWatchToken(sessionId: string) {
         const res = await fetch(
           `/api/token?room=${sessionId}&identity=${identity}&role=attendee`
         );
-        const data = await res.json();
+        const data = await readJsonResponse<TokenResponse>(res);
         if (!res.ok || data.error) {
           setError(getJoinErrorMessage(getApiErrorCode(data), t));
           return;
         }
+
+        if (typeof data.token !== "string" || typeof data.serverUrl !== "string") {
+          setError({ kind: "generic", message: t("joinError") });
+          return;
+        }
+
         setToken(data.token);
         setLivekitUrl(data.serverUrl);
         setExpiresAt(
@@ -60,7 +76,7 @@ export function useWatchToken(sessionId: string) {
       }
     }
 
-    fetchToken();
+    void fetchToken();
   }, [sessionId, t]);
 
   return {

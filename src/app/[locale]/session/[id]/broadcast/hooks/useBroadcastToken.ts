@@ -1,13 +1,23 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { type FormEvent, useCallback, useEffect, useState } from "react";
+
 import {
   API_ERROR_CODES,
-  getApiErrorCode,
   type ApiErrorCode,
+  getApiErrorCode,
 } from "@/lib/api-errors";
+import { readJsonResponse } from "@/lib/api-request";
+
 import type { FetchTokenResult } from "../types";
+
+type TokenResponse = {
+  error?: unknown;
+  expiresAt?: unknown;
+  serverUrl?: unknown;
+  token?: unknown;
+};
 
 function getTokenErrorMessage(
   code: ApiErrorCode | undefined,
@@ -49,7 +59,7 @@ export function useBroadcastToken(sessionId: string) {
           : "";
         const url = `/api/token?room=${sessionId}&identity=${identity}&role=organizer${passwordParam}`;
         const res = await fetch(url);
-        const data = await res.json();
+        const data = await readJsonResponse<TokenResponse>(res);
 
         if (res.status === 401) {
           setPasswordPromptRequired(true);
@@ -59,6 +69,11 @@ export function useBroadcastToken(sessionId: string) {
 
         if (!res.ok || data.error) {
           setError(getTokenErrorMessage(getApiErrorCode(data), t));
+          return { ok: false, reason: "error" };
+        }
+
+        if (typeof data.token !== "string" || typeof data.serverUrl !== "string") {
+          setError(t("fetchTokenError"));
           return { ok: false, reason: "error" };
         }
 
@@ -84,7 +99,7 @@ export function useBroadcastToken(sessionId: string) {
   useEffect(() => {
     const cachedPass = sessionStorage.getItem("broadcast_password") || "";
     const initialFetch = window.setTimeout(() => {
-      fetchToken(cachedPass);
+      void fetchToken(cachedPass);
     }, 0);
     return () => clearTimeout(initialFetch);
   }, [fetchToken]);

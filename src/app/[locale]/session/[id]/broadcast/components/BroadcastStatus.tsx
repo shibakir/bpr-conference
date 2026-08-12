@@ -2,6 +2,7 @@
 
 import { LockKeyholeIcon, UsersIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+
 import SessionCountdown from "@/components/SessionCountdown";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";

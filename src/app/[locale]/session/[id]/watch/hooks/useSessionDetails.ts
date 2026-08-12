@@ -1,7 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
+import { readJsonResponse } from "@/lib/api-request";
 import type { InputLanguageMode } from "@/lib/session-types";
+
+type SessionDetailsResponse = {
+  allowedLanguages?: unknown;
+  enableAudioTranslation?: unknown;
+  enableTranscription?: unknown;
+  inputLanguageMode?: unknown;
+  sourceLanguage?: unknown;
+};
 
 export function useSessionDetails(sessionId: string) {
   const [allowedLanguages, setAllowedLanguages] = useState<
@@ -21,8 +31,13 @@ export function useSessionDetails(sessionId: string) {
       try {
         const res = await fetch(`/api/sessions/${sessionId}`);
         if (res.ok) {
-          const data = await res.json();
-          setAllowedLanguages(data.allowedLanguages);
+          const data = await readJsonResponse<SessionDetailsResponse>(res);
+          setAllowedLanguages(
+            Array.isArray(data.allowedLanguages) &&
+              data.allowedLanguages.every((language) => typeof language === "string")
+              ? data.allowedLanguages
+              : undefined
+          );
           setInputLanguageMode(
             data.inputLanguageMode === "single" ? "single" : "multi"
           );
@@ -41,7 +56,7 @@ export function useSessionDetails(sessionId: string) {
       }
     }
 
-    fetchSessionDetails();
+    void fetchSessionDetails();
   }, [sessionId]);
 
   return {

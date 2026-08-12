@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
 import { Volume2Icon, VolumeXIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useMemo } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -13,9 +14,9 @@ import {
 } from "@/components/ui/native-select";
 import { Spinner } from "@/components/ui/spinner";
 import {
-  SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLanguageDisplayName,
+  SUPPORTED_LANGUAGES,
 } from "@/lib/languages";
 import type { InputLanguageMode } from "@/lib/session-types";
 

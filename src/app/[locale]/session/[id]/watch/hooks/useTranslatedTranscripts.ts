@@ -1,8 +1,36 @@
 "use client";
 
-import { RefObject, useEffect, useMemo, useState } from "react";
-import { RoomEvent, type Room } from "livekit-client";
+import { type Room,RoomEvent } from "livekit-client";
+import { type RefObject, useEffect, useMemo, useState } from "react";
+
+import { parseJson } from "@/lib/api-request";
+
 import type { TranscriptEntry } from "../types";
+
+type TranscriptionMessage = {
+  final: boolean;
+  language: string;
+  segmentId: string;
+  text: string;
+  timestamp: number;
+  type: "transcription";
+};
+
+function isTranscriptionMessage(value: unknown): value is TranscriptionMessage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const message = value as Partial<TranscriptionMessage>;
+  return (
+    message.type === "transcription" &&
+    typeof message.segmentId === "string" &&
+    typeof message.text === "string" &&
+    typeof message.language === "string" &&
+    typeof message.final === "boolean" &&
+    typeof message.timestamp === "number"
+  );
+}
 
 export function useTranslatedTranscripts({
   room,
@@ -39,8 +67,8 @@ export function useTranslatedTranscripts({
       if (topic !== "transcription") return;
 
       try {
-        const data = JSON.parse(new TextDecoder().decode(payload));
-        if (data.type !== "transcription") return;
+        const data = parseJson(new TextDecoder().decode(payload));
+        if (!isTranscriptionMessage(data)) return;
         if (!allowedLanguages.has(data.language)) return;
 
         setTranscriptsByLanguage((prev) => {
@@ -58,9 +86,14 @@ export function useTranslatedTranscripts({
 
           if (existing >= 0) {
             const updated = [...languageTranscripts];
+            const previous = updated[existing];
+            if (!previous) {
+              return prev;
+            }
+
             updated[existing] = {
-              ...updated[existing],
-              text: updated[existing].text + data.text,
+              ...previous,
+              text: previous.text + data.text,
               final: data.final,
             };
             return {

@@ -1,33 +1,35 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
 import { useRoomContext, useTracks } from "@livekit/components-react";
 import { Track } from "livekit-client";
 import { useLocale, useTranslations } from "next-intl";
+import { useCallback, useMemo, useRef, useState } from "react";
+
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import {
-  SUPPORTED_LANGUAGES,
   getLanguageByCode,
   getLanguageDisplayName,
+  SUPPORTED_LANGUAGES,
 } from "@/lib/languages";
+
 import { useFontSizePreference } from "../hooks/useFontSizePreference";
 import { useOrganizerAudioPresence } from "../hooks/useOrganizerAudioPresence";
 import { useParticipantLanguageAttribute } from "../hooks/useParticipantLanguageAttribute";
 import { useSelectedAudioSubscription } from "../hooks/useSelectedAudioSubscription";
 import { useSessionDetails } from "../hooks/useSessionDetails";
 import {
-  useTranslatedTranscripts,
   useTranscriptAutoScroll,
+  useTranslatedTranscripts,
 } from "../hooks/useTranslatedTranscripts";
 import { useTranslationSubscriptions } from "../hooks/useTranslationSubscriptions";
-import LanguageSelector from "./LanguageSelector";
 import {
-  FloatingTranscriptWindow,
   type FloatingCaptionPanel,
+  FloatingTranscriptWindow,
 } from "./FloatingTranscriptWindow";
+import LanguageSelector from "./LanguageSelector";
 import { ListenerStatus } from "./ListenerStatus";
 import { TranscriptPanel } from "./TranscriptPanel";
 
@@ -311,12 +313,16 @@ export function AttendeeView({
           onLanguageChange={handleLanguageChange}
           onAudioMutedChange={setAudioMuted}
           disabled={!isConnected || !sessionDetails.loaded}
-          allowedLanguages={sessionDetails.allowedLanguages}
           inputLanguageMode={sessionDetails.inputLanguageMode}
-          sourceLanguage={sessionDetails.sourceLanguage}
-          translationError={currentTranslationState?.error}
+          translationError={currentTranslationState?.error ?? null}
           translationLoading={currentTranslationLoading}
           translationsEnabled={sessionDetails.enableAudioTranslation}
+          {...(sessionDetails.allowedLanguages
+            ? { allowedLanguages: sessionDetails.allowedLanguages }
+            : {})}
+          {...(sessionDetails.sourceLanguage
+            ? { sourceLanguage: sessionDetails.sourceLanguage }
+            : {})}
         />
         {sessionDetails.enableTranscription && (
           <SubtitleLanguageSelector

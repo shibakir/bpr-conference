@@ -2,6 +2,7 @@
 
 import { AlertTriangleIcon, RefreshCwIcon } from "lucide-react";
 import { useTranslations } from "next-intl";
+
 import { CenteredPage } from "@/components/CenteredPage";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+
 import type { WatchError } from "../types";
 
 export function WatchErrorState({ error }: { error: WatchError }) {

@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useLocale } from "next-intl";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+
 import { getPathname } from "@/i18n/navigation";
+
 import {
   copyTextToClipboard,
   getClientOrigin,

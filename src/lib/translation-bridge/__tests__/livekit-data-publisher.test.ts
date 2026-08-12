@@ -1,6 +1,13 @@
-import { describe, expect, it, vi } from "vitest";
 import type { Room } from "@livekit/rtc-node";
+import { describe, expect, it, vi } from "vitest";
+
+import { parseJson } from "../../api-request";
 import { TranslationDataPublisher } from "../livekit-data-publisher";
+
+type PublishData = (
+  payload: Uint8Array,
+  options?: Record<string, unknown>
+) => Promise<void>;
 
 function createRoom(
   participants: Array<{
@@ -9,7 +16,7 @@ function createRoom(
     language?: string;
   }>
 ) {
-  const publishData = vi.fn().mockResolvedValue(undefined);
+  const publishData = vi.fn<PublishData>().mockResolvedValue(undefined);
   const room = {
     localParticipant: { publishData },
     remoteParticipants: new Map(
@@ -31,6 +38,15 @@ function createRoom(
   return { room, publishData };
 }
 
+function getPublishCall(publishData: ReturnType<typeof createRoom>["publishData"]) {
+  const call = publishData.mock.calls[0];
+  if (!call) {
+    throw new Error("Expected publishData to be called");
+  }
+
+  return call;
+}
+
 describe("TranslationDataPublisher", () => {
   it("sends a final transcription only to listeners of the target language", async () => {
     const { room, publishData } = createRoom([
@@ -44,8 +60,8 @@ describe("TranslationDataPublisher", () => {
 
     await publisher.publishTranscription(room, "Ahoj", false, 4);
 
-    const [encodedPayload, options] = publishData.mock.calls[0];
-    expect(JSON.parse(new TextDecoder().decode(encodedPayload))).toMatchObject({
+    const [encodedPayload, options] = getPublishCall(publishData);
+    expect(parseJson(new TextDecoder().decode(encodedPayload))).toMatchObject({
       type: "transcription",
       language: "cs",
       segmentId: "cs-4",
@@ -75,7 +91,7 @@ describe("TranslationDataPublisher", () => {
 
     await publisher.publishTranscription(room, "Ahoj", false, 4);
 
-    const [, options] = publishData.mock.calls[0];
+    const [, options] = getPublishCall(publishData);
     expect(options).toEqual({
       reliable: true,
       topic: "transcription",
@@ -94,8 +110,8 @@ describe("TranslationDataPublisher", () => {
 
     await publisher.publishTranscription(room, " průběžný text", true, 4);
 
-    const [encodedPayload, options] = publishData.mock.calls[0];
-    expect(JSON.parse(new TextDecoder().decode(encodedPayload))).toMatchObject({
+    const [encodedPayload, options] = getPublishCall(publishData);
+    expect(parseJson(new TextDecoder().decode(encodedPayload))).toMatchObject({
       type: "transcription",
       language: "cs",
       segmentId: "cs-4",
@@ -120,7 +136,7 @@ describe("TranslationDataPublisher", () => {
 
     await publisher.publishTranscription(room, "Ahoj", true, 4);
 
-    const [, options] = publishData.mock.calls[0];
+    const [, options] = getPublishCall(publishData);
     expect(options).toEqual({
       reliable: true,
       topic: "transcription",
@@ -139,8 +155,8 @@ describe("TranslationDataPublisher", () => {
 
     await publisher.publishInputDiagnostic(room, "Dobrý den", true, 2);
 
-    const [encodedPayload, options] = publishData.mock.calls[0];
-    expect(JSON.parse(new TextDecoder().decode(encodedPayload))).toMatchObject({
+    const [encodedPayload, options] = getPublishCall(publishData);
+    expect(parseJson(new TextDecoder().decode(encodedPayload))).toMatchObject({
       type: "input-diagnostic",
       targetLanguage: "cs",
       segmentId: "cs-input-2",

@@ -1,9 +1,11 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
+
 import { Badge } from "@/components/ui/badge";
 import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
 import { cn } from "@/lib/utils";
+
 import type { TranslationInfo } from "../types";
 
 export function ActiveTranslationsPanel({

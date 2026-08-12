@@ -1,7 +1,7 @@
 "use client";
 
+import { type Room,RoomEvent, Track } from "livekit-client";
 import { useEffect, useState } from "react";
-import { RoomEvent, Track, type Room } from "livekit-client";
 
 export function useOrganizerAudioPresence(room: Room | undefined) {
   const [isConnected, setIsConnected] = useState(false);

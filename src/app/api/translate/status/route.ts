@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
+
 import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 

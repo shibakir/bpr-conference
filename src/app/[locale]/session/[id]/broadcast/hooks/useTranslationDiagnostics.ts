@@ -1,8 +1,36 @@
 "use client";
 
+import { type Room,RoomEvent } from "livekit-client";
 import { useEffect, useState } from "react";
-import { RoomEvent, type Room } from "livekit-client";
+
+import { parseJson } from "@/lib/api-request";
+
 import type { TranslationDiagnostic } from "../types";
+
+type TranslationDiagnosticMessage = {
+  final?: unknown;
+  segmentId: string;
+  targetLanguage: string;
+  text: string;
+  timestamp?: unknown;
+  type: "input-diagnostic";
+};
+
+function isTranslationDiagnosticMessage(
+  value: unknown
+): value is TranslationDiagnosticMessage {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const message = value as Partial<TranslationDiagnosticMessage>;
+  return (
+    message.type === "input-diagnostic" &&
+    typeof message.segmentId === "string" &&
+    typeof message.targetLanguage === "string" &&
+    typeof message.text === "string"
+  );
+}
 
 export function useTranslationDiagnostics(room: Room | undefined) {
   const [diagnostics, setDiagnostics] = useState<TranslationDiagnostic[]>([]);
@@ -21,15 +49,8 @@ export function useTranslationDiagnostics(room: Room | undefined) {
       if (topic !== "translation-diagnostics") return;
 
       try {
-        const data = JSON.parse(new TextDecoder().decode(payload));
-        if (data.type !== "input-diagnostic") return;
-        if (
-          typeof data.segmentId !== "string" ||
-          typeof data.targetLanguage !== "string" ||
-          typeof data.text !== "string"
-        ) {
-          return;
-        }
+        const data = parseJson(new TextDecoder().decode(payload));
+        if (!isTranslationDiagnosticMessage(data)) return;
 
         setDiagnostics((prev) => {
           const existing = prev.findIndex(
@@ -46,9 +67,12 @@ export function useTranslationDiagnostics(room: Room | undefined) {
 
           if (existing >= 0) {
             const updated = [...prev];
+            const previous = updated[existing];
+            if (!previous) return updated.slice(-12);
+
             updated[existing] = {
-              ...updated[existing],
-              text: updated[existing].text + data.text,
+              ...previous,
+              text: previous.text + data.text,
               final: entry.final,
               timestamp: entry.timestamp,
             };

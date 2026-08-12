@@ -1,4 +1,4 @@
-import { AudioFrame, AudioSource } from "@livekit/rtc-node";
+import { AudioFrame, type AudioSource } from "@livekit/rtc-node";
 
 type QueuedTranslatedAudioFrame = {
   pcmBuffer: Buffer;

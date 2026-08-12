@@ -1,10 +1,13 @@
 "use client";
 
-import { MicIcon, ScreenShareIcon } from "lucide-react";
 import { useRoomContext } from "@livekit/components-react";
-import { useRouter } from "@/i18n/navigation";
+import { MicIcon, ScreenShareIcon } from "lucide-react";
+import { useTranslations } from "next-intl";
+
 import { Separator } from "@/components/ui/separator";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { useRouter } from "@/i18n/navigation";
+
 import { useActiveTranslations } from "../hooks/useActiveTranslations";
 import { useBroadcastAudioMixer } from "../hooks/useBroadcastAudioMixer";
 import { useJoinUrl } from "../hooks/useJoinUrl";
@@ -16,7 +19,6 @@ import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { InputDiagnosticsPanel } from "./InputDiagnosticsPanel";
 import { SharePanel } from "./SharePanel";
-import { useTranslations } from "next-intl";
 
 export function BroadcastControls({
   sessionId,
@@ -51,8 +53,12 @@ export function BroadcastControls({
     } catch (err) {
       console.error("Failed to explicitly delete session on broadcast end:", err);
     }
-    room.disconnect();
-    router.push("/");
+    void room.disconnect();
+    void router.push("/");
+  };
+
+  const handleEndBroadcast = () => {
+    void endBroadcast();
   };
 
   return (
@@ -115,7 +121,7 @@ export function BroadcastControls({
 
       <Separator />
 
-      <EndBroadcastControl onEnd={endBroadcast} />
+      <EndBroadcastControl onEnd={handleEndBroadcast} />
     </div>
   );
 }

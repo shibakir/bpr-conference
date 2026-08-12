@@ -1,7 +1,5 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
-import { useLocale, useTranslations } from "next-intl";
 import {
   CaptionsIcon,
   ClockIcon,
@@ -11,6 +9,9 @@ import {
   Volume2Icon,
   XIcon,
 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
+import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
+
 import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -33,18 +34,19 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
 import {
   API_ERROR_CODES,
-  getApiErrorCode,
   type ApiErrorCode,
+  getApiErrorCode,
 } from "@/lib/api-errors";
-import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
+import { readJsonResponse } from "@/lib/api-request";
+import { getLanguageDisplayName,SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
   DEFAULT_SESSION_DURATION_MINUTES,
   MAX_SESSION_DURATION_MINUTES,
   MIN_SESSION_DURATION_MINUTES,
 } from "@/lib/session-duration";
 import {
-  TRANSLATION_OUTPUT_MODES,
   type InputLanguageMode,
+  TRANSLATION_OUTPUT_MODES,
   type TranslationOutputMode,
 } from "@/lib/session-types";
 import { cn } from "@/lib/utils";
@@ -62,6 +64,14 @@ const DEFAULT_LANGUAGES = [
 
 const DEFAULT_SOURCE_LANGUAGE = "cs";
 const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
+
+type AuthStatusResponse = {
+  passwordRequired?: unknown;
+};
+
+type CreateSessionResponse = {
+  sessionId?: unknown;
+};
 
 export default function Home() {
   const t = useTranslations("Home");
@@ -163,13 +173,13 @@ export default function Home() {
     async function checkAuthStatus() {
       try {
         const res = await fetch("/api/auth/status");
-        const data = await res.json();
-        setPasswordRequired(data.passwordRequired);
+        const data = await readJsonResponse<AuthStatusResponse>(res);
+        setPasswordRequired(data.passwordRequired === true);
       } catch (err) {
         console.error("Failed to check auth status:", err);
       }
     }
-    checkAuthStatus();
+    void checkAuthStatus();
   }, []);
 
   function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
@@ -212,9 +222,14 @@ export default function Home() {
             : undefined,
         }),
       });
-      const data = await res.json();
+      const data = await readJsonResponse<CreateSessionResponse>(res);
       if (!res.ok) {
         setError(getCreateSessionErrorMessage(getApiErrorCode(data)));
+        setLoading(false);
+        return;
+      }
+      if (typeof data.sessionId !== "string") {
+        setError(t("createError"));
         setLoading(false);
         return;
       }
@@ -232,7 +247,7 @@ export default function Home() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!loading) {
-      createSession();
+      void createSession();
     }
   }
 

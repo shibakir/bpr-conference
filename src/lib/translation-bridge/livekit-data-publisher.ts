@@ -19,8 +19,8 @@ function participantWantsTranscription(
   targetLanguage: string
 ) {
   return (
-    participantAttributes?.language === targetLanguage ||
-    parseCaptionLanguages(participantAttributes?.captionLanguages).includes(
+    participantAttributes?.["language"] === targetLanguage ||
+    parseCaptionLanguages(participantAttributes?.["captionLanguages"]).includes(
       targetLanguage
     )
   );

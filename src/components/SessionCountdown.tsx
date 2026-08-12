@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
 import { ClockIcon } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+
 import { Badge } from "@/components/ui/badge";
 import { formatRemainingSessionTime } from "@/lib/session-duration";
 import { cn } from "@/lib/utils";

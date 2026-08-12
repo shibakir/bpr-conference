@@ -10,19 +10,20 @@
  */
 
 import {
+  type AudioFrame,
+  AudioSource,
+  AudioStream,
+  LocalAudioTrack,
+  type RemoteAudioTrack,
+  type RemoteParticipant,
+  type RemoteTrackPublication,
   Room,
   RoomEvent,
-  LocalAudioTrack,
-  AudioSource,
+  TrackKind,
   TrackPublishOptions,
   TrackSource,
-  RemoteTrackPublication,
-  RemoteParticipant,
-  RemoteAudioTrack,
-  TrackKind,
-  AudioStream,
-  type AudioFrame,
 } from "@livekit/rtc-node";
+
 import {
   GeminiLiveConnection,
   type GeminiServerMessage,

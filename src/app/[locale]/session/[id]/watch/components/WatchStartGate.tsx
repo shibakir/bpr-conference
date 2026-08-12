@@ -2,6 +2,7 @@
 
 import { Volume2Icon } from "lucide-react";
 import { useTranslations } from "next-intl";
+
 import { CenteredPage } from "@/components/CenteredPage";
 import SessionCountdown from "@/components/SessionCountdown";
 import { Button } from "@/components/ui/button";

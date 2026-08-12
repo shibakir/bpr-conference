@@ -101,6 +101,10 @@ export class GeminiLiveConnection {
 
     for (let index = 0; index < attempts.length; index++) {
       const modalities = attempts[index];
+      const nextModalities = attempts[index + 1];
+      if (!modalities) {
+        continue;
+      }
       this.responseModalities = modalities;
 
       try {
@@ -124,7 +128,7 @@ export class GeminiLiveConnection {
         this.ws = null;
 
         console.warn(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini rejected setup with responseModalities=${modalities.join(",")}; retrying with responseModalities=${attempts[index + 1].join(",")}`
+          `[TranslationBridge:${this.options.targetLanguage}] Gemini rejected setup with responseModalities=${modalities.join(",")}; retrying with responseModalities=${nextModalities?.join(",") || "none"}`
         );
       }
     }
@@ -433,7 +437,16 @@ export class GeminiLiveConnection {
   }
 
   private parseMessage(data: WebSocket.Data): GeminiServerMessage {
-    return JSON.parse(data.toString()) as GeminiServerMessage;
+    const text = typeof data === "string"
+      ? data
+      : Array.isArray(data)
+        ? Buffer.concat(data).toString()
+        : Buffer.isBuffer(data)
+          ? data.toString()
+          : Buffer.from(data).toString();
+
+    const message: unknown = JSON.parse(text);
+    return message as GeminiServerMessage;
   }
 
   private canReconnect(): boolean {

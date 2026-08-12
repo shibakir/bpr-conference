@@ -1,13 +1,30 @@
 import { EventEmitter } from "node:events";
+
 import { describe, expect, it, vi } from "vitest";
 import WebSocket from "ws";
+
+import { parseJson } from "../../api-request";
 import {
   GeminiLiveConnection,
   type GeminiLiveConnectionOptions,
 } from "../gemini-live-connection";
 
+type GeminiSetupPayload = {
+  setup: {
+    generationConfig: {
+      inputAudioTranscription?: unknown;
+      outputAudioTranscription?: unknown;
+      responseModalities: string[];
+    };
+    inputAudioTranscription?: unknown;
+    model: string;
+    outputAudioTranscription?: unknown;
+    sessionResumption?: unknown;
+  };
+};
+
 class FakeWebSocket extends EventEmitter {
-  readyState = WebSocket.CONNECTING;
+  readyState: number = WebSocket.CONNECTING;
   readonly sent: string[] = [];
   readonly close = vi.fn(() => {
     this.readyState = WebSocket.CLOSED;
@@ -53,6 +70,15 @@ function createConnection(
   return { connection, onMessage };
 }
 
+function parseSentPayload<T>(socket: FakeWebSocket, index: number): T {
+  const payload = socket.sent[index];
+  if (payload === undefined) {
+    throw new Error(`Expected sent WebSocket payload at index ${index}`);
+  }
+
+  return parseJson(payload) as T;
+}
+
 describe("GeminiLiveConnection", () => {
   it("waits for setupComplete before allowing audio and sends the expected setup", async () => {
     const socket = new FakeWebSocket();
@@ -61,7 +87,7 @@ describe("GeminiLiveConnection", () => {
     const connecting = connection.connect();
     socket.open();
 
-    const setupPayload = JSON.parse(socket.sent[0]);
+    const setupPayload = parseSentPayload<GeminiSetupPayload>(socket, 0);
     expect(setupPayload.setup.model).toBe("models/gemini-test-model");
     expect(setupPayload.setup.outputAudioTranscription).toEqual({});
     expect(setupPayload.setup.inputAudioTranscription).toEqual({});
@@ -82,7 +108,7 @@ describe("GeminiLiveConnection", () => {
 
     expect(connection.isReady).toBe(true);
     expect(connection.sendAudio("AQI=", 16_000)).toBe(true);
-    expect(JSON.parse(socket.sent[1])).toEqual({
+    expect(parseSentPayload(socket, 1)).toEqual({
       realtimeInput: {
         audio: {
           mimeType: "audio/pcm;rate=16000",
@@ -108,9 +134,10 @@ describe("GeminiLiveConnection", () => {
     firstSocket.receive({ goAway: { timeLeft: "10s" } });
 
     secondSocket.open();
-    expect(JSON.parse(secondSocket.sent[0]).setup.sessionResumption).toEqual({
-      handle: "resume-1",
-    });
+    expect(
+      parseSentPayload<GeminiSetupPayload>(secondSocket, 0).setup
+        .sessionResumption
+    ).toEqual({ handle: "resume-1" });
     secondSocket.receive({ setupComplete: {} });
 
     expect(connection.isReady).toBe(true);
@@ -142,7 +169,7 @@ describe("GeminiLiveConnection", () => {
     const connecting = connection.connect();
     socket.open();
 
-    const setupPayload = JSON.parse(socket.sent[0]);
+    const setupPayload = parseSentPayload<GeminiSetupPayload>(socket, 0);
     expect(setupPayload.setup.generationConfig.responseModalities).toEqual([
       "AUDIO",
     ]);
@@ -163,7 +190,8 @@ describe("GeminiLiveConnection", () => {
     socket.open();
 
     expect(
-      JSON.parse(socket.sent[0]).setup.generationConfig.responseModalities
+      parseSentPayload<GeminiSetupPayload>(socket, 0).setup.generationConfig
+        .responseModalities
     ).toEqual(["TEXT"]);
 
     socket.receive({ setupComplete: {} });
@@ -187,7 +215,8 @@ describe("GeminiLiveConnection", () => {
     secondSocket.open();
 
     expect(
-      JSON.parse(secondSocket.sent[0]).setup.generationConfig.responseModalities
+      parseSentPayload<GeminiSetupPayload>(secondSocket, 0).setup
+        .generationConfig.responseModalities
     ).toEqual(["AUDIO"]);
 
     secondSocket.receive({ setupComplete: {} });

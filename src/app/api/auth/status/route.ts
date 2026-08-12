@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { getBroadcastPassword } from "@/lib/server-env";
+
 export async function GET() {
-  const passwordRequired = !!process.env.BROADCAST_PASSWORD;
+  const passwordRequired = !!getBroadcastPassword();
   return NextResponse.json({ passwordRequired });
 }

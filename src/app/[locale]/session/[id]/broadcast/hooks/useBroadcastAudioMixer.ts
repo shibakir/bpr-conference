@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type MutableRefObject } from "react";
-import { Track, type LocalTrackPublication, type Room } from "livekit-client";
+import { type LocalTrackPublication, type Room,Track } from "livekit-client";
+import { type MutableRefObject,useEffect, useRef, useState } from "react";
 
 type WindowWithWebkitAudioContext = Window &
   typeof globalThis & {
@@ -14,6 +14,36 @@ function stopStream(stream: MediaStream | null) {
 
 function disconnectNode(node: AudioNode | null) {
   node?.disconnect();
+}
+
+type MediaCaptureMethod = "getUserMedia" | "getDisplayMedia";
+
+function getLocalPresenterOrigin() {
+  const url = new URL(window.location.href);
+  url.hostname = "localhost";
+  return url.origin;
+}
+
+function getMediaCaptureUnavailableMessage(feature: string) {
+  if (!window.isSecureContext) {
+    return `${feature} requires HTTPS or localhost. Open the presenter page at ${getLocalPresenterOrigin()} on this computer, or use HTTPS for the LAN address.`;
+  }
+
+  return `${feature} is not supported by this browser.`;
+}
+
+function requireMediaCaptureMethod<T extends MediaCaptureMethod>(
+  method: T,
+  feature: string
+) {
+  const mediaDevices = navigator.mediaDevices;
+  const mediaMethod = mediaDevices?.[method];
+
+  if (typeof mediaMethod !== "function") {
+    throw new Error(getMediaCaptureUnavailableMessage(feature));
+  }
+
+  return mediaMethod.bind(mediaDevices) as MediaDevices[T];
 }
 
 const BROADCAST_AUDIO_TRACK_NAME = "broadcast-audio";
@@ -50,7 +80,7 @@ async function unpublishBroadcastAudioPublication(
 
   try {
     await room.localParticipant.unpublishTrack(pub.track, true);
-    console.log(
+    console.info(
       `[BroadcastControls] Unpublished ${reason} ${BROADCAST_AUDIO_TRACK_NAME} track:`,
       pub.trackSid
     );
@@ -168,6 +198,9 @@ export function useBroadcastAudioMixer({
         localDestinationNode = dest;
 
         const mixedTrack = dest.stream.getAudioTracks()[0];
+        if (!mixedTrack) {
+          throw new Error("Failed to create mixed audio track.");
+        }
         localMixedTrack = mixedTrack;
 
         audioContextRef.current = ctx;
@@ -207,7 +240,7 @@ export function useBroadcastAudioMixer({
           }
           await unpublishExtraBroadcastAudioPublications(localRoom, pub);
 
-          console.log(
+          console.info(
             "Published mixed audio track:",
             pub.trackSid
           );
@@ -217,7 +250,7 @@ export function useBroadcastAudioMixer({
       }
     }
 
-    initAudio();
+    void initAudio();
 
     return () => {
       active = false;
@@ -260,14 +293,14 @@ export function useBroadcastAudioMixer({
       pub
         .unmute()
         .then(() =>
-          console.log("[BroadcastControls] Unmuted broadcast-audio track")
+          console.info("[BroadcastControls] Unmuted broadcast-audio track")
         )
         .catch((err: unknown) => console.error("Failed to unmute track:", err));
     } else {
       pub
         .mute()
         .then(() =>
-          console.log("[BroadcastControls] Muted broadcast-audio track")
+          console.info("[BroadcastControls] Muted broadcast-audio track")
         )
         .catch((err: unknown) => console.error("Failed to mute track:", err));
     }
@@ -291,7 +324,11 @@ export function useBroadcastAudioMixer({
 
     try {
       await ctx.resume();
-      const stream = await navigator.mediaDevices.getUserMedia({
+      const getUserMedia = requireMediaCaptureMethod(
+        "getUserMedia",
+        "Microphone capture"
+      );
+      const stream = await getUserMedia({
         audio: true,
       });
       micStreamRef.current = stream;
@@ -331,7 +368,11 @@ export function useBroadcastAudioMixer({
 
     try {
       await ctx.resume();
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      const getDisplayMedia = requireMediaCaptureMethod(
+        "getDisplayMedia",
+        "Tab audio capture"
+      );
+      const stream = await getDisplayMedia({
         video: { displaySurface: "browser" },
         audio: true,
       });
@@ -367,10 +408,14 @@ export function useBroadcastAudioMixer({
         setIsTabAudioEnabled(false);
       };
 
-      audioTracks[0].onended = handleTrackEnded;
+      const audioTrack = audioTracks[0];
+      if (audioTrack) {
+        audioTrack.onended = handleTrackEnded;
+      }
       const videoTracks = stream.getVideoTracks();
-      if (videoTracks.length > 0) {
-        videoTracks[0].onended = handleTrackEnded;
+      const videoTrack = videoTracks[0];
+      if (videoTrack) {
+        videoTrack.onended = handleTrackEnded;
       }
     } catch (err) {
       console.error("Failed to capture tab audio:", err);

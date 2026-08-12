@@ -40,7 +40,7 @@ function captureConsole(): Record<ConsoleMethod, ConsoleMethodFn> {
   return CONSOLE_METHODS.reduce(
     (captured, method) => ({
       ...captured,
-      [method]: console[method],
+      [method]: console[method].bind(console),
     }),
     {} as Record<ConsoleMethod, ConsoleMethodFn>,
   );

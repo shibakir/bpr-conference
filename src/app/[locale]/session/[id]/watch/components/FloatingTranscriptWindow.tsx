@@ -1,8 +1,15 @@
 "use client";
 
 import {
-  CSSProperties,
-  ReactNode,
+  CaptionsIcon,
+  PictureInPicture2Icon,
+  Settings2Icon,
+  XIcon,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import {
+  type CSSProperties,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -10,24 +17,19 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import {
-  CaptionsIcon,
-  PictureInPicture2Icon,
-  Settings2Icon,
-  XIcon,
-} from "lucide-react";
-import { useTranslations } from "next-intl";
+
 import { Button } from "@/components/ui/button";
 import { ColorPicker } from "@/components/ui/color-picker";
 import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Slider } from "@/components/ui/slider";
+
 import {
   CAPTION_FONT_OPTIONS,
+  type CaptionWindowSettings,
   getCaptionBackground,
   getCaptionFontCssValue,
   useCaptionWindowPreference,
-  type CaptionWindowSettings,
 } from "../hooks/useCaptionWindowPreference";
 import type { TranscriptEntry } from "../types";
 import { getTranscriptParagraphs } from "../utils";
@@ -419,7 +421,7 @@ export function FloatingTranscriptWindow({
     onOpenChange?.(mode !== null);
   }, [mode, onOpenChange]);
 
-  const closeFloatingWindow = useCallback(async () => {
+  const closeFloatingWindow = useCallback(() => {
     const pipWindow = documentPipWindowRef.current;
     if (pipWindow && !pipWindow.closed) {
       pipWindow.close();
