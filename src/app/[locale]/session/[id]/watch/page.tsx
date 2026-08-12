@@ -2,11 +2,7 @@
 
 import "@livekit/components-styles";
 
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  StartAudio,
-} from "@livekit/components-react";
+import { LiveKitRoom, RoomAudioRenderer, StartAudio } from "@livekit/components-react";
 import { useTranslations } from "next-intl";
 import { use, useState } from "react";
 
@@ -19,58 +15,50 @@ import { WatchErrorState } from "./components/WatchErrorState";
 import { WatchStartGate } from "./components/WatchStartGate";
 import { useWatchToken } from "./hooks/useWatchToken";
 
-export default function WatchPage({
-  params,
-}: {
-  params: Promise<{ locale: string; id: string }>;
-}) {
-  const t = useTranslations("Watch");
-  const { id: sessionId } = use(params);
-  const [started, setStarted] = useState(false);
-  const { error, expiresAt, livekitUrl, markExpired, token } =
-    useWatchToken(sessionId);
+export default function WatchPage({ params }: { params: Promise<{ locale: string; id: string }> }) {
+    const t = useTranslations("Watch");
+    const { id: sessionId } = use(params);
+    const [started, setStarted] = useState(false);
+    const { error, expiresAt, livekitUrl, markExpired, token } = useWatchToken(sessionId);
 
-  if (error) {
-    return <WatchErrorState error={error} />;
-  }
+    if (error) {
+        return <WatchErrorState error={error} />;
+    }
 
-  if (!token || !livekitUrl) {
-    return <CenteredLoadingState label={t("joining")} />;
-  }
+    if (!token || !livekitUrl) {
+        return <CenteredLoadingState label={t("joining")} />;
+    }
 
-  if (!started) {
+    if (!started) {
+        return (
+            <WatchStartGate
+                sessionId={sessionId}
+                expiresAt={expiresAt}
+                onStart={() => setStarted(true)}
+                onSessionExpired={markExpired}
+            />
+        );
+    }
+
     return (
-      <WatchStartGate
-        sessionId={sessionId}
-        expiresAt={expiresAt}
-        onStart={() => setStarted(true)}
-        onSessionExpired={markExpired}
-      />
+        <main className="min-h-svh px-4 py-10 sm:px-6">
+            <LiveKitRoom
+                video={false}
+                audio={false}
+                token={token}
+                serverUrl={livekitUrl}
+                connectOptions={{ autoSubscribe: false }}
+                options={{ disconnectOnPageLeave: false }}
+                className="flex w-full flex-col items-center"
+            >
+                <RoomAudioRenderer />
+                <StartAudio label={t("enableAudio")} className={cn(buttonVariants(), "mb-4")} />
+                <AttendeeView
+                    sessionId={sessionId}
+                    expiresAt={expiresAt}
+                    onSessionExpired={markExpired}
+                />
+            </LiveKitRoom>
+        </main>
     );
-  }
-
-  return (
-    <main className="min-h-svh px-4 py-10 sm:px-6">
-      <LiveKitRoom
-        video={false}
-        audio={false}
-        token={token}
-        serverUrl={livekitUrl}
-        connectOptions={{ autoSubscribe: false }}
-        options={{ disconnectOnPageLeave: false }}
-        className="flex w-full flex-col items-center"
-      >
-        <RoomAudioRenderer />
-        <StartAudio
-          label={t("enableAudio")}
-          className={cn(buttonVariants(), "mb-4")}
-        />
-        <AttendeeView
-          sessionId={sessionId}
-          expiresAt={expiresAt}
-          onSessionExpired={markExpired}
-        />
-      </LiveKitRoom>
-    </main>
-  );
 }

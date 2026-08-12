@@ -1,12 +1,12 @@
 export interface TranscriptEntry {
-  id: string;
-  text: string;
-  language: string;
-  final: boolean;
-  timestamp: number;
+    id: string;
+    text: string;
+    language: string;
+    final: boolean;
+    timestamp: number;
 }
 
 export type WatchError = {
-  kind: "ended" | "inactive" | "generic";
-  message: string;
+    kind: "ended" | "inactive" | "generic";
+    message: string;
 };

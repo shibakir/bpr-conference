@@ -3,55 +3,53 @@
 import { useEffect, useState } from "react";
 
 type NavigatorWithWakeLock = Navigator & {
-  wakeLock: {
-    request: (type: "screen") => Promise<WakeLockSentinel>;
-  };
+    wakeLock: {
+        request: (type: "screen") => Promise<WakeLockSentinel>;
+    };
 };
 
 export function useWakeLock() {
-  const [isWakeLockActive, setIsWakeLockActive] = useState(false);
+    const [isWakeLockActive, setIsWakeLockActive] = useState(false);
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !("wakeLock" in navigator)) {
-      return;
-    }
+    useEffect(() => {
+        if (typeof window === "undefined" || !("wakeLock" in navigator)) {
+            return;
+        }
 
-    let wakeLock: WakeLockSentinel | null = null;
+        let wakeLock: WakeLockSentinel | null = null;
 
-    async function requestWakeLock() {
-      try {
-        wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request(
-          "screen"
-        );
-        setIsWakeLockActive(true);
+        async function requestWakeLock() {
+            try {
+                wakeLock = await (navigator as NavigatorWithWakeLock).wakeLock.request("screen");
+                setIsWakeLockActive(true);
 
-        wakeLock.addEventListener("release", () => {
-          setIsWakeLockActive(false);
-        });
-      } catch (err) {
-        console.error("Failed to acquire Screen Wake Lock:", err);
-      }
-    }
+                wakeLock.addEventListener("release", () => {
+                    setIsWakeLockActive(false);
+                });
+            } catch (err) {
+                console.error("Failed to acquire Screen Wake Lock:", err);
+            }
+        }
 
-    void requestWakeLock();
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "visible" && !wakeLock) {
         void requestWakeLock();
-      }
-    };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === "visible" && !wakeLock) {
+                void requestWakeLock();
+            }
+        };
 
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      if (wakeLock) {
-        wakeLock.release().catch((err: unknown) => {
-          console.error("Failed to release Screen Wake Lock:", err);
-        });
-      }
-    };
-  }, []);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
 
-  return isWakeLockActive;
+        return () => {
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            if (wakeLock) {
+                wakeLock.release().catch((err: unknown) => {
+                    console.error("Failed to release Screen Wake Lock:", err);
+                });
+            }
+        };
+    }, []);
+
+    return isWakeLockActive;
 }
