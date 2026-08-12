@@ -4,26 +4,64 @@ import { useCallback, useEffect, useState } from "react";
 
 const STORAGE_KEY = "watch_caption_window_preferences";
 
+export const CAPTION_FONT_OPTIONS = [
+  {
+    value: "geist",
+    label: "Geist",
+    css: '"Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif',
+  },
+  {
+    value: "system",
+    label: "System UI",
+    css: 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  },
+  {
+    value: "arial",
+    label: "Arial",
+    css: 'Arial, "Helvetica Neue", Helvetica, sans-serif',
+  },
+  {
+    value: "verdana",
+    label: "Verdana",
+    css: "Verdana, Geneva, sans-serif",
+  },
+  {
+    value: "georgia",
+    label: "Georgia",
+    css: "Georgia, serif",
+  },
+  {
+    value: "times",
+    label: "Times New Roman",
+    css: '"Times New Roman", Times, serif',
+  },
+  {
+    value: "courier",
+    label: "Courier New",
+    css: '"Courier New", Courier, monospace',
+  },
+] as const;
+
+export type CaptionFontFamily = (typeof CAPTION_FONT_OPTIONS)[number]["value"];
+
 export type CaptionWindowSettings = {
   backgroundColor: string;
   backgroundOpacity: number;
   textColor: string;
+  fontFamily: CaptionFontFamily;
   fontSize: number;
   lineHeight: number;
   maxLines: number;
-  width: number;
-  height: number;
 };
 
 const DEFAULT_SETTINGS: CaptionWindowSettings = {
   backgroundColor: "#000000",
   backgroundOpacity: 78,
   textColor: "#ffffff",
+  fontFamily: "geist",
   fontSize: 28,
   lineHeight: 1.35,
   maxLines: 20,
-  width: 720,
-  height: 360,
 };
 
 const LIMITS = {
@@ -31,8 +69,6 @@ const LIMITS = {
   fontSize: { min: 16, max: 56 },
   lineHeight: { min: 1.1, max: 1.8 },
   maxLines: { min: 2, max: 40 },
-  width: { min: 360, max: 1280 },
-  height: { min: 180, max: 720 },
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -45,6 +81,12 @@ function normalizeHexColor(value: unknown, fallback: string): string {
   return /^#[0-9a-f]{6}$/i.test(value)
     ? value.toLowerCase()
     : fallback;
+}
+
+function normalizeFontFamily(value: unknown): CaptionFontFamily {
+  return CAPTION_FONT_OPTIONS.some((option) => option.value === value)
+    ? (value as CaptionFontFamily)
+    : DEFAULT_SETTINGS.fontFamily;
 }
 
 function normalizeBackgroundColor(
@@ -89,6 +131,7 @@ function normalizeSettings(value: unknown): CaptionWindowSettings {
       )
     ),
     textColor: normalizeHexColor(candidate.textColor, DEFAULT_SETTINGS.textColor),
+    fontFamily: normalizeFontFamily(candidate.fontFamily),
     fontSize: Math.round(
       clamp(
         Number(candidate.fontSize ?? DEFAULT_SETTINGS.fontSize),
@@ -109,20 +152,6 @@ function normalizeSettings(value: unknown): CaptionWindowSettings {
         Number(candidate.maxLines ?? DEFAULT_SETTINGS.maxLines),
         LIMITS.maxLines.min,
         LIMITS.maxLines.max
-      )
-    ),
-    width: Math.round(
-      clamp(
-        Number(candidate.width ?? DEFAULT_SETTINGS.width),
-        LIMITS.width.min,
-        LIMITS.width.max
-      )
-    ),
-    height: Math.round(
-      clamp(
-        Number(candidate.height ?? DEFAULT_SETTINGS.height),
-        LIMITS.height.min,
-        LIMITS.height.max
       )
     ),
   };
@@ -146,6 +175,13 @@ export function getCaptionBackground(settings: CaptionWindowSettings): string {
   const g = (value >> 8) & 255;
   const b = value & 255;
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function getCaptionFontCssValue(fontFamily: CaptionFontFamily): string {
+  return (
+    CAPTION_FONT_OPTIONS.find((option) => option.value === fontFamily)?.css ??
+    CAPTION_FONT_OPTIONS[0].css
+  );
 }
 
 export function useCaptionWindowPreference() {
