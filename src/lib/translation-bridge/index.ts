@@ -597,7 +597,16 @@ export class TranslationBridge {
           participant.identity === this.organizerIdentity &&
           publication.kind === TrackKind.KIND_AUDIO
         ) {
-          publication.setSubscribed(true);
+          const preferredPublication =
+            this.selectOrganizerAudioPublication(participant);
+
+          if (preferredPublication === publication) {
+            publication.setSubscribed(true);
+          } else {
+            console.log(
+              `[TranslationBridge:${this.targetLanguage}] Ignoring newly published organizer audio ${this.getPublicationLabel(publication)}; preferred=${preferredPublication ? this.getPublicationLabel(preferredPublication) : "none"}`
+            );
+          }
         }
       }
     );
@@ -643,11 +652,7 @@ export class TranslationBridge {
       }
     );
 
-    const audioPublications = Array.from(participant.trackPublications.values())
-      .filter((publication) => publication.kind === TrackKind.KIND_AUDIO);
-    const preferredPublication =
-      audioPublications.find((publication) => publication.name === "broadcast-audio") ??
-      audioPublications[0];
+    const preferredPublication = this.selectOrganizerAudioPublication(participant);
 
     if (!preferredPublication) {
       console.log(
@@ -660,6 +665,33 @@ export class TranslationBridge {
       `[TranslationBridge:${this.targetLanguage}] Subscribing to organizer audio publication ${this.getPublicationLabel(preferredPublication)}`
     );
     preferredPublication.setSubscribed(true);
+  }
+
+  private selectOrganizerAudioPublication(
+    participant: RemoteParticipant
+  ): RemoteTrackPublication | undefined {
+    const audioPublications = Array.from(participant.trackPublications.values())
+      .filter((publication) => publication.kind === TrackKind.KIND_AUDIO);
+    const broadcastPublications = audioPublications.filter(
+      (publication) => publication.name === "broadcast-audio"
+    );
+    const candidates =
+      broadcastPublications.length > 0 ? broadcastPublications : audioPublications;
+
+    if (broadcastPublications.length > 1) {
+      console.warn(
+        `[TranslationBridge:${this.targetLanguage}] Found duplicate organizer broadcast-audio publications:`,
+        broadcastPublications.map((publication) =>
+          this.getPublicationLabel(publication)
+        )
+      );
+    }
+
+    return (
+      candidates.find((publication) => publication.muted === false) ??
+      candidates.find((publication) => publication.muted !== true) ??
+      candidates[0]
+    );
   }
 
   private pipeTrackToGemini(
@@ -722,7 +754,7 @@ export class TranslationBridge {
   }
 
   private getPublicationLabel(publication: RemoteTrackPublication): string {
-    return `sid=${publication.sid || "unknown"}, name=${publication.name || "unnamed"}`;
+    return `sid=${publication.sid || "unknown"}, name=${publication.name || "unnamed"}, muted=${publication.muted ?? "unknown"}, subscribed=${publication.subscribed}`;
   }
 
   private sendAudioToGemini(frame: AudioFrame): void {

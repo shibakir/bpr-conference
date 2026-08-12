@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import { Track, type LocalTrackPublication, type Room } from "livekit-client";
 
 type WindowWithWebkitAudioContext = Window &
@@ -14,6 +14,89 @@ function stopStream(stream: MediaStream | null) {
 
 function disconnectNode(node: AudioNode | null) {
   node?.disconnect();
+}
+
+const BROADCAST_AUDIO_TRACK_NAME = "broadcast-audio";
+const mixerGenerationByRoom = new WeakMap<Room, number>();
+
+function nextMixerGeneration(room: Room) {
+  const generation = (mixerGenerationByRoom.get(room) ?? 0) + 1;
+  mixerGenerationByRoom.set(room, generation);
+  return generation;
+}
+
+function isCurrentMixerGeneration(room: Room, generation: number) {
+  return mixerGenerationByRoom.get(room) === generation;
+}
+
+function isBroadcastAudioPublication(pub: LocalTrackPublication) {
+  return (
+    pub.kind === Track.Kind.Audio &&
+    pub.trackName === BROADCAST_AUDIO_TRACK_NAME
+  );
+}
+
+function getBroadcastAudioPublications(room: Room) {
+  return Array.from(room.localParticipant?.trackPublications.values() ?? [])
+    .filter(isBroadcastAudioPublication);
+}
+
+async function unpublishBroadcastAudioPublication(
+  room: Room,
+  pub: LocalTrackPublication,
+  reason: string
+) {
+  if (!room.localParticipant || !pub.track) return;
+
+  try {
+    await room.localParticipant.unpublishTrack(pub.track, true);
+    console.log(
+      `[BroadcastControls] Unpublished ${reason} ${BROADCAST_AUDIO_TRACK_NAME} track:`,
+      pub.trackSid
+    );
+  } catch (err) {
+    console.error(
+      `[BroadcastControls] Failed to unpublish ${reason} ${BROADCAST_AUDIO_TRACK_NAME} track:`,
+      err
+    );
+  }
+}
+
+async function unpublishExtraBroadcastAudioPublications(
+  room: Room,
+  keep?: LocalTrackPublication
+) {
+  const extraPublications = getBroadcastAudioPublications(room)
+    .filter((pub) => pub !== keep);
+
+  if (extraPublications.length === 0) return;
+
+  console.warn(
+    `[BroadcastControls] Removing ${extraPublications.length} stale ${BROADCAST_AUDIO_TRACK_NAME} publication(s)`,
+    extraPublications.map((pub) => ({
+      muted: pub.isMuted,
+      sid: pub.trackSid,
+    }))
+  );
+
+  await Promise.all(
+    extraPublications.map((pub) =>
+      unpublishBroadcastAudioPublication(room, pub, "stale")
+    )
+  );
+}
+
+function clearRefIfCurrent<T>(
+  ref: MutableRefObject<T | null>,
+  current: T | null
+) {
+  if (current && ref.current === current) {
+    ref.current = null;
+  }
+}
+
+function closeAudioContext(ctx: AudioContext | null) {
+  ctx?.close().catch(() => {});
 }
 
 export function useBroadcastAudioMixer({
@@ -42,13 +125,27 @@ export function useBroadcastAudioMixer({
   const tabSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const tabGainNodeRef = useRef<GainNode | null>(null);
   const publishedTrackPubRef = useRef<LocalTrackPublication | null>(null);
+  const isMicEnabledRef = useRef(isMicEnabled);
+  const isTabAudioEnabledRef = useRef(isTabAudioEnabled);
+
+  useEffect(() => {
+    isMicEnabledRef.current = isMicEnabled;
+  }, [isMicEnabled]);
+
+  useEffect(() => {
+    isTabAudioEnabledRef.current = isTabAudioEnabled;
+  }, [isTabAudioEnabled]);
 
   useEffect(() => {
     if (!room || !room.localParticipant) return;
 
     const localRoom = room;
+    const generation = nextMixerGeneration(localRoom);
     let active = true;
     let localPub: LocalTrackPublication | null = null;
+    let localAudioContext: AudioContext | null = null;
+    let localDestinationNode: MediaStreamAudioDestinationNode | null = null;
+    let localMixedTrack: MediaStreamTrack | null = null;
 
     async function initAudio() {
       try {
@@ -61,23 +158,57 @@ export function useBroadcastAudioMixer({
         }
 
         const ctx = new AudioContextClass();
-        audioContextRef.current = ctx;
+        localAudioContext = ctx;
+        if (!active || !isCurrentMixerGeneration(localRoom, generation)) {
+          closeAudioContext(ctx);
+          return;
+        }
 
         const dest = ctx.createMediaStreamDestination();
-        destinationNodeRef.current = dest;
+        localDestinationNode = dest;
 
         const mixedTrack = dest.stream.getAudioTracks()[0];
+        localMixedTrack = mixedTrack;
+
+        audioContextRef.current = ctx;
+        destinationNodeRef.current = dest;
 
         if (active && localRoom.localParticipant) {
+          await unpublishExtraBroadcastAudioPublications(localRoom);
+
+          if (!active || !isCurrentMixerGeneration(localRoom, generation)) {
+            mixedTrack.stop();
+            closeAudioContext(ctx);
+            return;
+          }
+
           const pub = await localRoom.localParticipant.publishTrack(mixedTrack, {
-            name: "broadcast-audio",
+            name: BROADCAST_AUDIO_TRACK_NAME,
             source: Track.Source.Microphone,
           });
-          publishedTrackPubRef.current = pub;
           localPub = pub;
-          await pub.mute();
+
+          if (!active || !isCurrentMixerGeneration(localRoom, generation)) {
+            await unpublishBroadcastAudioPublication(
+              localRoom,
+              pub,
+              "superseded"
+            );
+            mixedTrack.stop();
+            closeAudioContext(ctx);
+            return;
+          }
+
+          publishedTrackPubRef.current = pub;
+          if (isMicEnabledRef.current || isTabAudioEnabledRef.current) {
+            await pub.unmute();
+          } else {
+            await pub.mute();
+          }
+          await unpublishExtraBroadcastAudioPublications(localRoom, pub);
+
           console.log(
-            "Published and initially muted mixed audio track:",
+            "Published mixed audio track:",
             pub.trackSid
           );
         }
@@ -90,28 +221,33 @@ export function useBroadcastAudioMixer({
 
     return () => {
       active = false;
-      if (localPub?.track && localRoom.localParticipant) {
-        localRoom.localParticipant.unpublishTrack(localPub.track).catch((err) => {
-          console.error("Failed to unpublish mixed track:", err);
-        });
+      if (localPub) {
+        void unpublishBroadcastAudioPublication(localRoom, localPub, "mixed");
       }
 
-      stopStream(micStreamRef.current);
-      micStreamRef.current = null;
-      disconnectNode(micSourceNodeRef.current);
-      micSourceNodeRef.current = null;
-      disconnectNode(micGainNodeRef.current);
-      micGainNodeRef.current = null;
-      stopStream(tabStreamRef.current);
-      tabStreamRef.current = null;
-      disconnectNode(tabSourceNodeRef.current);
-      tabSourceNodeRef.current = null;
-      disconnectNode(tabGainNodeRef.current);
-      tabGainNodeRef.current = null;
-      audioContextRef.current?.close().catch(() => {});
-      audioContextRef.current = null;
-      destinationNodeRef.current = null;
-      publishedTrackPubRef.current = null;
+      if (micSourceNodeRef.current?.context === localAudioContext) {
+        stopStream(micStreamRef.current);
+        micStreamRef.current = null;
+        disconnectNode(micSourceNodeRef.current);
+        micSourceNodeRef.current = null;
+        disconnectNode(micGainNodeRef.current);
+        micGainNodeRef.current = null;
+      }
+      if (tabSourceNodeRef.current?.context === localAudioContext) {
+        stopStream(tabStreamRef.current);
+        tabStreamRef.current = null;
+        disconnectNode(tabSourceNodeRef.current);
+        tabSourceNodeRef.current = null;
+        disconnectNode(tabGainNodeRef.current);
+        tabGainNodeRef.current = null;
+      }
+      clearRefIfCurrent(audioContextRef, localAudioContext);
+      clearRefIfCurrent(destinationNodeRef, localDestinationNode);
+      clearRefIfCurrent(publishedTrackPubRef, localPub);
+      closeAudioContext(localAudioContext);
+      if (!localPub) {
+        localMixedTrack?.stop();
+      }
     };
   }, [room]);
 
