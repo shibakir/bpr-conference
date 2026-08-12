@@ -5,11 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 const STORAGE_KEY = "watch_caption_window_preferences";
 
 export type CaptionWindowSettings = {
-  background: {
-    r: number;
-    g: number;
-    b: number;
-  };
+  backgroundColor: string;
   backgroundOpacity: number;
   textColor: string;
   fontSize: number;
@@ -20,11 +16,7 @@ export type CaptionWindowSettings = {
 };
 
 const DEFAULT_SETTINGS: CaptionWindowSettings = {
-  background: {
-    r: 0,
-    g: 0,
-    b: 0,
-  },
+  backgroundColor: "#000000",
   backgroundOpacity: 78,
   textColor: "#ffffff",
   fontSize: 28,
@@ -35,7 +27,6 @@ const DEFAULT_SETTINGS: CaptionWindowSettings = {
 };
 
 const LIMITS = {
-  color: { min: 0, max: 255 },
   opacity: { min: 0, max: 100 },
   fontSize: { min: 16, max: 56 },
   lineHeight: { min: 1.1, max: 1.8 },
@@ -49,9 +40,37 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeHexColor(value: unknown): string {
-  if (typeof value !== "string") return DEFAULT_SETTINGS.textColor;
-  return /^#[0-9a-f]{6}$/i.test(value) ? value : DEFAULT_SETTINGS.textColor;
+function normalizeHexColor(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  return /^#[0-9a-f]{6}$/i.test(value)
+    ? value.toLowerCase()
+    : fallback;
+}
+
+function normalizeBackgroundColor(
+  candidate: Partial<CaptionWindowSettings> & {
+    background?: { r?: unknown; g?: unknown; b?: unknown };
+  }
+): string {
+  if (typeof candidate.backgroundColor === "string") {
+    return normalizeHexColor(
+      candidate.backgroundColor,
+      DEFAULT_SETTINGS.backgroundColor
+    );
+  }
+
+  const background = candidate.background;
+  if (!background || typeof background !== "object") {
+    return DEFAULT_SETTINGS.backgroundColor;
+  }
+
+  return `#${(["r", "g", "b"] as const)
+    .map((channel) =>
+      Math.round(clamp(Number(background[channel]), 0, 255))
+        .toString(16)
+        .padStart(2, "0")
+    )
+    .join("")}`;
 }
 
 function normalizeSettings(value: unknown): CaptionWindowSettings {
@@ -59,23 +78,9 @@ function normalizeSettings(value: unknown): CaptionWindowSettings {
     value && typeof value === "object"
       ? (value as Partial<CaptionWindowSettings>)
       : {};
-  const background =
-    candidate.background && typeof candidate.background === "object"
-      ? candidate.background
-      : DEFAULT_SETTINGS.background;
 
   return {
-    background: {
-      r: Math.round(
-        clamp(Number(background.r), LIMITS.color.min, LIMITS.color.max)
-      ),
-      g: Math.round(
-        clamp(Number(background.g), LIMITS.color.min, LIMITS.color.max)
-      ),
-      b: Math.round(
-        clamp(Number(background.b), LIMITS.color.min, LIMITS.color.max)
-      ),
-    },
+    backgroundColor: normalizeBackgroundColor(candidate),
     backgroundOpacity: Math.round(
       clamp(
         Number(candidate.backgroundOpacity ?? DEFAULT_SETTINGS.backgroundOpacity),
@@ -83,7 +88,7 @@ function normalizeSettings(value: unknown): CaptionWindowSettings {
         LIMITS.opacity.max
       )
     ),
-    textColor: normalizeHexColor(candidate.textColor),
+    textColor: normalizeHexColor(candidate.textColor, DEFAULT_SETTINGS.textColor),
     fontSize: Math.round(
       clamp(
         Number(candidate.fontSize ?? DEFAULT_SETTINGS.fontSize),
@@ -136,7 +141,11 @@ function readStoredSettings(): CaptionWindowSettings {
 
 export function getCaptionBackground(settings: CaptionWindowSettings): string {
   const alpha = settings.backgroundOpacity / 100;
-  return `rgba(${settings.background.r}, ${settings.background.g}, ${settings.background.b}, ${alpha})`;
+  const value = Number.parseInt(settings.backgroundColor.slice(1), 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function useCaptionWindowPreference() {
@@ -158,21 +167,6 @@ export function useCaptionWindowPreference() {
     []
   );
 
-  const updateBackground = useCallback(
-    (channel: keyof CaptionWindowSettings["background"], value: number) => {
-      setSettings((prev) =>
-        normalizeSettings({
-          ...prev,
-          background: {
-            ...prev.background,
-            [channel]: value,
-          },
-        })
-      );
-    },
-    []
-  );
-
   const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
   }, []);
@@ -181,7 +175,6 @@ export function useCaptionWindowPreference() {
     settings,
     limits: LIMITS,
     updateSettings,
-    updateBackground,
     resetSettings,
   };
 }

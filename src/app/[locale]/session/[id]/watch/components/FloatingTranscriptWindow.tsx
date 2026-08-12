@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { ColorPicker } from "@/components/ui/color-picker";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
@@ -179,8 +179,15 @@ function prepareDocumentPipWindow(
   title: string
 ): HTMLElement {
   const pipDocument = pipWindow.document;
+  const sourceStyles = document.querySelectorAll(
+    'link[rel="stylesheet"], style'
+  );
+
   pipDocument.title = title;
   pipDocument.head.innerHTML = "";
+  sourceStyles.forEach((node) => {
+    pipDocument.head.append(node.cloneNode(true));
+  });
   pipDocument.body.innerHTML = "";
   pipDocument.documentElement.style.background = "transparent";
   pipDocument.body.style.margin = "0";
@@ -197,18 +204,28 @@ function prepareDocumentPipWindow(
 function CaptionSurface({
   emptyMessage,
   fill,
+  limits,
+  modeLabel,
   onClose,
+  onReset,
+  onSettingsChange,
   paragraphs,
   settings,
   title,
 }: {
   emptyMessage: string;
   fill?: boolean;
+  limits: ReturnType<typeof useCaptionWindowPreference>["limits"];
+  modeLabel: string;
   onClose?: () => void;
+  onReset: () => void;
+  onSettingsChange: (patch: Partial<CaptionWindowSettings>) => void;
   paragraphs: CaptionParagraph[];
   settings: CaptionWindowSettings;
   title: string;
 }) {
+  const t = useTranslations("Watch");
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const lineHeightPx = settings.fontSize * settings.lineHeight;
   const textWrapRef = useRef<HTMLDivElement | null>(null);
   const maxCaptionHeight = Math.max(
@@ -238,6 +255,7 @@ function CaptionSurface({
     flexDirection: "column",
     fontFamily: CAPTION_FONT_FAMILY,
     overflow: "hidden",
+    position: "relative",
     borderRadius: fill ? 0 : 8,
     border: fill ? "none" : "1px solid rgba(255, 255, 255, 0.18)",
     boxShadow: fill ? "none" : "0 20px 60px rgba(0, 0, 0, 0.35)",
@@ -271,6 +289,7 @@ function CaptionSurface({
     overflowX: "hidden",
     overflowY: "hidden",
     scrollBehavior: "auto",
+    width: "100%",
   };
   const paragraphStyle: CSSProperties = {
     fontSize: settings.fontSize,
@@ -298,22 +317,49 @@ function CaptionSurface({
     padding: 0,
     width: 24,
   };
+  const actionGroupStyle: CSSProperties = {
+    alignItems: "center",
+    display: "flex",
+    gap: 6,
+  };
 
   return (
     <div style={surfaceStyle}>
       <div style={headerStyle}>
         <span>{title}</span>
-        {onClose && (
+        <span style={actionGroupStyle}>
           <button
             type="button"
-            onClick={onClose}
-            aria-label={title}
+            onClick={() => setSettingsOpen((open) => !open)}
+            aria-expanded={settingsOpen}
+            aria-label={t("captionSettings")}
+            title={t("captionSettings")}
             style={closeStyle}
           >
-            <XIcon size={14} />
+            <Settings2Icon size={14} />
           </button>
-        )}
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={title}
+              style={closeStyle}
+            >
+              <XIcon size={14} />
+            </button>
+          )}
+        </span>
       </div>
+      {settingsOpen && (
+        <CaptionSettingsPanel
+          limits={limits}
+          modeLabel={modeLabel}
+          onClose={() => setSettingsOpen(false)}
+          onReset={onReset}
+          onSettingsChange={onSettingsChange}
+          settings={settings}
+        />
+      )}
       <div style={bodyStyle}>
         <div ref={textWrapRef} style={textWrapStyle}>
           {paragraphs.length === 0 ? (
@@ -371,7 +417,6 @@ export function FloatingTranscriptWindow({
     limits,
     resetSettings,
     settings,
-    updateBackground,
     updateSettings,
   } = useCaptionWindowPreference();
   const [mode, setMode] = useState<CaptionMode | null>(null);
@@ -381,7 +426,6 @@ export function FloatingTranscriptWindow({
   const [documentPipWindow, setDocumentPipWindow] = useState<Window | null>(
     null
   );
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -583,34 +627,15 @@ export function FloatingTranscriptWindow({
         </span>
       </Button>
 
-      <Button
-        type="button"
-        variant={settingsOpen ? "secondary" : "outline"}
-        size="icon-xs"
-        onClick={() => setSettingsOpen((open) => !open)}
-        title={t("captionSettings")}
-        aria-label={t("captionSettings")}
-      >
-        <Settings2Icon className="size-3" />
-      </Button>
-
-      {settingsOpen && (
-        <CaptionSettingsPanel
-          limits={limits}
-          modeLabel={modeLabel}
-          onBackgroundChange={updateBackground}
-          onClose={() => setSettingsOpen(false)}
-          onReset={resetSettings}
-          onSettingsChange={updateSettings}
-          settings={settings}
-        />
-      )}
-
       {mode === "inline" && (
         <div className="fixed right-4 bottom-4 z-50 max-w-[calc(100vw-2rem)] overflow-hidden">
           <CaptionSurface
             emptyMessage={emptyMessage}
+            limits={limits}
+            modeLabel={modeLabel}
             onClose={() => void closeFloatingWindow()}
+            onReset={resetSettings}
+            onSettingsChange={updateSettings}
             paragraphs={paragraphs}
             settings={settings}
             title={title}
@@ -624,7 +649,11 @@ export function FloatingTranscriptWindow({
           <CaptionSurface
             emptyMessage={emptyMessage}
             fill
+            limits={limits}
+            modeLabel={modeLabel}
             onClose={() => void closeFloatingWindow()}
+            onReset={resetSettings}
+            onSettingsChange={updateSettings}
             paragraphs={paragraphs}
             settings={settings}
             title={title}
@@ -651,7 +680,6 @@ export function FloatingTranscriptWindow({
 function CaptionSettingsPanel({
   limits,
   modeLabel,
-  onBackgroundChange,
   onClose,
   onReset,
   onSettingsChange,
@@ -659,19 +687,18 @@ function CaptionSettingsPanel({
 }: {
   limits: ReturnType<typeof useCaptionWindowPreference>["limits"];
   modeLabel: string;
-  onBackgroundChange: (
-    channel: keyof CaptionWindowSettings["background"],
-    value: number
-  ) => void;
   onClose: () => void;
   onReset: () => void;
   onSettingsChange: (patch: Partial<CaptionWindowSettings>) => void;
   settings: CaptionWindowSettings;
 }) {
   const t = useTranslations("Watch");
+  const [openColorPicker, setOpenColorPicker] = useState<
+    "background" | "text" | null
+  >(null);
 
   return (
-    <div className="absolute top-8 right-0 z-50 w-[min(88vw,22rem)] rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl">
+    <div className="absolute top-10 right-3 z-50 max-h-[calc(100%-3rem)] w-[min(88vw,22rem)] overflow-y-auto rounded-lg border bg-popover p-3 text-popover-foreground shadow-xl">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div className="grid gap-0.5">
           <span className="text-sm font-medium">{t("captionSettings")}</span>
@@ -690,27 +717,16 @@ function CaptionSettingsPanel({
       </div>
 
       <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label className="text-xs text-muted-foreground">
-            {t("captionBackgroundRgb")}
-          </Label>
-          <div className="grid grid-cols-3 gap-2">
-            {(["r", "g", "b"] as const).map((channel) => (
-              <Input
-                key={channel}
-                type="number"
-                min={limits.color.min}
-                max={limits.color.max}
-                value={settings.background[channel]}
-                onChange={(event) =>
-                  onBackgroundChange(channel, Number(event.target.value))
-                }
-                aria-label={`${t("captionBackgroundRgb")} ${channel.toUpperCase()}`}
-                className="h-7"
-              />
-            ))}
-          </div>
-        </div>
+        <ColorPicker
+          id="caption-background-color"
+          label={t("captionBackgroundColor")}
+          open={openColorPicker === "background"}
+          onOpenChange={(open) =>
+            setOpenColorPicker(open ? "background" : null)
+          }
+          value={settings.backgroundColor}
+          onChange={(value) => onSettingsChange({ backgroundColor: value })}
+        />
 
         <SettingRow
           label={t("captionOpacity")}
@@ -729,20 +745,14 @@ function CaptionSettingsPanel({
           />
         </SettingRow>
 
-        <div className="grid gap-2">
-          <Label htmlFor="caption-text-color" className="text-xs text-muted-foreground">
-            {t("captionTextColor")}
-          </Label>
-          <Input
-            id="caption-text-color"
-            type="color"
-            value={settings.textColor}
-            onChange={(event) =>
-              onSettingsChange({ textColor: event.target.value })
-            }
-            className="h-8 p-1"
-          />
-        </div>
+        <ColorPicker
+          id="caption-text-color"
+          label={t("captionTextColor")}
+          open={openColorPicker === "text"}
+          onOpenChange={(open) => setOpenColorPicker(open ? "text" : null)}
+          value={settings.textColor}
+          onChange={(value) => onSettingsChange({ textColor: value })}
+        />
 
         <SettingRow
           label={t("captionFontSize")}
@@ -785,30 +795,6 @@ function CaptionSettingsPanel({
             value={[settings.maxLines]}
             onValueChange={([value]) =>
               onSettingsChange({ maxLines: value ?? settings.maxLines })
-            }
-          />
-        </SettingRow>
-
-        <SettingRow label={t("captionWidth")} value={`${settings.width}px`}>
-          <Slider
-            min={limits.width.min}
-            max={limits.width.max}
-            step={20}
-            value={[settings.width]}
-            onValueChange={([value]) =>
-              onSettingsChange({ width: value ?? settings.width })
-            }
-          />
-        </SettingRow>
-
-        <SettingRow label={t("captionHeight")} value={`${settings.height}px`}>
-          <Slider
-            min={limits.height.min}
-            max={limits.height.max}
-            step={20}
-            value={[settings.height]}
-            onValueChange={([value]) =>
-              onSettingsChange({ height: value ?? settings.height })
             }
           />
         </SettingRow>

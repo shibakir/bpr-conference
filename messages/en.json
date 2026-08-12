@@ -118,6 +118,7 @@
     "captionInPageFallback": "In-page fallback",
     "captionReady": "Ready",
     "captionBackgroundRgb": "Background RGB",
+    "captionBackgroundColor": "Background color",
     "captionOpacity": "Background opacity",
     "captionTextColor": "Text color",
     "captionFontSize": "Text size",

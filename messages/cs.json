@@ -118,6 +118,7 @@
     "captionInPageFallback": "Plovoucí v této stránce",
     "captionReady": "Připraveno",
     "captionBackgroundRgb": "RGB pozadí",
+    "captionBackgroundColor": "Barva pozadí",
     "captionOpacity": "Průhlednost pozadí",
     "captionTextColor": "Barva textu",
     "captionFontSize": "Velikost textu",
