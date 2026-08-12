@@ -8,6 +8,10 @@
         "dark": "tmavý",
         "switchTheme": "Přepnout motiv na {theme}"
     },
+    "PasswordInput": {
+        "showPassword": "Zobrazit heslo",
+        "hidePassword": "Skrýt heslo"
+    },
     "Header": {
         "liveTranslation": "Živý překlad",
         "language": "Jazyk",

@@ -8,6 +8,7 @@ import { useForm, useWatch } from "react-hook-form";
 import useSWR from "swr";
 
 import { CenteredPage } from "@/components/CenteredPage";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,6 @@ import {
     FieldLegend,
     FieldSet,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -213,9 +213,8 @@ export default function Home() {
                                         <FieldLabel htmlFor="broadcast-password">
                                             {t("passwordPlaceholder")}
                                         </FieldLabel>
-                                        <Input
+                                        <PasswordInput
                                             id="broadcast-password"
-                                            type="password"
                                             autoComplete="new-password"
                                             placeholder={t("passwordPlaceholder")}
                                             disabled={isSubmitting}

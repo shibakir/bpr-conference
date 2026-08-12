@@ -8,6 +8,10 @@
         "dark": "dark",
         "switchTheme": "Switch theme to {theme}"
     },
+    "PasswordInput": {
+        "showPassword": "Show password",
+        "hidePassword": "Hide password"
+    },
     "Header": {
         "liveTranslation": "Live translation",
         "language": "Language",

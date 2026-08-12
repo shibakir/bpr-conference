@@ -5,11 +5,11 @@ import { useTranslations } from "next-intl";
 import { type FormEvent } from "react";
 
 import { CenteredPage } from "@/components/CenteredPage";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
 export function BroadcastPasswordGate({
@@ -46,14 +46,14 @@ export function BroadcastPasswordGate({
                                 <FieldLabel htmlFor="broadcast-password">
                                     {t("passwordPlaceholder")}
                                 </FieldLabel>
-                                <Input
+                                <PasswordInput
                                     id="broadcast-password"
-                                    type="password"
                                     autoComplete="new-password"
                                     placeholder={t("passwordPlaceholder")}
                                     value={localPassword}
                                     onChange={(e) => onPasswordChange(e.target.value)}
                                     disabled={verifying}
+                                    aria-invalid={!!passwordError}
                                     required
                                 />
                             </Field>
