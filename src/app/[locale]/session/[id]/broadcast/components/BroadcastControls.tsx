@@ -7,7 +7,7 @@ import useSWRMutation from "swr/mutation";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FieldGroup, FieldLegend, FieldSet } from "@/components/ui/field";
+import { FieldGroup, FieldSet, FieldTitle } from "@/components/ui/field";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { useRouter } from "@/i18n/navigation";
 import { fetchValidatedJson } from "@/lib/api-client";
@@ -103,7 +103,7 @@ export function BroadcastControls({
                         />
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">
-                            <FieldLegend variant="label">{t("audioSources")}</FieldLegend>
+                            <FieldTitle>{t("audioSources")}</FieldTitle>
                             <div className="grid gap-3">
                                 <AudioInputCard
                                     title={t("microphone")}

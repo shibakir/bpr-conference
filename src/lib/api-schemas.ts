@@ -70,7 +70,9 @@ export const createSessionFormSchema = z.object({
     langSearch: z.string(),
     password: z.string(),
     selectedLanguages: z.array(z.string()).min(1),
-    translationOutputs: z.array(translationOutputModeSchema).min(1),
+    translationOutputs: z.array(translationOutputModeSchema).min(1, {
+        message: "Select at least one option.",
+    }),
 });
 
 export type CreateSessionFormValues = z.infer<typeof createSessionFormSchema>;

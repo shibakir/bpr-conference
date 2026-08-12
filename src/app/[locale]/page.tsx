@@ -30,8 +30,8 @@ import {
     FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useRouter } from "@/i18n/navigation";
@@ -47,8 +47,8 @@ import { clientLogger } from "@/lib/client-logger";
 import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
     DEFAULT_SESSION_DURATION_MINUTES,
-    MAX_SESSION_DURATION_MINUTES,
-    MIN_SESSION_DURATION_MINUTES,
+    formatSessionDurationLabel,
+    SESSION_DURATION_OPTIONS_MINUTES,
 } from "@/lib/session-duration";
 import { TRANSLATION_OUTPUT_MODES, type TranslationOutputMode } from "@/lib/session-types";
 import { cn } from "@/lib/utils";
@@ -102,6 +102,7 @@ export default function Home() {
     });
     const durationMinutes =
         useWatch({ control, name: "durationMinutes" }) ?? DEFAULT_SESSION_DURATION_MINUTES;
+    const durationLabel = formatSessionDurationLabel(durationMinutes, locale);
     const translationOutputs =
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const selectedLanguages =
@@ -238,26 +239,33 @@ export default function Home() {
                                             variant="secondary"
                                             className="font-mono tabular-nums"
                                         >
-                                            {t("durationValue", { count: durationMinutes })}
+                                            {durationLabel}
                                         </Badge>
                                     </div>
-                                    <Slider
+                                    <NativeSelect
                                         id="session-duration"
+                                        className="w-full"
                                         aria-label={t("duration")}
                                         aria-invalid={!!errors.durationMinutes}
-                                        value={[durationMinutes]}
-                                        min={MIN_SESSION_DURATION_MINUTES}
-                                        max={MAX_SESSION_DURATION_MINUTES}
-                                        step={1}
-                                        onValueChange={(value) =>
+                                        value={String(durationMinutes)}
+                                        onChange={(event) =>
                                             setValue(
                                                 "durationMinutes",
-                                                value[0] ?? DEFAULT_SESSION_DURATION_MINUTES,
+                                                Number(event.target.value),
                                                 FORM_UPDATE_OPTIONS,
                                             )
                                         }
                                         disabled={isSubmitting}
-                                    />
+                                    >
+                                        {SESSION_DURATION_OPTIONS_MINUTES.map((duration) => (
+                                            <NativeSelectOption
+                                                key={duration}
+                                                value={String(duration)}
+                                            >
+                                                {formatSessionDurationLabel(duration, locale)}
+                                            </NativeSelectOption>
+                                        ))}
+                                    </NativeSelect>
                                     <FieldDescription>{t("durationDescription")}</FieldDescription>
                                     <FieldError errors={[errors.durationMinutes]} />
                                 </FieldSet>
@@ -309,7 +317,7 @@ export default function Home() {
                                                     key={option.value}
                                                     value={option.value}
                                                     aria-label={option.label}
-                                                    className="h-auto min-h-24 w-full items-start justify-start gap-3 whitespace-normal border-transparent bg-muted/35 p-3 text-left shadow-none data-[state=on]:border-primary/70 data-[state=on]:bg-primary/12"
+                                                    className="h-auto min-h-24 w-full items-center justify-start gap-3 whitespace-normal border-transparent bg-muted/35 p-3 text-left shadow-none data-[state=on]:border-primary/70 data-[state=on]:bg-primary/12"
                                                 >
                                                     <span
                                                         className={cn(
@@ -333,12 +341,11 @@ export default function Home() {
                                             );
                                         })}
                                     </ToggleGroup>
-                                    {translationOutputs.length === 0 && (
-                                        <p className="text-xs text-muted-foreground">
-                                            {t("selectAtLeastOneTranslationOutput")}
-                                        </p>
-                                    )}
-                                    <FieldError errors={[errors.translationOutputs]} />
+                                    <FieldError>
+                                        {errors.translationOutputs
+                                            ? t("selectAtLeastOneTranslationOutput")
+                                            : null}
+                                    </FieldError>
                                 </FieldSet>
 
                                 <div className="border-t border-border/35 pt-5">
