@@ -1,70 +1,34 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 
-import { readJsonResponse } from "@/lib/api-request";
+import { fetchValidatedJson } from "@/lib/api-client";
+import { sessionDetailsResponseSchema } from "@/lib/api-schemas";
 import type { InputLanguageMode } from "@/lib/session-types";
 
-type SessionDetailsResponse = {
-  allowedLanguages?: unknown;
-  enableAudioTranslation?: unknown;
-  enableTranscription?: unknown;
-  inputLanguageMode?: unknown;
-  sourceLanguage?: unknown;
-};
+async function fetchSessionDetails(url: string) {
+  return fetchValidatedJson(url, undefined, sessionDetailsResponseSchema);
+}
 
 export function useSessionDetails(sessionId: string) {
-  const [allowedLanguages, setAllowedLanguages] = useState<
-    string[] | undefined
-  >(undefined);
-  const [inputLanguageMode, setInputLanguageMode] =
-    useState<InputLanguageMode>("multi");
-  const [sourceLanguage, setSourceLanguage] = useState<string | undefined>(
-    undefined
+  const { data, isLoading } = useSWR(
+    `/api/sessions/${encodeURIComponent(sessionId)}`,
+    fetchSessionDetails,
+    {
+      revalidateOnFocus: false,
+      shouldRetryOnError: false,
+    },
   );
-  const [enableAudioTranslation, setEnableAudioTranslation] = useState(true);
-  const [enableTranscription, setEnableTranscription] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
-  useEffect(() => {
-    async function fetchSessionDetails() {
-      try {
-        const res = await fetch(`/api/sessions/${sessionId}`);
-        if (res.ok) {
-          const data = await readJsonResponse<SessionDetailsResponse>(res);
-          setAllowedLanguages(
-            Array.isArray(data.allowedLanguages) &&
-              data.allowedLanguages.every((language) => typeof language === "string")
-              ? data.allowedLanguages
-              : undefined
-          );
-          setInputLanguageMode(
-            data.inputLanguageMode === "single" ? "single" : "multi"
-          );
-          setSourceLanguage(
-            typeof data.sourceLanguage === "string"
-              ? data.sourceLanguage
-              : undefined
-          );
-          setEnableAudioTranslation(data.enableAudioTranslation !== false);
-          setEnableTranscription(data.enableTranscription === true);
-        }
-      } catch (err) {
-        console.error("Failed to fetch session details:", err);
-      } finally {
-        setLoaded(true);
-      }
-    }
-
-    void fetchSessionDetails();
-  }, [sessionId]);
+  const inputLanguageMode: InputLanguageMode =
+    data?.inputLanguageMode === "single" ? "single" : "multi";
 
   return {
-    allowedLanguages,
+    allowedLanguages: data?.allowedLanguages,
     inputLanguageMode,
-    sourceLanguage,
-    enableAudioTranslation,
-    enableTranscription,
-    loaded,
+    sourceLanguage: data?.sourceLanguage,
+    enableAudioTranslation: data?.enableAudioTranslation !== false,
+    enableTranscription: data?.enableTranscription === true,
+    loaded: !isLoading,
   };
 }

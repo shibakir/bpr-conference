@@ -1,5 +1,7 @@
 import { AudioFrame, type AudioSource } from "@livekit/rtc-node";
 
+import { createLogger } from "../logger";
+
 type QueuedTranslatedAudioFrame = {
   pcmBuffer: Buffer;
   durationMs: number;
@@ -34,8 +36,17 @@ export class TranslatedAudioOutput {
   private lastBacklogLogAt = 0;
   private lastBacklogWarningAt = 0;
   private lastPublishedAt = 0;
+  private readonly log;
 
-  constructor(private readonly options: TranslatedAudioOutputOptions) {}
+  private readonly options: TranslatedAudioOutputOptions;
+
+  constructor(options: TranslatedAudioOutputOptions) {
+    this.options = options;
+    this.log = createLogger({
+      component: "translated-audio-output",
+      targetLanguage: options.targetLanguage,
+    });
+  }
 
   attach(audioSource: AudioSource): void {
     this.audioSource = audioSource;
@@ -75,17 +86,14 @@ export class TranslatedAudioOutput {
 
       if (!this.isPublishing) {
         this.drain().catch((error) => {
-          console.error(
-            `[TranslationBridge:${this.options.targetLanguage}] Error draining translated audio queue:`,
-            error
+          this.log.error(
+            { err: error },
+            "Error draining translated audio queue",
           );
         });
       }
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.options.targetLanguage}] Error queueing translated audio frame:`,
-        error
-      );
+      this.log.error({ err: error }, "Error queueing translated audio frame");
     }
   }
 
@@ -114,9 +122,9 @@ export class TranslatedAudioOutput {
         this.pendingDurationMs = 0;
       } else if (this.pendingFrames.length > 0) {
         this.drain().catch((error) => {
-          console.error(
-            `[TranslationBridge:${this.options.targetLanguage}] Error restarting translated audio queue drain:`,
-            error
+          this.log.error(
+            { err: error },
+            "Error restarting translated audio queue drain",
           );
         });
       }
@@ -144,8 +152,12 @@ export class TranslatedAudioOutput {
       const now = Date.now();
       this.options.onFramePublished(queuedFrame.receivedAt, now);
       if (this.lastPublishedAt && now - this.lastPublishedAt > 2000) {
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Audio resumed after ${now - this.lastPublishedAt}ms gap (frame #${queuedFrame.sequenceNumber})`
+        this.log.info(
+          {
+            gapMs: now - this.lastPublishedAt,
+            sequenceNumber: queuedFrame.sequenceNumber,
+          },
+          "Translated audio resumed after publish gap",
         );
       }
       this.lastPublishedAt = now;
@@ -153,15 +165,10 @@ export class TranslatedAudioOutput {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       if (message.includes("InvalidState") || message.includes("closed")) {
-        console.warn(
-          `[TranslationBridge:${this.options.targetLanguage}] AudioSource closed — stopping capture`
-        );
+        this.log.warn("AudioSource closed; stopping capture");
         this.audioSource = null;
       } else {
-        console.error(
-          `[TranslationBridge:${this.options.targetLanguage}] Error capturing audio frame:`,
-          error
-        );
+        this.log.error({ err: error }, "Error capturing audio frame");
       }
     }
   }
@@ -222,14 +229,16 @@ export class TranslatedAudioOutput {
     if (now - this.lastBacklogWarningAt < 2000) return;
     this.lastBacklogWarningAt = now;
 
-    console.warn(
-      `[TranslationBridge:${this.options.targetLanguage}] Output audio backlog capped during ${reason}: total=${Math.round(
-        totalBeforeMs
-      )}ms, clearedNative=${Math.round(
-        clearedNativeMs
-      )}ms, droppedPending=${droppedFrames} frames/${Math.round(
-        droppedDurationMs
-      )}ms, remaining=${Math.round(this.getTotalBacklogMs())}ms`
+    this.log.warn(
+      {
+        clearedNativeMs: Math.round(clearedNativeMs),
+        droppedDurationMs: Math.round(droppedDurationMs),
+        droppedFrames,
+        reason,
+        remainingMs: Math.round(this.getTotalBacklogMs()),
+        totalBeforeMs: Math.round(totalBeforeMs),
+      },
+      "Output audio backlog capped",
     );
   }
 
@@ -254,14 +263,16 @@ export class TranslatedAudioOutput {
     this.lastBacklogLogAt = now;
     this.lastLoggedDroppedFrames = this.droppedFrames;
 
-    console.log(
-      `[TranslationBridge:${this.options.targetLanguage}] Output audio backlog: total=${Math.round(
-        totalBacklogMs
-      )}ms, native=${Math.round(nativeQueuedMs)}ms, pending=${Math.round(
-        this.pendingDurationMs
-      )}ms, pendingFrames=${this.pendingFrames.length}, dropped=${
-        this.droppedFrames
-      } frames/${Math.round(this.droppedDurationMs)}ms`
+    this.log.info(
+      {
+        droppedDurationMs: Math.round(this.droppedDurationMs),
+        droppedFrames: this.droppedFrames,
+        nativeQueuedMs: Math.round(nativeQueuedMs),
+        pendingDurationMs: Math.round(this.pendingDurationMs),
+        pendingFrames: this.pendingFrames.length,
+        totalBacklogMs: Math.round(totalBacklogMs),
+      },
+      "Output audio backlog",
     );
   }
 }

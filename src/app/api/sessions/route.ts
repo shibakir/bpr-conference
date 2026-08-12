@@ -1,39 +1,31 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
+import type { z } from "zod";
 
-import { isLocale, type Locale,routing } from "@/i18n/routing";
+import type { Locale } from "@/i18n/routing";
 import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
-import { readJsonObject } from "@/lib/api-request";
+import { parseJsonRequest } from "@/lib/api-request";
+import {
+  createSessionRequestSchema,
+  zodErrorDetails,
+} from "@/lib/api-schemas";
 import { getLanguageByCode } from "@/lib/languages";
+import { createLogger } from "@/lib/logger";
 import { getConfiguredAttendeeOrigin } from "@/lib/public-origin";
 import { getBroadcastPassword } from "@/lib/server-env";
 import {
   MAX_SESSION_DURATION_MINUTES,
   MIN_SESSION_DURATION_MINUTES,
-  parseSessionDurationMinutes,
 } from "@/lib/session-duration";
-import {
-  type InputLanguageMode,
-  isTranslationOutputMode,
-} from "@/lib/session-types";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
-interface CreateSessionRequest {
-  organizerName?: unknown;
-  password?: unknown;
-  eventId?: unknown;
-  locale?: unknown;
-  allowedLanguages?: unknown;
-  inputLanguageMode?: unknown;
-  sourceLanguage?: unknown;
-  translationOutputs?: unknown;
-  enableAudioTranslation?: unknown;
-  enableTranscription?: unknown;
-  enableInputDiagnostics?: unknown;
-  durationMinutes?: unknown;
-}
+const log = createLogger({ route: "/api/sessions" });
 
-function getSessionPath(locale: Locale, sessionId: string, mode: "watch" | "broadcast") {
+function getSessionPath(
+  locale: Locale,
+  sessionId: string,
+  mode: "watch" | "broadcast",
+) {
   return `/${locale}/session/${sessionId}/${mode}`;
 }
 
@@ -44,64 +36,74 @@ function getRequestOrigin(req: NextRequest) {
   return `${protocol}://${host}`;
 }
 
+function hasValidationIssue(error: z.ZodError, field: string) {
+  return error.issues.some((issue) => issue.path[0] === field);
+}
+
+function invalidCreateSessionRequest(error: z.ZodError) {
+  if (hasValidationIssue(error, "durationMinutes")) {
+    return NextResponse.json(
+      apiError(
+        API_ERROR_CODES.INVALID_SESSION_DURATION,
+        `Session duration must be between ${MIN_SESSION_DURATION_MINUTES} and ${MAX_SESSION_DURATION_MINUTES} minutes`,
+        {
+          ...zodErrorDetails(error),
+          min: MIN_SESSION_DURATION_MINUTES,
+          max: MAX_SESSION_DURATION_MINUTES,
+        },
+      ),
+      { status: 400 },
+    );
+  }
+
+  if (hasValidationIssue(error, "locale")) {
+    return NextResponse.json(
+      apiError(
+        API_ERROR_CODES.INVALID_LOCALE,
+        "Invalid locale",
+        zodErrorDetails(error),
+      ),
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json(
+    apiError(
+      API_ERROR_CODES.INVALID_REQUEST,
+      "Invalid session request",
+      zodErrorDetails(error),
+    ),
+    { status: 400 },
+  );
+}
+
 // POST /api/sessions — Create a new broadcast session
 export async function POST(req: NextRequest) {
   try {
-    const body: CreateSessionRequest = await readJsonObject(req);
-    const organizerName = typeof body.organizerName === "string" ? body.organizerName : "organizer";
-    const password = body.password;
-    const eventId = body.eventId;
-    let locale: Locale = routing.defaultLocale;
-    const durationMinutes = parseSessionDurationMinutes(body.durationMinutes);
-
-    if (durationMinutes === undefined) {
-      return NextResponse.json(
-        apiError(
-          API_ERROR_CODES.INVALID_SESSION_DURATION,
-          `Session duration must be between ${MIN_SESSION_DURATION_MINUTES} and ${MAX_SESSION_DURATION_MINUTES} minutes`,
-          {
-            min: MIN_SESSION_DURATION_MINUTES,
-            max: MAX_SESSION_DURATION_MINUTES,
-          }
-        ),
-        { status: 400 }
-      );
+    const parsed = await parseJsonRequest(req, createSessionRequestSchema);
+    if (!parsed.success) {
+      return invalidCreateSessionRequest(parsed.error);
     }
 
-    if (body.locale !== undefined) {
-      if (typeof body.locale !== "string" || !isLocale(body.locale)) {
-        return NextResponse.json(
-          apiError(API_ERROR_CODES.INVALID_LOCALE, "Invalid locale"),
-          { status: 400 }
-        );
-      }
-
-      locale = body.locale;
-    }
-
-    if (
-      body.inputLanguageMode !== undefined &&
-      body.inputLanguageMode !== "single" &&
-      body.inputLanguageMode !== "multi"
-    ) {
-      return NextResponse.json(
-        apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid input language mode"),
-        { status: 400 }
-      );
-    }
-
-    const inputLanguageMode: InputLanguageMode =
-      body.inputLanguageMode === "single" ? "single" : "multi";
+    const body = parsed.data;
+    const {
+      durationMinutes,
+      eventId,
+      inputLanguageMode,
+      locale,
+      organizerName,
+      password,
+    } = body;
     let sourceLanguage: string | undefined = undefined;
 
     if (inputLanguageMode === "single") {
-      if (typeof body.sourceLanguage !== "string") {
+      if (!body.sourceLanguage) {
         return NextResponse.json(
           apiError(
             API_ERROR_CODES.INVALID_SOURCE_LANGUAGE,
-            "Invalid source language"
+            "Invalid source language",
           ),
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -110,9 +112,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(
           apiError(
             API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE,
-            "Unsupported source language"
+            "Unsupported source language",
           ),
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -123,23 +125,7 @@ export async function POST(req: NextRequest) {
     let enableTranscription = body.enableTranscription === true;
 
     if (body.translationOutputs !== undefined) {
-      if (!Array.isArray(body.translationOutputs)) {
-        return NextResponse.json(
-          apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid translation outputs"),
-          { status: 400 }
-        );
-      }
-
-      if (!body.translationOutputs.every(isTranslationOutputMode)) {
-        return NextResponse.json(
-          apiError(API_ERROR_CODES.INVALID_REQUEST, "Invalid translation outputs"),
-          { status: 400 }
-        );
-      }
-
-      const translationOutputs = Array.from(
-        new Set(body.translationOutputs)
-      );
+      const translationOutputs = Array.from(new Set(body.translationOutputs));
 
       enableAudioTranslation = translationOutputs.includes("audio");
       enableTranscription = translationOutputs.includes("text");
@@ -165,12 +151,12 @@ export async function POST(req: NextRequest) {
     if (expectedPassword && password !== expectedPassword) {
       return NextResponse.json(
         apiError(API_ERROR_CODES.INCORRECT_PASSWORD, "Incorrect password"),
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     let sessionId: string;
-    if (eventId && typeof eventId === "string" && eventId.trim().length > 0) {
+    if (eventId && eventId.trim().length > 0) {
       // Sanitize: lowercase, replace spaces/special chars with hyphens, allow alphanumeric, -, _
       sessionId = eventId
         .trim()
@@ -191,7 +177,10 @@ export async function POST(req: NextRequest) {
 
     // Clean up any stale translations/livekit rooms or translator bots from previous sessions under the same ID
     if (manager.hasSession(sessionId)) {
-      console.log(`[SessionsAPI] Overwriting existing session ${sessionId}. Tearing down previous bridges...`);
+      log.info(
+        { sessionId },
+        "Overwriting existing session; tearing down previous bridges",
+      );
       await manager.removeAllTranslations(sessionId);
     }
 
@@ -220,8 +209,8 @@ export async function POST(req: NextRequest) {
       enableTranscription,
       enableInputDiagnostics,
       translationOutputs: [
-        ...(enableAudioTranslation ? ["audio"] : []),
-        ...(enableTranscription ? ["text"] : []),
+      ...(enableAudioTranslation ? ["audio"] : []),
+      ...(enableTranscription ? ["text"] : []),
       ],
       durationMinutes,
       expiresAt: session?.expiresAt.toISOString(),
@@ -229,10 +218,10 @@ export async function POST(req: NextRequest) {
       broadcastUrl: `${requestOrigin}${getSessionPath(locale, sessionId, "broadcast")}`,
     });
   } catch (error) {
-    console.error("Error creating session:", error);
+    log.error({ err: error }, "Error creating session");
     return NextResponse.json(
       apiError(API_ERROR_CODES.CREATE_SESSION_FAILED, "Failed to create session"),
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

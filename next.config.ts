@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
   //allowedDevOrigins: ["192.168.0.*"],
   output: "standalone",
   serverExternalPackages: ["@livekit/rtc-node", "ws"],
+  transpilePackages: ["@t3-oss/env-core", "@t3-oss/env-nextjs"],
 };
 
 const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");

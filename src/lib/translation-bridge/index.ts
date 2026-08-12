@@ -24,6 +24,7 @@ import {
   TrackSource,
 } from "@livekit/rtc-node";
 
+import { createLogger } from "../logger";
 import {
   GeminiLiveConnection,
   type GeminiServerMessage,
@@ -133,6 +134,7 @@ export class TranslationBridge {
   private readonly latencyMetrics: TranslationLatencyMetrics;
   private readonly dataPublisher: TranslationDataPublisher;
   private readonly translatedAudioOutput: TranslatedAudioOutput;
+  private readonly log;
 
   private organizerIdentity: string;
   private activeOrganizerAudioPipelineId: string | null = null;
@@ -162,6 +164,11 @@ export class TranslationBridge {
     this.enableAudioTranslation = config.enableAudioTranslation !== false;
     this.enableTranscription = config.enableTranscription === true;
     this.enableInputDiagnostics = config.enableInputDiagnostics === true;
+    this.log = createLogger({
+      component: "translation-bridge",
+      sessionId,
+      targetLanguage,
+    });
     this.geminiConnection = new GeminiLiveConnection({
       apiKey: this.geminiApiKey,
       model: this.geminiModel,
@@ -208,9 +215,7 @@ export class TranslationBridge {
   }
 
   async start(): Promise<void> {
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Starting bridge for session ${this.sessionId}`
-    );
+    this.log.info("Starting translation bridge");
 
     try {
       // 1. Generate token and join LiveKit room
@@ -223,23 +228,16 @@ export class TranslationBridge {
       await this.subscribeToOrganizer();
 
       this.status = "active";
-      console.log(
-        `[TranslationBridge:${this.targetLanguage}] Bridge is active`
-      );
+      this.log.info("Translation bridge is active");
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.targetLanguage}] Failed to start:`,
-        error
-      );
+      this.log.error({ err: error }, "Failed to start translation bridge");
       this.status = "error";
       throw error;
     }
   }
 
   async stop(): Promise<void> {
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Stopping bridge`
-    );
+    this.log.info("Stopping translation bridge");
     this.status = "closed";
 
     if (this.interimTimeout) {
@@ -292,9 +290,7 @@ export class TranslationBridge {
     this.room = new Room();
 
     this.room.on(RoomEvent.Disconnected, () => {
-      console.log(
-        `[TranslationBridge:${this.targetLanguage}] Disconnected from room`
-      );
+      this.log.info("Disconnected from LiveKit room");
       this.status = "closed";
     });
 
@@ -302,13 +298,14 @@ export class TranslationBridge {
       RoomEvent.ParticipantDisconnected,
       (participant: RemoteParticipant) => {
         if (participant.identity === this.organizerIdentity) {
-          console.log(
-            `[TranslationBridge:${this.targetLanguage}] Organizer ${this.organizerIdentity} disconnected, stopping bridge`
+          this.log.info(
+            { organizerIdentity: this.organizerIdentity },
+            "Organizer disconnected; stopping bridge",
           );
           this.stop().catch((err) => {
-            console.error(
-              `[TranslationBridge:${this.targetLanguage}] Error stopping bridge after organizer disconnect:`,
-              err
+            this.log.error(
+              { err },
+              "Error stopping bridge after organizer disconnect",
             );
           });
         }
@@ -320,14 +317,10 @@ export class TranslationBridge {
       dynacast: false,
     });
 
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Joined room as ${this.identity}`
-    );
+    this.log.info({ identity: this.identity }, "Joined LiveKit room");
 
     if (!this.enableAudioTranslation) {
-      console.log(
-        `[TranslationBridge:${this.targetLanguage}] Translated audio publication disabled`
-      );
+      this.log.info("Translated audio publication disabled");
       return;
     }
 
@@ -361,8 +354,9 @@ export class TranslationBridge {
       }
     }
 
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Published translated audio track (sid: ${this.publishedTrackSid || 'pending'})`
+    this.log.info(
+      { publishedTrackSid: this.publishedTrackSid || "pending" },
+      "Published translated audio track",
     );
   }
 
@@ -384,9 +378,12 @@ export class TranslationBridge {
 
     if (!shouldLog) return;
 
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Gemini raw debug #${this.geminiDebugMessageCount}:`,
-      JSON.stringify(sanitizeGeminiDebugValue(message), null, 2)
+    this.log.info(
+      {
+        debugMessageCount: this.geminiDebugMessageCount,
+        geminiMessage: sanitizeGeminiDebugValue(message),
+      },
+      "Gemini raw debug message",
     );
   }
 
@@ -421,8 +418,13 @@ export class TranslationBridge {
               this.framesReceivedFromGemini <= 3 ||
               this.framesReceivedFromGemini % 100 === 0
             ) {
-              console.log(
-                `[TranslationBridge:${this.targetLanguage}] Received audio frame #${this.framesReceivedFromGemini} from Gemini (${part.inlineData.data.length} bytes base64${this.enableAudioTranslation ? "" : ", publication disabled"})`
+              this.log.info(
+                {
+                  base64Bytes: part.inlineData.data.length,
+                  frameNumber: this.framesReceivedFromGemini,
+                  publicationEnabled: this.enableAudioTranslation,
+                },
+                "Received audio frame from Gemini",
               );
             }
             if (!this.enableAudioTranslation) {
@@ -473,9 +475,9 @@ export class TranslationBridge {
         const text = inputTranscription.text;
         const isInterim = !isInputTranscriptionComplete;
 
-        console.log(
-          `[TranslationBridge:${this.targetLanguage}] Input diagnostic${isInterim ? " interim" : " final"}:`,
-          text.slice(0, 160)
+        this.log.info(
+          { interim: isInterim, textPreview: text.slice(0, 160) },
+          "Input diagnostic transcription received",
         );
 
         if (isInterim) {
@@ -562,10 +564,7 @@ export class TranslationBridge {
         this.inputDiagnosticSegmentId++;
       }
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.targetLanguage}] Error parsing Gemini message:`,
-        error
-      );
+      this.log.error({ err: error }, "Error handling Gemini message");
     }
   }
 
@@ -583,8 +582,9 @@ export class TranslationBridge {
     }
 
     // If organizer hasn't joined yet, wait for them
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Waiting for organizer ${this.organizerIdentity}...`
+    this.log.info(
+      { organizerIdentity: this.organizerIdentity },
+      "Waiting for organizer",
     );
 
     // Listen for the organizer to publish their track
@@ -604,8 +604,14 @@ export class TranslationBridge {
           if (preferredPublication === publication) {
             publication.setSubscribed(true);
           } else {
-            console.log(
-              `[TranslationBridge:${this.targetLanguage}] Ignoring newly published organizer audio ${this.getPublicationLabel(publication)}; preferred=${preferredPublication ? this.getPublicationLabel(preferredPublication) : "none"}`
+            this.log.info(
+              {
+                preferredPublication: preferredPublication
+                  ? this.getPublicationLabel(preferredPublication)
+                  : "none",
+                publication: this.getPublicationLabel(publication),
+              },
+              "Ignoring non-preferred organizer audio publication",
             );
           }
         }
@@ -656,14 +662,16 @@ export class TranslationBridge {
     const preferredPublication = this.selectOrganizerAudioPublication(participant);
 
     if (!preferredPublication) {
-      console.log(
-        `[TranslationBridge:${this.targetLanguage}] Organizer ${this.organizerIdentity} has no audio tracks yet`
+      this.log.info(
+        { organizerIdentity: this.organizerIdentity },
+        "Organizer has no audio tracks yet",
       );
       return;
     }
 
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Subscribing to organizer audio publication ${this.getPublicationLabel(preferredPublication)}`
+    this.log.info(
+      { publication: this.getPublicationLabel(preferredPublication) },
+      "Subscribing to organizer audio publication",
     );
     preferredPublication.setSubscribed(true);
   }
@@ -680,11 +688,13 @@ export class TranslationBridge {
       broadcastPublications.length > 0 ? broadcastPublications : audioPublications;
 
     if (broadcastPublications.length > 1) {
-      console.warn(
-        `[TranslationBridge:${this.targetLanguage}] Found duplicate organizer broadcast-audio publications:`,
-        broadcastPublications.map((publication) =>
-          this.getPublicationLabel(publication)
-        )
+      this.log.warn(
+        {
+          publications: broadcastPublications.map((publication) =>
+            this.getPublicationLabel(publication),
+          ),
+        },
+        "Found duplicate organizer broadcast-audio publications",
       );
     }
 
@@ -706,15 +716,24 @@ export class TranslationBridge {
         this.activeOrganizerAudioPipelineId === pipelineId
           ? "duplicate"
           : "additional";
-      console.warn(
-        `[TranslationBridge:${this.targetLanguage}] Ignoring ${duplicateKind} organizer audio pipeline ${pipelineId}; active=${this.activeOrganizerAudioPipelineId}`
+      this.log.warn(
+        {
+          activePipelineId: this.activeOrganizerAudioPipelineId,
+          duplicateKind,
+          pipelineId,
+        },
+        "Ignoring organizer audio pipeline while another pipeline is active",
       );
       return;
     }
 
     this.activeOrganizerAudioPipelineId = pipelineId;
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Subscribed to organizer audio track ${pipelineId} (${this.getPublicationLabel(publication)}), piping to Gemini`
+    this.log.info(
+      {
+        pipelineId,
+        publication: this.getPublicationLabel(publication),
+      },
+      "Subscribed to organizer audio track; piping to Gemini",
     );
 
     const audioStream = new AudioStream(track, {
@@ -735,10 +754,7 @@ export class TranslationBridge {
 
     readLoop()
       .catch((err: Error) => {
-        console.error(
-          `[TranslationBridge:${this.targetLanguage}] Audio stream error:`,
-          err
-        );
+        this.log.error({ err }, "Audio stream error");
       })
       .finally(() => {
         if (this.activeOrganizerAudioPipelineId === pipelineId) {
@@ -772,8 +788,13 @@ export class TranslationBridge {
 
       this.framesSentToGemini++;
       if (this.framesSentToGemini <= 3 || this.framesSentToGemini % 500 === 0) {
-        console.log(
-          `[TranslationBridge:${this.targetLanguage}] Sent audio frame #${this.framesSentToGemini} to Gemini (${base64.length} bytes base64, ${int16Data.length} samples)`
+        this.log.info(
+          {
+            base64Bytes: base64.length,
+            frameNumber: this.framesSentToGemini,
+            samples: int16Data.length,
+          },
+          "Sent audio frame to Gemini",
         );
       }
 
@@ -785,10 +806,7 @@ export class TranslationBridge {
         this.translatedAudioOutput.getTotalBacklogMs()
       );
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.targetLanguage}] Error sending audio to Gemini:`,
-        error
-      );
+      this.log.error({ err: error }, "Error sending audio to Gemini");
     }
   }
 
@@ -822,9 +840,9 @@ export class TranslationBridge {
     const finalText = this.pendingInterimText + text;
     this.pendingInterimText = "";
     this.transcriptionSegmentHasText = true;
-    console.log(
-      `[TranslationBridge:${this.targetLanguage}] Final Transcription:`,
-      finalText.slice(0, 100)
+    this.log.info(
+      { textPreview: finalText.slice(0, 100) },
+      "Final transcription received",
     );
     void this.dataPublisher.publishTranscription(
       this.room,

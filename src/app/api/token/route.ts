@@ -2,6 +2,9 @@ import { AccessToken } from "livekit-server-sdk";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { API_ERROR_CODES, apiError } from "@/lib/api-errors";
+import { parseSearchParams } from "@/lib/api-request";
+import { tokenQuerySchema, zodErrorDetails } from "@/lib/api-schemas";
+import { createLogger } from "@/lib/logger";
 import {
   getBroadcastPassword,
   getLiveKitCredentials,
@@ -9,45 +12,45 @@ import {
 } from "@/lib/server-env";
 import TranslationSessionManager from "@/lib/translation-session-manager";
 
+const log = createLogger({ route: "/api/token" });
+
 // GET /api/token — Generate a LiveKit access token
 export async function GET(req: NextRequest) {
-  const room = req.nextUrl.searchParams.get("room");
-  const identity = req.nextUrl.searchParams.get("identity");
-  const role = req.nextUrl.searchParams.get("role") || "attendee";
-
-  if (!room || !identity) {
+  const parsed = parseSearchParams(req.nextUrl.searchParams, tokenQuerySchema);
+  if (!parsed.success) {
     return NextResponse.json(
       apiError(
         API_ERROR_CODES.INVALID_REQUEST,
-        "Missing room or identity parameter"
+        "Missing room or identity parameter",
+        zodErrorDetails(parsed.error),
       ),
-      { status: 400 }
+      { status: 400 },
     );
   }
 
+  const { identity, password, role, room } = parsed.data;
   const isOrganizer = role === "organizer";
 
   const expectedPassword = getBroadcastPassword();
   if (isOrganizer && expectedPassword) {
-    const password = req.nextUrl.searchParams.get("password");
     if (password !== expectedPassword) {
       return NextResponse.json(
         apiError(API_ERROR_CODES.INCORRECT_PASSWORD, "Incorrect password"),
-        { status: 401 }
+        { status: 401 },
       );
     }
   }
 
   const manager = TranslationSessionManager.getInstance();
   const session = manager.getSession(room);
-  console.log(`[TokenAPI] Checking session for room "${room}". Found session:`, session);
+  log.info({ found: !!session, room }, "Checking session for token request");
   if (!session) {
     return NextResponse.json(
       apiError(
         API_ERROR_CODES.SESSION_INACTIVE,
-        "Broadcast session has not started yet or has ended"
+        "Broadcast session has not started yet or has ended",
       ),
-      { status: 404 }
+      { status: 404 },
     );
   }
 
@@ -57,9 +60,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(
       apiError(
         API_ERROR_CODES.LIVEKIT_NOT_CONFIGURED,
-        "LiveKit credentials not configured"
+        "LiveKit credentials not configured",
       ),
-      { status: 500 }
+      { status: 500 },
     );
   }
 

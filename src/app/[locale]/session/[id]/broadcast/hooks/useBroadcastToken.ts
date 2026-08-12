@@ -2,22 +2,13 @@
 
 import { useTranslations } from "next-intl";
 import { type FormEvent, useCallback, useEffect, useState } from "react";
+import useSWRMutation from "swr/mutation";
 
-import {
-  API_ERROR_CODES,
-  type ApiErrorCode,
-  getApiErrorCode,
-} from "@/lib/api-errors";
-import { readJsonResponse } from "@/lib/api-request";
+import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
+import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
+import { tokenResponseSchema } from "@/lib/api-schemas";
 
 import type { FetchTokenResult } from "../types";
-
-type TokenResponse = {
-  error?: unknown;
-  expiresAt?: unknown;
-  serverUrl?: unknown;
-  token?: unknown;
-};
 
 function getTokenErrorMessage(
   code: ApiErrorCode | undefined,
@@ -35,6 +26,10 @@ function getTokenErrorMessage(
   }
 }
 
+function appendPassword(url: string, password: string) {
+  return password ? `${url}&password=${encodeURIComponent(password)}` : url;
+}
+
 export function useBroadcastToken(sessionId: string) {
   const t = useTranslations("Broadcast");
   const [token, setToken] = useState("");
@@ -44,7 +39,16 @@ export function useBroadcastToken(sessionId: string) {
   const [passwordPromptRequired, setPasswordPromptRequired] = useState(false);
   const [localPassword, setLocalPassword] = useState("");
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [verifying, setVerifying] = useState(false);
+  const tokenUrl = `/api/token?room=${encodeURIComponent(sessionId)}&identity=organizer-host&role=organizer`;
+  const { isMutating, trigger } = useSWRMutation(
+    tokenUrl,
+    (url: string, { arg: password }: { arg: string }) =>
+      fetchValidatedJson(
+        appendPassword(url, password),
+        undefined,
+        tokenResponseSchema,
+      ),
+  );
 
   const markExpired = useCallback(() => {
     setError(t("sessionEnded"));
@@ -53,29 +57,7 @@ export function useBroadcastToken(sessionId: string) {
   const fetchToken = useCallback(
     async (pass: string): Promise<FetchTokenResult> => {
       try {
-        const identity = "organizer-host";
-        const passwordParam = pass
-          ? `&password=${encodeURIComponent(pass)}`
-          : "";
-        const url = `/api/token?room=${sessionId}&identity=${identity}&role=organizer${passwordParam}`;
-        const res = await fetch(url);
-        const data = await readJsonResponse<TokenResponse>(res);
-
-        if (res.status === 401) {
-          setPasswordPromptRequired(true);
-          setError(null);
-          return { ok: false, reason: "password" };
-        }
-
-        if (!res.ok || data.error) {
-          setError(getTokenErrorMessage(getApiErrorCode(data), t));
-          return { ok: false, reason: "error" };
-        }
-
-        if (typeof data.token !== "string" || typeof data.serverUrl !== "string") {
-          setError(t("fetchTokenError"));
-          return { ok: false, reason: "error" };
-        }
+        const data = await trigger(pass);
 
         if (pass) {
           sessionStorage.setItem("broadcast_password", pass);
@@ -87,13 +69,22 @@ export function useBroadcastToken(sessionId: string) {
         );
         setPasswordPromptRequired(false);
         return { ok: true };
-      } catch (err) {
-        console.error("Failed to fetch organizer token:", err);
-        setError(t("fetchTokenError"));
+      } catch (error) {
+        if (error instanceof ApiRequestError && error.status === 401) {
+          setPasswordPromptRequired(true);
+          setError(null);
+          return { ok: false, reason: "password" };
+        }
+
+        setError(
+          error instanceof ApiRequestError
+            ? getTokenErrorMessage(error.code, t)
+            : t("fetchTokenError"),
+        );
         return { ok: false, reason: "error" };
       }
     },
-    [sessionId, t]
+    [t, trigger],
   );
 
   useEffect(() => {
@@ -106,10 +97,8 @@ export function useBroadcastToken(sessionId: string) {
 
   const handlePasswordSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    setVerifying(true);
     setPasswordError(null);
     const result = await fetchToken(localPassword);
-    setVerifying(false);
     if (!result.ok && result.reason === "password") {
       setPasswordError(t("incorrectPassword"));
     }
@@ -127,6 +116,6 @@ export function useBroadcastToken(sessionId: string) {
     setError,
     setLocalPassword,
     token,
-    verifying,
+    verifying: isMutating,
   };
 }

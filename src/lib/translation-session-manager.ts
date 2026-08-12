@@ -9,6 +9,7 @@
 
 import { type ParticipantInfo,RoomServiceClient } from "livekit-server-sdk";
 
+import { createLogger } from "./logger";
 import {
   getGeminiApiKey,
   getLiveKitCredentials,
@@ -43,6 +44,8 @@ export interface SessionInfo {
 const globalForSessionManager = global as unknown as {
   sessionManagerInstance: TranslationSessionManager;
 };
+
+const log = createLogger({ component: "translation-session-manager" });
 
 function getLiveKitApiUrl(): string {
   const configuredUrl = getLiveKitUrl();
@@ -125,8 +128,19 @@ class TranslationSessionManager {
     };
     this.sessions.set(sessionId, info);
     this.scheduleSessionExpiration(info);
-    console.log(
-      `[SessionManager] Created session ${sessionId} for organizer ${organizerIdentity} with input mode ${options.inputLanguageMode}, source language ${options.sourceLanguage || "auto"}, audio translation ${options.enableAudioTranslation ? "enabled" : "disabled"}, transcriptions ${options.enableTranscription ? "enabled" : "disabled"}, input diagnostics ${options.enableInputDiagnostics ? "enabled" : "disabled"}, duration ${durationMinutes}m, allowed languages: ${options.allowedLanguages?.join(", ") || "all"}`
+    log.info(
+      {
+        allowedLanguages: options.allowedLanguages ?? "all",
+        durationMinutes,
+        enableAudioTranslation: options.enableAudioTranslation,
+        enableInputDiagnostics: options.enableInputDiagnostics,
+        enableTranscription: options.enableTranscription,
+        inputLanguageMode: options.inputLanguageMode,
+        organizerIdentity,
+        sessionId,
+        sourceLanguage: options.sourceLanguage ?? "auto",
+      },
+      "Created session",
     );
     return info;
   }
@@ -167,8 +181,9 @@ class TranslationSessionManager {
     if (languageMap) {
       const existingBridge = languageMap.get(targetLanguage);
       if (existingBridge && existingBridge.status === "active") {
-        console.log(
-          `[SessionManager] Reusing existing bridge for ${targetLanguage} in session ${sessionId}`
+        log.info(
+          { sessionId, targetLanguage },
+          "Reusing existing translation bridge",
         );
         existingBridge.subscriberCount++;
         this.bridgeLastSubscriberSeenAt.set(existingBridge, Date.now());
@@ -177,8 +192,9 @@ class TranslationSessionManager {
       }
       // If bridge exists but is in error/closed state, clean it up
       if (existingBridge && (existingBridge.status === "error" || existingBridge.status === "closed")) {
-        console.log(
-          `[SessionManager] Cleaning up stale bridge for ${targetLanguage}`
+        log.info(
+          { sessionId, status: existingBridge.status, targetLanguage },
+          "Cleaning up stale translation bridge",
         );
         await existingBridge.stop();
         this.cleanupBridgeReference(sessionId, targetLanguage, existingBridge);
@@ -187,8 +203,9 @@ class TranslationSessionManager {
     }
 
     // Create a new bridge
-    console.log(
-      `[SessionManager] Creating new bridge for ${targetLanguage} in session ${sessionId}`
+    log.info(
+      { sessionId, targetLanguage },
+      "Creating new translation bridge",
     );
 
     const geminiApiKey = getGeminiApiKey();
@@ -272,13 +289,19 @@ class TranslationSessionManager {
     if (!bridge) return;
 
     bridge.subscriberCount = Math.max(0, bridge.subscriberCount - 1);
-    console.log(
-      `[SessionManager] Unsubscribed from ${targetLanguage} in session ${sessionId} (${bridge.subscriberCount} remaining)`
+    log.info(
+      {
+        remainingSubscribers: bridge.subscriberCount,
+        sessionId,
+        targetLanguage,
+      },
+      "Unsubscribed from translation bridge",
     );
 
     if (bridge.subscriberCount === 0) {
-      console.log(
-        `[SessionManager] No more subscribers for ${targetLanguage}, tearing down bridge`
+      log.info(
+        { sessionId, targetLanguage },
+        "No more subscribers; tearing down translation bridge",
       );
       await bridge.stop();
       this.cleanupBridgeReference(sessionId, targetLanguage, bridge);
@@ -296,8 +319,9 @@ class TranslationSessionManager {
     if (bridge) {
       await bridge.stop();
       this.cleanupBridgeReference(sessionId, targetLanguage, bridge);
-      console.log(
-        `[SessionManager] Removed bridge for ${targetLanguage} in session ${sessionId}`
+      log.info(
+        { sessionId, targetLanguage },
+        "Removed translation bridge",
       );
     }
   }
@@ -316,8 +340,9 @@ class TranslationSessionManager {
     this.sessions.delete(sessionId);
     this.stopReconcileTimerIfIdle();
     await this.deleteLiveKitRoom(sessionId);
-    console.log(
-      `[SessionManager] Removed all bridges and session for ${sessionId}`
+    log.info(
+      { sessionId },
+      "Removed all translation bridges and session",
     );
   }
 
@@ -370,7 +395,7 @@ class TranslationSessionManager {
       return;
     }
 
-    console.log(`[SessionManager] Session ${sessionId} reached its time limit`);
+    log.info({ sessionId }, "Session reached its time limit");
     await this.removeAllTranslations(sessionId);
   }
 
@@ -386,10 +411,7 @@ class TranslationSessionManager {
         return;
       }
 
-      console.error(
-        `[SessionManager] Failed to delete LiveKit room ${sessionId}:`,
-        error
-      );
+      log.error({ err: error, sessionId }, "Failed to delete LiveKit room");
     }
   }
 
@@ -411,8 +433,8 @@ class TranslationSessionManager {
     const credentials = getLiveKitCredentials();
 
     if (!credentials) {
-      console.warn(
-        "[SessionManager] LiveKit credentials are not configured; skipping LiveKit room operation."
+      log.warn(
+        "LiveKit credentials are not configured; skipping LiveKit room operation",
       );
       return null;
     }
@@ -433,7 +455,7 @@ class TranslationSessionManager {
 
     this.reconcileInterval = setInterval(() => {
       void this.reconcileActiveTranslations().catch((error) => {
-        console.error("[SessionManager] Translation reconcile failed:", error);
+        log.error({ err: error }, "Translation reconcile failed");
       });
     }, this.reconcileIntervalMs);
 
@@ -467,9 +489,9 @@ class TranslationSessionManager {
       try {
         participants = await roomServiceClient.listParticipants(sessionId);
       } catch (error) {
-        console.error(
-          `[SessionManager] Failed to list LiveKit participants for session ${sessionId}:`,
-          error
+        log.error(
+          { err: error, sessionId },
+          "Failed to list LiveKit participants",
         );
         continue;
       }
@@ -501,8 +523,14 @@ class TranslationSessionManager {
 
         if (actualSubscriberCount > 0) {
           if (bridge.subscriberCount !== actualSubscriberCount) {
-            console.log(
-              `[SessionManager] Reconciled ${targetLanguage} in session ${sessionId}: ${bridge.subscriberCount} -> ${actualSubscriberCount} subscribers`
+            log.info(
+              {
+                actualSubscriberCount,
+                previousSubscriberCount: bridge.subscriberCount,
+                sessionId,
+                targetLanguage,
+              },
+              "Reconciled translation subscriber count",
             );
           }
 
@@ -562,8 +590,9 @@ class TranslationSessionManager {
       return;
     }
 
-    console.log(
-      `[SessionManager] Stopping bridge for ${targetLanguage} in session ${sessionId}: ${reason}`
+    log.info(
+      { reason, sessionId, targetLanguage },
+      "Stopping translation bridge",
     );
 
     try {
@@ -592,8 +621,9 @@ class TranslationSessionManager {
 
     if (languageMap.size === 0) {
       this.translations.delete(sessionId);
-      console.log(
-        `[SessionManager] Cleaned up active translations for session ${sessionId} as all translation bridges stopped.`
+      log.info(
+        { sessionId },
+        "Cleaned up active translations after all bridges stopped",
       );
     }
 

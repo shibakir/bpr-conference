@@ -147,7 +147,9 @@ const eslintConfig = defineConfig([
   {
     files: ["src/**/*.{ts,tsx}"],
     ignores: [
+      "src/env/**/*.{ts,tsx}",
       "src/instrumentation.ts",
+      "src/lib/logger.ts",
       "src/lib/public-origin.ts",
       "src/lib/server-env.ts",
     ],

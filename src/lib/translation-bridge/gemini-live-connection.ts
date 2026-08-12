@@ -1,5 +1,7 @@
 import WebSocket from "ws";
 
+import { createLogger } from "../logger";
+
 export type GeminiTranscription = {
   text?: string;
   finished?: boolean;
@@ -90,8 +92,17 @@ export class GeminiLiveConnection {
   private resumptionHandle: string | null = null;
   private isStopped = false;
   private responseModalities: string[] = ["AUDIO"];
+  private readonly log;
 
-  constructor(private readonly options: GeminiLiveConnectionOptions) {}
+  private readonly options: GeminiLiveConnectionOptions;
+
+  constructor(options: GeminiLiveConnectionOptions) {
+    this.options = options;
+    this.log = createLogger({
+      component: "gemini-live-connection",
+      targetLanguage: options.targetLanguage,
+    });
+  }
 
   async connect(): Promise<void> {
     this.isStopped = false;
@@ -127,8 +138,12 @@ export class GeminiLiveConnection {
         this.setupComplete = false;
         this.ws = null;
 
-        console.warn(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini rejected setup with responseModalities=${modalities.join(",")}; retrying with responseModalities=${nextModalities?.join(",") || "none"}`
+        this.log.warn(
+          {
+            responseModalities: modalities,
+            retryResponseModalities: nextModalities ?? [],
+          },
+          "Gemini rejected setup; retrying with fallback response modalities",
         );
       }
     }
@@ -154,9 +169,7 @@ export class GeminiLiveConnection {
       };
 
       ws.on("open", () => {
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini WebSocket connected`
-        );
+        this.log.info("Gemini WebSocket connected");
         this.sendSetup(ws);
       });
 
@@ -165,10 +178,7 @@ export class GeminiLiveConnection {
       });
 
       ws.on("error", (error) => {
-        console.error(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini WebSocket error:`,
-          error
-        );
+        this.log.error({ err: error }, "Gemini WebSocket error");
         if (!this.setupComplete) {
           finish(() => reject(error));
         }
@@ -176,9 +186,9 @@ export class GeminiLiveConnection {
 
       ws.on("close", (code: number, reason: Buffer) => {
         const reasonString = reason.toString();
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini WebSocket closed`,
-          { code, reason: reasonString }
+        this.log.info(
+          { code, reason: reasonString },
+          "Gemini WebSocket closed",
         );
         if (!this.setupComplete) {
           finish(() =>
@@ -189,9 +199,7 @@ export class GeminiLiveConnection {
             )
           );
         } else if (this.canReconnect()) {
-          console.log(
-            `[TranslationBridge:${this.options.targetLanguage}] Reconnecting Gemini WebSocket...`
-          );
+          this.log.info("Reconnecting Gemini WebSocket");
           this.setupComplete = false;
           void this.reconnect();
         }
@@ -244,24 +252,21 @@ export class GeminiLiveConnection {
 
   private async reconnect(): Promise<void> {
     if (this.isReconnecting) {
-      console.log(
-        `[TranslationBridge:${this.options.targetLanguage}] Reconnection already in progress. Skipping duplicate request.`
-      );
+      this.log.info("Reconnection already in progress");
       return;
     }
     this.isReconnecting = true;
 
     try {
-      console.log(
-        `[TranslationBridge:${this.options.targetLanguage}] Reconnecting Gemini WebSocket with handle: ${this.resumptionHandle || "none"}...`
+      this.log.info(
+        { hasResumptionHandle: !!this.resumptionHandle },
+        "Reconnecting Gemini WebSocket",
       );
       const nextWs = this.createWebSocket();
       let nextSetupComplete = false;
 
       nextWs.on("open", () => {
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini reconnect WebSocket opened`
-        );
+        this.log.info("Gemini reconnect WebSocket opened");
         this.sendSetup(nextWs);
       });
 
@@ -269,9 +274,7 @@ export class GeminiLiveConnection {
         try {
           const message = this.parseMessage(data);
           if (!nextSetupComplete && message.setupComplete) {
-            console.log(
-              `[TranslationBridge:${this.options.targetLanguage}] Gemini reconnect setup complete`
-            );
+            this.log.info("Gemini reconnect setup complete");
             nextSetupComplete = true;
             this.setupComplete = true;
 
@@ -280,9 +283,7 @@ export class GeminiLiveConnection {
             this.isReconnecting = false;
 
             if (oldWs) {
-              console.log(
-                `[TranslationBridge:${this.options.targetLanguage}] Gracefully closing old Gemini WebSocket`
-              );
+              this.log.info("Gracefully closing old Gemini WebSocket");
               oldWs.removeAllListeners();
               oldWs.close();
             }
@@ -291,25 +292,19 @@ export class GeminiLiveConnection {
 
           this.handleServerMessage(message);
         } catch (error) {
-          console.error(
-            `[TranslationBridge:${this.options.targetLanguage}] Error handling reconnect message:`,
-            error
-          );
+          this.log.error({ err: error }, "Error handling reconnect message");
         }
       });
 
       nextWs.on("error", (error) => {
-        console.error(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini reconnect error:`,
-          error
-        );
+        this.log.error({ err: error }, "Gemini reconnect error");
       });
 
       nextWs.on("close", (code: number, reason: Buffer) => {
         const reasonString = reason.toString();
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini reconnect WebSocket closed`,
-          { code, reason: reasonString }
+        this.log.info(
+          { code, reason: reasonString },
+          "Gemini reconnect WebSocket closed",
         );
 
         if (!this.canReconnect()) return;
@@ -323,10 +318,7 @@ export class GeminiLiveConnection {
         }
       });
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.options.targetLanguage}] Gemini reconnect initialization failed:`,
-        error
-      );
+      this.log.error({ err: error }, "Gemini reconnect initialization failed");
       this.isReconnecting = false;
       if (this.canReconnect()) {
         setTimeout(() => void this.reconnect(), 5000);
@@ -341,16 +333,14 @@ export class GeminiLiveConnection {
     try {
       const message = this.parseMessage(data);
       if (!this.setupComplete) {
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini message (pre-setup):`,
-          JSON.stringify(message).slice(0, 500)
+        this.log.info(
+          { messagePreview: JSON.stringify(message).slice(0, 500) },
+          "Gemini message received before setup",
         );
       }
 
       if (message.setupComplete) {
-        console.log(
-          `[TranslationBridge:${this.options.targetLanguage}] Gemini setup complete`
-        );
+        this.log.info("Gemini setup complete");
         this.setupComplete = true;
         onSetupComplete();
         return;
@@ -358,10 +348,7 @@ export class GeminiLiveConnection {
 
       this.handleServerMessage(message);
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.options.targetLanguage}] Error parsing Gemini message:`,
-        error
-      );
+      this.log.error({ err: error }, "Error parsing Gemini message");
     }
   }
 
@@ -369,14 +356,13 @@ export class GeminiLiveConnection {
     const update = message.sessionResumptionUpdate;
     if (update?.resumable && update.newHandle) {
       this.resumptionHandle = update.newHandle;
-      console.log(
-        `[TranslationBridge:${this.options.targetLanguage}] Received sessionResumptionUpdate with newHandle: ${this.resumptionHandle}`
-      );
+      this.log.info("Received Gemini session resumption update");
     }
 
     if (message.goAway) {
-      console.log(
-        `[TranslationBridge:${this.options.targetLanguage}] Received goAway message from Gemini. Time left: ${message.goAway.timeLeft || "unknown"}. Initiating graceful session resumption...`
+      this.log.info(
+        { timeLeft: message.goAway.timeLeft ?? "unknown" },
+        "Received Gemini goAway message; initiating graceful session resumption",
       );
       void this.reconnect();
     }
@@ -424,9 +410,9 @@ export class GeminiLiveConnection {
     }
 
     const setupMessage = { setup };
-    console.log(
-      `[TranslationBridge:${this.options.targetLanguage}] Sending Gemini setup (resuming: ${!!this.resumptionHandle}):`,
-      JSON.stringify(setupMessage, null, 2)
+    this.log.info(
+      { resuming: !!this.resumptionHandle, setup: setupMessage },
+      "Sending Gemini setup",
     );
     ws.send(JSON.stringify(setupMessage));
   }

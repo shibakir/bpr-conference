@@ -1,5 +1,7 @@
 import type { Room } from "@livekit/rtc-node";
 
+import { createLogger } from "../logger";
+
 export type TranslationDataPublisherOptions = {
   targetLanguage: string;
   organizerIdentity: string;
@@ -28,7 +30,16 @@ function participantWantsTranscription(
 
 /** Publishes translated text and organizer diagnostics through LiveKit data channels. */
 export class TranslationDataPublisher {
-  constructor(private readonly options: TranslationDataPublisherOptions) {}
+  private readonly log;
+  private readonly options: TranslationDataPublisherOptions;
+
+  constructor(options: TranslationDataPublisherOptions) {
+    this.options = options;
+    this.log = createLogger({
+      component: "translation-data-publisher",
+      targetLanguage: options.targetLanguage,
+    });
+  }
 
   async publishTranscription(
     room: Room | null,
@@ -65,10 +76,7 @@ export class TranslationDataPublisher {
           : {}),
       });
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.options.targetLanguage}] Error publishing transcription:`,
-        error
-      );
+      this.log.error({ err: error }, "Error publishing transcription");
     }
   }
 
@@ -104,10 +112,7 @@ export class TranslationDataPublisher {
         destination_identities: destinationIdentities,
       });
     } catch (error) {
-      console.error(
-        `[TranslationBridge:${this.options.targetLanguage}] Error publishing input diagnostic:`,
-        error
-      );
+      this.log.error({ err: error }, "Error publishing input diagnostic");
     }
   }
 }

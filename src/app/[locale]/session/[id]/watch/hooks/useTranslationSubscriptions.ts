@@ -2,13 +2,14 @@
 
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useSWRMutation from "swr/mutation";
 
+import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
 import {
   API_ERROR_CODES,
   type ApiErrorCode,
-  getApiErrorCode,
 } from "@/lib/api-errors";
-import { readJsonResponse } from "@/lib/api-request";
+import { translationStartResponseSchema } from "@/lib/api-schemas";
 
 export type TranslationSubscriptionStatus = "active" | "error";
 
@@ -22,10 +23,6 @@ type TranslationSubscriptionsByLanguage = Record<
   string,
   TranslationSubscriptionState | undefined
 >;
-
-type TranslationStartResponse = {
-  translatorIdentity?: unknown;
-};
 
 function getTranslationRequestErrorMessage(
   code: ApiErrorCode | undefined,
@@ -57,6 +54,28 @@ function createUnsubscribePayload(sessionId: string, targetLanguage: string) {
   });
 }
 
+function startTranslationRequest(
+  url: string,
+  {
+    arg,
+  }: {
+    arg: {
+      sessionId: string;
+      targetLanguage: string;
+    };
+  },
+) {
+  return fetchValidatedJson(
+    url,
+    {
+      body: JSON.stringify(arg),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+    translationStartResponseSchema,
+  );
+}
+
 export function useTranslationSubscriptions({
   enabled,
   languages,
@@ -67,6 +86,10 @@ export function useTranslationSubscriptions({
   sessionId: string;
 }) {
   const t = useTranslations("LanguageSelector");
+  const { trigger: startTranslation } = useSWRMutation(
+    "/api/translate",
+    startTranslationRequest,
+  );
   const [subscriptions, setSubscriptions] =
     useState<TranslationSubscriptionsByLanguage>({});
   const activeSubscriptionsRef = useRef(new Set<string>());
@@ -149,22 +172,9 @@ export function useTranslationSubscriptions({
 
       pendingSubscriptionsRef.current.add(language);
 
-      fetch("/api/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      startTranslation({
           sessionId,
           targetLanguage: language,
-        }),
-      })
-        .then(async (res) => {
-          const data = await readJsonResponse<TranslationStartResponse>(res);
-          if (!res.ok) {
-            throw new Error(
-              getTranslationRequestErrorMessage(getApiErrorCode(data), t)
-            );
-          }
-          return data;
         })
         .then((data) => {
           pendingSubscriptionsRef.current.delete(language);
@@ -180,10 +190,7 @@ export function useTranslationSubscriptions({
             [language]: {
               error: null,
               status: "active",
-              translatorIdentity:
-                typeof data.translatorIdentity === "string"
-                  ? data.translatorIdentity
-                  : null,
+              translatorIdentity: data.translatorIdentity ?? null,
             },
           }));
         })
@@ -195,7 +202,10 @@ export function useTranslationSubscriptions({
           setSubscriptions((prev) => ({
             ...prev,
             [language]: {
-              error: error instanceof Error ? error.message : t("translationError"),
+              error:
+                error instanceof ApiRequestError
+                  ? getTranslationRequestErrorMessage(error.code, t)
+                  : t("translationError"),
               status: "error",
               translatorIdentity: null,
             },
@@ -207,6 +217,7 @@ export function useTranslationSubscriptions({
     languageKey,
     normalizedLanguages,
     sessionId,
+    startTranslation,
     t,
     unsubscribeLanguage,
   ]);

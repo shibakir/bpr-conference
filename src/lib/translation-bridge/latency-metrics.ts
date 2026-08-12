@@ -1,3 +1,5 @@
+import { createLogger } from "../logger";
+
 type LatencyStatistic = {
   count: number;
   totalMs: number;
@@ -50,8 +52,18 @@ export class TranslationLatencyMetrics {
   private lastLogAt = 0;
   private lastGeminiAudioReceivedAt = 0;
   private firstInputAfterGeminiOutputIdleAt: number | null = null;
+  private readonly log;
 
-  constructor(private readonly options: TranslationLatencyMetricsOptions) {}
+  private readonly options: TranslationLatencyMetricsOptions;
+
+  constructor(options: TranslationLatencyMetricsOptions) {
+    this.options = options;
+    this.log = createLogger({
+      component: "translation-latency-metrics",
+      sessionId: options.sessionId,
+      targetLanguage: options.targetLanguage,
+    });
+  }
 
   recordInputSent(frameReceivedAt: number, sentAt: number): void {
     this.metrics.inputFrames++;
@@ -103,12 +115,9 @@ export class TranslationLatencyMetrics {
     this.windowStartedAt = now;
     this.metrics = createLatencyMetricsWindow();
 
-    console.info(
-      `[TranslationBridge:${this.options.targetLanguage}] Latency metrics`,
-      JSON.stringify({
+    this.log.info(
+      {
         event: "translation_latency",
-        sessionId: this.options.sessionId,
-        targetLanguage: this.options.targetLanguage,
         windowMs: now - windowStartedAt,
         inputSampleRate: this.options.inputSampleRate,
         inputFrames: metrics.inputFrames,
@@ -121,7 +130,8 @@ export class TranslationLatencyMetrics {
           metrics.geminiToLiveKitPublishMs
         ),
         outputBacklogMs: Math.round(outputBacklogMs),
-      })
+      },
+      "Translation latency metrics",
     );
   }
 

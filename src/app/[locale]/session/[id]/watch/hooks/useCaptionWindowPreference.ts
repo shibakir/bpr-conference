@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 
 const STORAGE_KEY = "watch_caption_window_preferences";
 
@@ -44,6 +45,10 @@ export const CAPTION_FONT_OPTIONS = [
 
 export type CaptionFontFamily = (typeof CAPTION_FONT_OPTIONS)[number]["value"];
 
+const CAPTION_FONT_FAMILIES = CAPTION_FONT_OPTIONS.map(
+  (option) => option.value,
+) as [CaptionFontFamily, ...CaptionFontFamily[]];
+
 export type CaptionWindowSettings = {
   backgroundColor: string;
   backgroundOpacity: number;
@@ -71,34 +76,38 @@ const LIMITS = {
   maxLines: { min: 2, max: 40 },
 };
 
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-f]{6}$/i)
+  .transform((value) => value.toLowerCase());
+
+const legacyBackgroundSchema = z.object({
+  b: z.coerce.number(),
+  g: z.coerce.number(),
+  r: z.coerce.number(),
+});
+
+const persistedSettingsSchema = z.object({
+  background: legacyBackgroundSchema.optional(),
+  backgroundColor: hexColorSchema.optional(),
+  backgroundOpacity: z.coerce.number().optional(),
+  fontFamily: z.enum(CAPTION_FONT_FAMILIES).optional(),
+  fontSize: z.coerce.number().optional(),
+  lineHeight: z.coerce.number().optional(),
+  maxLines: z.coerce.number().optional(),
+  textColor: hexColorSchema.optional(),
+});
+
 function clamp(value: number, min: number, max: number): number {
   if (!Number.isFinite(value)) return min;
   return Math.min(max, Math.max(min, value));
 }
 
-function normalizeHexColor(value: unknown, fallback: string): string {
-  if (typeof value !== "string") return fallback;
-  return /^#[0-9a-f]{6}$/i.test(value)
-    ? value.toLowerCase()
-    : fallback;
-}
-
-function normalizeFontFamily(value: unknown): CaptionFontFamily {
-  return CAPTION_FONT_OPTIONS.some((option) => option.value === value)
-    ? (value as CaptionFontFamily)
-    : DEFAULT_SETTINGS.fontFamily;
-}
-
 function normalizeBackgroundColor(
-  candidate: Partial<CaptionWindowSettings> & {
-    background?: { r?: unknown; g?: unknown; b?: unknown };
-  }
+  candidate: z.infer<typeof persistedSettingsSchema>,
 ): string {
-  if (typeof candidate.backgroundColor === "string") {
-    return normalizeHexColor(
-      candidate.backgroundColor,
-      DEFAULT_SETTINGS.backgroundColor
-    );
+  if (candidate.backgroundColor) {
+    return candidate.backgroundColor;
   }
 
   const background = candidate.background;
@@ -116,10 +125,8 @@ function normalizeBackgroundColor(
 }
 
 function normalizeSettings(value: unknown): CaptionWindowSettings {
-  const candidate =
-    value && typeof value === "object"
-      ? (value as Partial<CaptionWindowSettings>)
-      : {};
+  const parsed = persistedSettingsSchema.safeParse(value);
+  const candidate = parsed.success ? parsed.data : {};
 
   return {
     backgroundColor: normalizeBackgroundColor(candidate),
@@ -130,8 +137,8 @@ function normalizeSettings(value: unknown): CaptionWindowSettings {
         LIMITS.opacity.max
       )
     ),
-    textColor: normalizeHexColor(candidate.textColor, DEFAULT_SETTINGS.textColor),
-    fontFamily: normalizeFontFamily(candidate.fontFamily),
+    textColor: candidate.textColor ?? DEFAULT_SETTINGS.textColor,
+    fontFamily: candidate.fontFamily ?? DEFAULT_SETTINGS.fontFamily,
     fontSize: Math.round(
       clamp(
         Number(candidate.fontSize ?? DEFAULT_SETTINGS.fontSize),

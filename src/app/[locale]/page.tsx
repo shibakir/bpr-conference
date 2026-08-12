@@ -1,5 +1,6 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
   CaptionsIcon,
   ClockIcon,
@@ -10,7 +11,9 @@ import {
   XIcon,
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { type ChangeEvent, type FormEvent, useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import useSWR from "swr";
 
 import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -32,13 +35,15 @@ import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { Link, useRouter } from "@/i18n/navigation";
 import { locales } from "@/i18n/routing";
+import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
+import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
 import {
-  API_ERROR_CODES,
-  type ApiErrorCode,
-  getApiErrorCode,
-} from "@/lib/api-errors";
-import { readJsonResponse } from "@/lib/api-request";
-import { getLanguageDisplayName,SUPPORTED_LANGUAGES } from "@/lib/languages";
+  authStatusResponseSchema,
+  createSessionFormSchema,
+  type CreateSessionFormValues,
+  createSessionResponseSchema,
+} from "@/lib/api-schemas";
+import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
   DEFAULT_SESSION_DURATION_MINUTES,
   MAX_SESSION_DURATION_MINUTES,
@@ -65,34 +70,71 @@ const DEFAULT_LANGUAGES = [
 const DEFAULT_SOURCE_LANGUAGE = "cs";
 const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
 
-type AuthStatusResponse = {
-  passwordRequired?: unknown;
-};
+function getDefaultFormValues(): CreateSessionFormValues {
+  return {
+    durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
+    inputLanguageMode: "multi",
+    langSearch: "",
+    password: "",
+    restrictLanguages: true,
+    selectedLanguages: [...DEFAULT_LANGUAGES],
+    sourceLanguage: DEFAULT_SOURCE_LANGUAGE,
+    translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
+  };
+}
 
-type CreateSessionResponse = {
-  sessionId?: unknown;
-};
+async function fetchAuthStatus(url: string) {
+  return fetchValidatedJson(url, undefined, authStatusResponseSchema);
+}
+
+const FORM_UPDATE_OPTIONS = {
+  shouldDirty: true,
+  shouldValidate: true,
+} as const;
 
 export default function Home() {
   const t = useTranslations("Home");
   const locale = useLocale();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [passwordRequired, setPasswordRequired] = useState(false);
-  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [inputLanguageMode, setInputLanguageMode] =
-    useState<InputLanguageMode>("multi");
-  const [sourceLanguage, setSourceLanguage] = useState(DEFAULT_SOURCE_LANGUAGE);
-  const [durationMinutes, setDurationMinutes] = useState(
-    DEFAULT_SESSION_DURATION_MINUTES
-  );
-  const [translationOutputs, setTranslationOutputs] =
-    useState<TranslationOutputMode[]>(DEFAULT_TRANSLATION_OUTPUTS);
-  const [restrictLanguages, setRestrictLanguages] = useState(true);
-  const [selectedLanguages, setSelectedLanguages] =
-    useState<string[]>(DEFAULT_LANGUAGES);
-  const [langSearch, setLangSearch] = useState("");
+  const { data: authStatus } = useSWR("/api/auth/status", fetchAuthStatus, {
+    revalidateOnFocus: false,
+    shouldRetryOnError: false,
+  });
+  const passwordRequired = authStatus?.passwordRequired === true;
+  const {
+    control,
+    formState: { isSubmitting },
+    handleSubmit,
+    register,
+    setValue,
+  } = useForm<CreateSessionFormValues>({
+    defaultValues: getDefaultFormValues(),
+    resolver: zodResolver(createSessionFormSchema),
+  });
+  const durationMinutes =
+    useWatch({ control, name: "durationMinutes" }) ??
+    DEFAULT_SESSION_DURATION_MINUTES;
+  const inputLanguageMode =
+    useWatch({ control, name: "inputLanguageMode" }) ?? "multi";
+  const sourceLanguage =
+    useWatch({ control, name: "sourceLanguage" }) ?? DEFAULT_SOURCE_LANGUAGE;
+  const translationOutputs =
+    useWatch({ control, name: "translationOutputs" }) ??
+    DEFAULT_TRANSLATION_OUTPUTS;
+  const restrictLanguages =
+    useWatch({ control, name: "restrictLanguages" }) ?? true;
+  const selectedLanguages =
+    useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_LANGUAGES;
+  const langSearch = useWatch({ control, name: "langSearch" }) ?? "";
+
+  function setSelectedLanguagesValue(next: string[]) {
+    setValue("selectedLanguages", next, FORM_UPDATE_OPTIONS);
+  }
+
+  function setTranslationOutputsValue(next: TranslationOutputMode[]) {
+    setValue("translationOutputs", next, FORM_UPDATE_OPTIONS);
+  }
 
   const languageOptions = useMemo(
     () =>
@@ -133,54 +175,36 @@ export default function Home() {
       lang.code.toLowerCase().includes(query.toLowerCase())
     );
   });
-  const enableAudioTranslation = translationOutputs.includes("audio");
-  const enableTranscription = translationOutputs.includes("text");
-
-  function handleSourceLanguageChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextSourceLanguage = event.target.value;
-    setSourceLanguage(nextSourceLanguage);
+  function handleSourceLanguageChange(nextSourceLanguage: string) {
+    setValue("sourceLanguage", nextSourceLanguage, FORM_UPDATE_OPTIONS);
     if (inputLanguageMode === "single") {
-      setSelectedLanguages((prev) =>
-        prev.filter((code) => code !== nextSourceLanguage)
+      setSelectedLanguagesValue(
+        selectedLanguages.filter((code) => code !== nextSourceLanguage)
       );
     }
   }
 
-  function handleInputLanguageModeChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextMode = event.target.value === "single" ? "single" : "multi";
-    setInputLanguageMode(nextMode);
+  function handleInputLanguageModeChange(nextMode: InputLanguageMode) {
+    setValue("inputLanguageMode", nextMode, FORM_UPDATE_OPTIONS);
     if (nextMode === "single") {
-      setSelectedLanguages((prev) =>
-        prev.filter((code) => code !== sourceLanguage)
+      setSelectedLanguagesValue(
+        selectedLanguages.filter((code) => code !== sourceLanguage)
       );
     }
   }
 
   function toggleTranslationOutput(output: TranslationOutputMode) {
-    setTranslationOutputs((prev) => {
-      const next = new Set(prev);
-      if (next.has(output)) {
-        next.delete(output);
-      } else {
-        next.add(output);
-      }
-
-      return TRANSLATION_OUTPUT_MODES.filter((mode) => next.has(mode));
-    });
-  }
-
-  useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const res = await fetch("/api/auth/status");
-        const data = await readJsonResponse<AuthStatusResponse>(res);
-        setPasswordRequired(data.passwordRequired === true);
-      } catch (err) {
-        console.error("Failed to check auth status:", err);
-      }
+    const next = new Set(translationOutputs);
+    if (next.has(output)) {
+      next.delete(output);
+    } else {
+      next.add(output);
     }
-    void checkAuthStatus();
-  }, []);
+
+    setTranslationOutputsValue(
+      TRANSLATION_OUTPUT_MODES.filter((mode) => next.has(mode))
+    );
+  }
 
   function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
     switch (code) {
@@ -198,56 +222,58 @@ export default function Home() {
     }
   }
 
-  async function createSession() {
-    setLoading(true);
+  async function createSession(values: CreateSessionFormValues) {
     setError(null);
+    const valuesEnableAudioTranslation =
+      values.translationOutputs.includes("audio");
+    const valuesEnableTranscription =
+      values.translationOutputs.includes("text");
+    const selectedLanguagesForSubmit = values.selectedLanguages.filter(
+      (code) =>
+        values.inputLanguageMode !== "single" ||
+        code !== values.sourceLanguage
+    );
+
     try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizerName: "host",
-          password,
-          locale,
-          inputLanguageMode,
-          sourceLanguage:
-            inputLanguageMode === "single" ? sourceLanguage : undefined,
-          translationOutputs,
-          enableAudioTranslation,
-          enableTranscription,
-          enableInputDiagnostics: true,
-          durationMinutes,
-          allowedLanguages: restrictLanguages
-            ? selectedTranslationLanguages
-            : undefined,
-        }),
-      });
-      const data = await readJsonResponse<CreateSessionResponse>(res);
-      if (!res.ok) {
-        setError(getCreateSessionErrorMessage(getApiErrorCode(data)));
-        setLoading(false);
-        return;
-      }
-      if (typeof data.sessionId !== "string") {
-        setError(t("createError"));
-        setLoading(false);
-        return;
-      }
+      const data = await fetchValidatedJson(
+        "/api/sessions",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            organizerName: "host",
+            password: values.password,
+            locale,
+            inputLanguageMode: values.inputLanguageMode,
+            sourceLanguage:
+              values.inputLanguageMode === "single"
+                ? values.sourceLanguage
+                : undefined,
+            translationOutputs: values.translationOutputs,
+            enableAudioTranslation: valuesEnableAudioTranslation,
+            enableTranscription: valuesEnableTranscription,
+            enableInputDiagnostics: true,
+            durationMinutes: values.durationMinutes,
+            allowedLanguages: values.restrictLanguages
+              ? selectedLanguagesForSubmit
+              : undefined,
+          }),
+        },
+        createSessionResponseSchema,
+      );
+
       if (passwordRequired) {
-        sessionStorage.setItem("broadcast_password", password);
+        sessionStorage.setItem("broadcast_password", values.password);
       }
       router.push(`/session/${data.sessionId}/broadcast`);
-    } catch (err) {
-      console.error("Failed to create session:", err);
-      setError(t("createError"));
-      setLoading(false);
-    }
-  }
+    } catch (requestError) {
+      if (requestError instanceof ApiRequestError) {
+        setError(getCreateSessionErrorMessage(requestError.code));
+        return;
+      }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!loading) {
-      void createSession();
+      console.error("Failed to create session:", requestError);
+      setError(t("createError"));
     }
   }
 
@@ -306,7 +332,7 @@ export default function Home() {
             <CardDescription>{t("subtitle")}</CardDescription>
           </CardHeader>
           <CardContent>
-            <form className="grid gap-4" onSubmit={handleSubmit}>
+            <form className="grid gap-4" onSubmit={handleSubmit(createSession)}>
               {passwordRequired && (
                 <div className="grid gap-2">
                   <Label htmlFor="broadcast-password">
@@ -317,9 +343,8 @@ export default function Home() {
                     type="password"
                     autoComplete="new-password"
                     placeholder={t("passwordPlaceholder")}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
+                    disabled={isSubmitting}
+                    {...register("password")}
                   />
                 </div>
               )}
@@ -345,11 +370,13 @@ export default function Home() {
                   max={MAX_SESSION_DURATION_MINUTES}
                   step={1}
                   onValueChange={(value) =>
-                    setDurationMinutes(
-                      value[0] ?? DEFAULT_SESSION_DURATION_MINUTES
+                    setValue(
+                      "durationMinutes",
+                      value[0] ?? DEFAULT_SESSION_DURATION_MINUTES,
+                      FORM_UPDATE_OPTIONS,
                     )
                   }
-                  disabled={loading}
+                  disabled={isSubmitting}
                 />
                 <p className="text-xs leading-5 text-muted-foreground">
                   {t("durationDescription")}
@@ -364,8 +391,12 @@ export default function Home() {
                   id="input-language-mode"
                   className="w-full"
                   value={inputLanguageMode}
-                  onChange={handleInputLanguageModeChange}
-                  disabled={loading}
+                  onChange={(event) =>
+                    handleInputLanguageModeChange(
+                      event.target.value === "single" ? "single" : "multi",
+                    )
+                  }
+                  disabled={isSubmitting}
                 >
                   <NativeSelectOption value="multi">
                     {t("inputLanguageModeMulti")}
@@ -388,8 +419,10 @@ export default function Home() {
                   id="source-language"
                   className="w-full"
                   value={sourceLanguage}
-                  onChange={handleSourceLanguageChange}
-                  disabled={loading}
+                  onChange={(event) =>
+                    handleSourceLanguageChange(event.target.value)
+                  }
+                  disabled={isSubmitting}
                 >
                   {languageOptions.map((lang) => (
                     <NativeSelectOption key={lang.code} value={lang.code}>
@@ -435,7 +468,7 @@ export default function Home() {
                         key={option.value}
                         type="button"
                         aria-pressed={selected}
-                        disabled={loading}
+                        disabled={isSubmitting}
                         onClick={() => toggleTranslationOutput(option.value)}
                         className={cn(
                           "flex min-h-24 items-start gap-3 rounded-lg border p-3 text-left transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-60",
@@ -482,9 +515,13 @@ export default function Home() {
                   <Checkbox
                     checked={restrictLanguages}
                     onCheckedChange={(checked) =>
-                      setRestrictLanguages(checked === true)
+                      setValue(
+                        "restrictLanguages",
+                        checked === true,
+                        FORM_UPDATE_OPTIONS,
+                      )
                     }
-                    disabled={loading}
+                    disabled={isSubmitting}
                     className="mt-0.5"
                   />
                   <span className="grid gap-1">
@@ -514,8 +551,10 @@ export default function Home() {
                               size="xs"
                               title={t("removeLanguage")}
                               onClick={() =>
-                                setSelectedLanguages((prev) =>
-                                  prev.filter((item) => item !== code)
+                                setSelectedLanguagesValue(
+                                  selectedLanguages.filter(
+                                    (item) => item !== code,
+                                  )
                                 )
                               }
                             >
@@ -534,8 +573,14 @@ export default function Home() {
                         type="search"
                         placeholder={t("searchLanguages")}
                         value={langSearch}
-                        onChange={(e) => setLangSearch(e.target.value)}
-                        disabled={loading}
+                        onChange={(event) =>
+                          setValue(
+                            "langSearch",
+                            event.target.value,
+                            FORM_UPDATE_OPTIONS,
+                          )
+                        }
+                        disabled={isSubmitting}
                         className="pl-8"
                       />
                     </div>
@@ -559,15 +604,15 @@ export default function Home() {
                                 <Checkbox
                                   checked={isChecked}
                                   onCheckedChange={() => {
-                                    setSelectedLanguages((prev) =>
+                                    setSelectedLanguagesValue(
                                       isChecked
-                                        ? prev.filter(
+                                        ? selectedLanguages.filter(
                                             (code) => code !== lang.code
                                           )
-                                        : [...prev, lang.code]
+                                        : [...selectedLanguages, lang.code]
                                     );
                                   }}
-                                  disabled={loading}
+                                  disabled={isSubmitting}
                                 />
                                 <span>
                                   {lang.flag} {lang.displayName}
@@ -591,7 +636,7 @@ export default function Home() {
                           variant="ghost"
                           size="xs"
                           onClick={() =>
-                            setSelectedLanguages(
+                            setSelectedLanguagesValue(
                               translationLanguageOptions.map((lang) => lang.code)
                             )
                           }
@@ -602,7 +647,7 @@ export default function Home() {
                           type="button"
                           variant="ghost"
                           size="xs"
-                          onClick={() => setSelectedLanguages([])}
+                          onClick={() => setSelectedLanguagesValue([])}
                         >
                           {t("clear")}
                         </Button>
@@ -620,11 +665,11 @@ export default function Home() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={isSubmitting}
                 id="create-session-btn"
                 className="w-full"
               >
-                {loading ? (
+                {isSubmitting ? (
                   <>
                     <Spinner />
                     {t("creating")}

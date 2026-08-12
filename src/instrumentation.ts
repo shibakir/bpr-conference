@@ -3,9 +3,7 @@ export async function register() {
     return;
   }
 
-  const { registerConsoleLogFile } = await import(
-    "./lib/server-console-log-file"
-  );
+  const { registerServerLogger } = await import("./lib/logger");
 
-  registerConsoleLogFile();
+  registerServerLogger();
 }
