@@ -5,7 +5,12 @@ import { cn } from "@/lib/utils";
 
 export function CenteredPage({ children, className }: { children: ReactNode; className?: string }) {
     return (
-        <main className={cn("flex min-h-svh items-center justify-center px-4 py-10", className)}>
+        <main
+            className={cn(
+                "flex min-h-[calc(100svh-var(--app-header-height))] items-center justify-center px-4 py-10",
+                className,
+            )}
+        >
             {children}
         </main>
     );

@@ -46,6 +46,8 @@
     --sidebar-border: color-mix(in oklch, var(--brand-graphite) 24%, transparent);
     --sidebar-ring: var(--brand-lime);
     --radius: 0.625rem;
+    --app-header-height: 5.5rem;
+    color-scheme: light;
 }
 
 .dark {
@@ -85,6 +87,7 @@
     --sidebar-accent-foreground: var(--brand-paper);
     --sidebar-border: color-mix(in oklch, var(--brand-paper) 15%, transparent);
     --sidebar-ring: var(--brand-lime);
+    color-scheme: dark;
 }
 
 @theme inline {

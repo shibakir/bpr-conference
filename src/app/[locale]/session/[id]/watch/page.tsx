@@ -41,7 +41,7 @@ export default function WatchPage({ params }: { params: Promise<{ locale: string
     }
 
     return (
-        <main className="min-h-svh px-4 py-10 sm:px-6">
+        <main className="min-h-[calc(100svh-var(--app-header-height))] px-4 py-10 sm:px-6">
             <LiveKitRoom
                 video={false}
                 audio={false}

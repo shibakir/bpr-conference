@@ -6,6 +6,9 @@ import { notFound } from "next/navigation";
 import { NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
+import { AppHeader } from "@/components/AppHeader";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { ThemeScript } from "@/components/theme/theme-script";
 import { isLocale, routing } from "@/i18n/routing";
 
 const geistSans = Geist({
@@ -57,9 +60,21 @@ export default async function RootLayout({
     setRequestLocale(locale);
 
     return (
-        <html lang={locale} className={`${geistSans.variable} ${geistMono.variable}`}>
+        <html
+            lang={locale}
+            className={`${geistSans.variable} ${geistMono.variable}`}
+            suppressHydrationWarning
+        >
+            <head>
+                <ThemeScript />
+            </head>
             <body>
-                <NextIntlClientProvider>{children}</NextIntlClientProvider>
+                <ThemeProvider>
+                    <NextIntlClientProvider>
+                        <AppHeader />
+                        {children}
+                    </NextIntlClientProvider>
+                </ThemeProvider>
             </body>
         </html>
     );

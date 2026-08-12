@@ -3,6 +3,24 @@
         "title": "BPR Conference",
         "description": "Real-time broadcast translation powered by the Gemini Live API."
     },
+    "Theme": {
+        "system": "system",
+        "light": "light",
+        "dark": "dark",
+        "theme": "Theme",
+        "switchTheme": "Switch theme to {theme}",
+        "currentTheme": "Current theme: {theme}"
+    },
+    "Header": {
+        "liveTranslation": "Live translation",
+        "language": "Language",
+        "currentLanguage": "Current language: {language}",
+        "switchLanguage": "Switch language to {language}",
+        "languages": {
+            "en": "English",
+            "cs": "Czech"
+        }
+    },
     "Home": {
         "title": "BPR Conference",
         "liveTranslation": "Live translation",
@@ -36,7 +54,7 @@
         "selectAll": "Select all",
         "clear": "Clear",
         "creating": "Creating...",
-        "createSession": "Create session",
+        "createSession": "Create new session",
         "createError": "Failed to create session",
         "incorrectPassword": "Incorrect password",
         "invalidRequest": "Invalid request",

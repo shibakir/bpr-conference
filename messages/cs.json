@@ -3,6 +3,24 @@
         "title": "BPR Conference",
         "description": "Překlad vysílání v reálném čase pomocí Gemini Live API."
     },
+    "Theme": {
+        "system": "systémový",
+        "light": "světlý",
+        "dark": "tmavý",
+        "theme": "Motiv",
+        "switchTheme": "Přepnout motiv na {theme}",
+        "currentTheme": "Aktuální motiv: {theme}"
+    },
+    "Header": {
+        "liveTranslation": "Živý překlad",
+        "language": "Jazyk",
+        "currentLanguage": "Aktuální jazyk: {language}",
+        "switchLanguage": "Přepnout jazyk na {language}",
+        "languages": {
+            "en": "Angličtina",
+            "cs": "Čeština"
+        }
+    },
     "Home": {
         "title": "BPR Conference",
         "liveTranslation": "Živý překlad",
@@ -36,7 +54,7 @@
         "selectAll": "Vybrat vše",
         "clear": "Vymazat",
         "creating": "Vytvářím...",
-        "createSession": "Vytvořit session",
+        "createSession": "Vytvořit novou session",
         "createError": "Nepodařilo se vytvořit session",
         "incorrectPassword": "Nesprávné heslo",
         "invalidRequest": "Neplatný požadavek",

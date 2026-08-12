@@ -1,14 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-    CaptionsIcon,
-    ClockIcon,
-    LanguagesIcon,
-    RadioTowerIcon,
-    Volume2Icon,
-    XIcon,
-} from "lucide-react";
+import { CaptionsIcon, ClockIcon, RadioTowerIcon, Volume2Icon, XIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -18,7 +11,7 @@ import { CenteredPage } from "@/components/CenteredPage";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
     Command,
@@ -44,8 +37,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Slider } from "@/components/ui/slider";
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { Link, useRouter } from "@/i18n/navigation";
-import { locales } from "@/i18n/routing";
+import { useRouter } from "@/i18n/navigation";
 import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
 import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
 import {
@@ -252,59 +244,12 @@ export default function Home() {
         }
     }
 
-    const title = t("title");
-    const titleHighlight = "BPR";
-    const titleHighlightIndex = title.indexOf(titleHighlight);
-
     return (
         <CenteredPage className="sm:px-6">
             <section className="grid w-full max-w-xl gap-6">
-                <nav className="flex justify-center gap-1" aria-label="Language">
-                    {locales.map((item) => (
-                        <Button
-                            key={item}
-                            asChild
-                            variant={item === locale ? "secondary" : "ghost"}
-                            size="xs"
-                        >
-                            <Link
-                                href="/"
-                                locale={item}
-                                aria-label={t("switchLocale", {
-                                    locale: item.toUpperCase(),
-                                })}
-                            >
-                                {item.toUpperCase()}
-                            </Link>
-                        </Button>
-                    ))}
-                </nav>
-
-                <div className="space-y-3 text-center">
-                    <Badge variant="outline" className="mx-auto gap-1.5">
-                        <LanguagesIcon className="size-3" />
-                        {t("liveTranslation")}
-                    </Badge>
-                    <h1 className="text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-                        {titleHighlightIndex >= 0 ? (
-                            <>
-                                {title.slice(0, titleHighlightIndex)}
-                                <span className="text-primary">{titleHighlight}</span>
-                                {title.slice(titleHighlightIndex + titleHighlight.length)}
-                            </>
-                        ) : (
-                            title
-                        )}
-                    </h1>
-                    <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
-                        {t("subtitle")}
-                    </p>
-                </div>
-
                 <Card>
                     <CardHeader>
                         <CardTitle>{t("createSession")}</CardTitle>
-                        <CardDescription>{t("subtitle")}</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <form className="grid gap-4" onSubmit={handleSubmit(createSession)}>
