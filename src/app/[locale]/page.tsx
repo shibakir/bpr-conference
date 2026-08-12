@@ -55,7 +55,7 @@ import {
 import { TRANSLATION_OUTPUT_MODES, type TranslationOutputMode } from "@/lib/session-types";
 import { cn } from "@/lib/utils";
 
-const DEFAULT_LANGUAGES = ["en", "zh-Hans", "fr", "de", "it", "ar", "ru", "vi"];
+const DEFAULT_SELECTED_LANGUAGES: string[] = [];
 
 const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
 
@@ -65,7 +65,7 @@ function getDefaultFormValues(): CreateSessionFormValues {
         langSearch: "",
         password: "",
         restrictLanguages: true,
-        selectedLanguages: [...DEFAULT_LANGUAGES],
+        selectedLanguages: [...DEFAULT_SELECTED_LANGUAGES],
         translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
     };
 }
@@ -104,7 +104,8 @@ export default function Home() {
     const translationOutputs =
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const restrictLanguages = useWatch({ control, name: "restrictLanguages" }) ?? true;
-    const selectedLanguages = useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_LANGUAGES;
+    const selectedLanguages =
+        useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_SELECTED_LANGUAGES;
     const langSearch = useWatch({ control, name: "langSearch" }) ?? "";
 
     function setSelectedLanguagesValue(next: string[]) {
@@ -354,7 +355,10 @@ export default function Home() {
                                                 )
                                             }
                                             disabled={isSubmitting}
-                                            aria-invalid={!!errors.restrictLanguages}
+                                            aria-invalid={
+                                                !!errors.restrictLanguages ||
+                                                !!errors.selectedLanguages
+                                            }
                                             className="mt-0.5"
                                         />
                                         <FieldContent>
@@ -410,6 +414,7 @@ export default function Home() {
                                             >
                                                 <CommandInput
                                                     placeholder={t("searchLanguages")}
+                                                    className="text-base sm:text-sm"
                                                     value={langSearch}
                                                     disabled={isSubmitting}
                                                     onValueChange={(value) =>
@@ -498,7 +503,11 @@ export default function Home() {
                                                     </Button>
                                                 </div>
                                             </div>
-                                            <FieldError errors={[errors.selectedLanguages]} />
+                                            <FieldError>
+                                                {errors.selectedLanguages
+                                                    ? t("selectAtLeastOneLanguage")
+                                                    : null}
+                                            </FieldError>
                                         </div>
                                     )}
                                 </FieldSet>
