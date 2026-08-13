@@ -1,4 +1,5 @@
 export const API_ERROR_CODES = {
+    BACKEND_UNAVAILABLE: "backend_unavailable",
     CREATE_SESSION_FAILED: "create_session_failed",
     INCORRECT_PASSWORD: "incorrect_password",
     INVALID_LOCALE: "invalid_locale",

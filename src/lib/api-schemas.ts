@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-import { locales, routing } from "@/i18n/routing";
-import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
+import { defaultLocale, locales } from "../i18n/locales";
+import { API_ERROR_CODES, type ApiErrorCode } from "./api-errors";
 import {
     DEFAULT_SESSION_DURATION_MINUTES,
     MAX_SESSION_DURATION_MINUTES,
     MIN_SESSION_DURATION_MINUTES,
-} from "@/lib/session-duration";
-import { TRANSLATION_OUTPUT_MODES } from "@/lib/session-types";
+} from "./session-duration";
+import { TRANSLATION_OUTPUT_MODES } from "./session-types";
 
 const apiErrorCodes = Object.values(API_ERROR_CODES) as [ApiErrorCode, ...ApiErrorCode[]];
 
@@ -41,7 +41,7 @@ export const createSessionRequestSchema = z.object({
     enableAudioTranslation: z.boolean().optional(),
     enableTranscription: z.boolean().optional(),
     eventId: z.string().optional(),
-    locale: localeSchema.optional().default(routing.defaultLocale),
+    locale: localeSchema.optional().default(defaultLocale),
     organizerName: organizerNameSchema,
     password: z.string().optional(),
     translationOutputs: z.array(translationOutputModeSchema).optional(),

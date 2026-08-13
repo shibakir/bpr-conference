@@ -22,7 +22,7 @@ Attendee → subscribes to translator-{lang} audio track
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - A [Gemini API key](https://aistudio.google.com/apikey)
 - A running LiveKit server (local or cloud)
 
@@ -63,17 +63,26 @@ The default dev keys are `devkey` / `secret`, matching `.env.local`.
 
 ### 3. Configure environment
 
-Edit `.env.local`:
+Edit `.env.local` in this web project:
 
 ```env
-LIVEKIT_API_KEY=devkey
-LIVEKIT_API_SECRET=secret
-LIVEKIT_URL=ws://localhost:7880
-GEMINI_API_KEY=your-gemini-api-key-here
-BROADCAST_PASSWORD=optional-secure-password
+BACKEND_API_ORIGIN=http://127.0.0.1:3001
+NEXT_PUBLIC_ATTENDEE_ORIGIN=http://localhost:3000
 ```
 
+Configure LiveKit, Gemini and broadcaster password in the sibling
+`../bpr-conference-server/.env.local`.
+
 ### 4. Run the app
+
+Start the Nest API from the sibling project in one terminal:
+
+```bash
+cd ../bpr-conference-server
+npm run dev
+```
+
+Start the Next.js web app from this project in another terminal:
 
 ```bash
 npm run dev
@@ -81,9 +90,25 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
-## Deploy to Cloud Run
+By default, Next proxies `/api/*` to `http://127.0.0.1:3001`. Override this with
+`BACKEND_API_ORIGIN` if the Nest API runs elsewhere.
 
-We recommend deploying to Google Cloud Run since the translation bridges are long-running processes (WebSocket connections to Gemini and LiveKit) that require persistent containers and support for long-running requests.
+For a production-like local run:
+
+```bash
+npm run build
+npm start
+```
+
+Run the server separately from `../bpr-conference-server` with `npm run build` and `npm start`.
+
+## Deploy API Server to Cloud Run
+
+We recommend deploying the sibling `../bpr-conference-server` project to Google Cloud Run
+since the translation bridges are long-running processes (WebSocket connections to Gemini and
+LiveKit) that require persistent containers and support for long-running requests.
+
+Deploy the web app separately and set its `BACKEND_API_ORIGIN` to the API server URL.
 
 ### Prerequisites
 
@@ -95,6 +120,7 @@ We recommend deploying to Google Cloud Run since the translation bridges are lon
 First, create secrets in Google Secret Manager (reads values from your `.env.local`):
 
 ```bash
+cd ../bpr-conference-server
 source <(grep -v '^#' .env.local | sed 's/^/export /')
 
 echo -n "$GEMINI_API_KEY" | gcloud secrets create gemini-api-key --data-file=-
@@ -124,6 +150,7 @@ LIVEKIT_URL=wss://your-project.livekit.cloud"
 For subsequent deployments (code changes only, retaining existing secrets and environment variables):
 
 ```bash
+cd ../bpr-conference-server
 gcloud run deploy live-translate --source . --region us-central1
 ```
 
@@ -217,9 +244,7 @@ gcloud run services update live-translate --region us-central1 --iap
 src/
 ├── app/
 │   ├── api/
-│   │   ├── sessions/          # Create/list/delete sessions
-│   │   ├── token/             # LiveKit token generation
-│   │   └── translate/         # Request translations, check status
+│   │   └── [...path]/route.ts         # Thin proxy to the Nest API
 │   ├── session/[id]/
 │   │   ├── broadcast/         # Organizer view
 │   │   └── watch/             # Attendee view + language selector
@@ -229,17 +254,19 @@ src/
 ├── components/
 │   └── SessionQRCode.tsx
 └── lib/
-    ├── languages.ts                    # Supported languages
-    ├── translation-bridge.ts           # LiveKit ↔ Gemini bridge
-    └── translation-session-manager.ts  # Singleton: max 1 session/lang
+    ├── api-client.ts
+    ├── api-schemas.ts
+    ├── backend-origin.ts
+    └── languages.ts                   # Supported languages for UI
 ```
 
 ## Key design decisions
 
 - **Audio only** — no video, keeps things simple and bandwidth-light
 - **`translationConfig`** — uses Gemini's native directional translation, not prompt-based
-- **`@livekit/rtc-node`** — server-side bot joins the room programmatically (not a browser)
-- **Singleton per language** — `TranslationSessionManager` ensures at most one Gemini session per language per room
+- **Separate Nest API** — `../bpr-conference-server` owns LiveKit tokens, Gemini bridges and in-memory sessions; Next only serves UI and proxies `/api/*`
+- **Server-side LiveKit bot** — the Nest server uses `@livekit/rtc-node` to join rooms programmatically
+- **Singleton per language** — the Nest server's `TranslationSessionManager` ensures at most one Gemini session per language per room
 - **Attendee audio switching** — client uses `setSubscribed()` to subscribe only to the selected translator bot's audio track
 - **Reliable transcription delivery** — transcriptions are sent via `publishData` (reliable data channel), not tied to audio track subscription state
 - **Tab close cleanup** — `navigator.sendBeacon()` fires on `beforeunload` to decrement subscriber counts and tear down idle Gemini sessions

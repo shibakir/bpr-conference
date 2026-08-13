@@ -25,7 +25,6 @@ const clientRuntimeFiles = [
 const serverRuntimeFiles = [
     "src/app/**/route.ts",
     "src/i18n/**/*.{ts,tsx}",
-    "src/instrumentation.ts",
     "src/lib/**/*.{ts,tsx}",
     "src/proxy.ts",
 ];
@@ -147,11 +146,9 @@ const eslintConfig = defineConfig([
         files: ["src/**/*.{ts,tsx}"],
         ignores: [
             "src/env/**/*.{ts,tsx}",
-            "src/instrumentation.ts",
+            "src/lib/backend-origin.ts",
             "src/lib/client-logger.ts",
-            "src/lib/logger.ts",
             "src/lib/public-origin.ts",
-            "src/lib/server-env.ts",
         ],
         rules: {
             "no-restricted-properties": [
@@ -160,7 +157,7 @@ const eslintConfig = defineConfig([
                     object: "process",
                     property: "env",
                     message:
-                        "Read environment variables through @/lib/server-env or @/lib/public-origin so secrets stay centralized.",
+                        "Read environment variables through @/lib/backend-origin or @/lib/public-origin so config stays centralized.",
                 },
             ],
         },
@@ -244,7 +241,7 @@ const eslintConfig = defineConfig([
         },
     },
     prettier,
-    globalIgnores([".next/**", "out/**", "build/**", "coverage/**", "next-env.d.ts"]),
+    globalIgnores([".next/**", "out/**", "build/**", "coverage/**", "dist/**", "next-env.d.ts"]),
 ]);
 
 export default eslintConfig;
