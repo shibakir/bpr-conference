@@ -1,520 +1,493 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { CaptionsIcon, RadioTowerIcon, Volume2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import {
-  ClockIcon,
-  LanguagesIcon,
-  RadioTowerIcon,
-  SearchIcon,
-  XIcon,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import useSWR from "swr";
+
+import { CenteredPage } from "@/components/CenteredPage";
+import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Field,
+    FieldDescription,
+    FieldError,
+    FieldGroup,
+    FieldLabel,
+    FieldLegend,
+    FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Slider } from "@/components/ui/slider";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
-import { Link, useRouter } from "@/i18n/navigation";
-import { locales } from "@/i18n/routing";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useRouter } from "@/i18n/navigation";
+import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
+import { API_ERROR_CODES, type ApiErrorCode } from "@/lib/api-errors";
 import {
-  API_ERROR_CODES,
-  getApiErrorCode,
-  type ApiErrorCode,
-} from "@/lib/api-errors";
-import { SUPPORTED_LANGUAGES, getLanguageDisplayName } from "@/lib/languages";
+    authStatusResponseSchema,
+    createSessionFormSchema,
+    type CreateSessionFormValues,
+    createSessionResponseSchema,
+} from "@/lib/api-schemas";
+import { clientLogger } from "@/lib/client-logger";
+import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
-  DEFAULT_SESSION_DURATION_MINUTES,
-  MAX_SESSION_DURATION_MINUTES,
-  MIN_SESSION_DURATION_MINUTES,
+    DEFAULT_SESSION_DURATION_MINUTES,
+    formatSessionDurationLabel,
+    SESSION_DURATION_OPTIONS_MINUTES,
 } from "@/lib/session-duration";
+import { TRANSLATION_OUTPUT_MODES, type TranslationOutputMode } from "@/lib/session-types";
+import { cn } from "@/lib/utils";
 
-const DEFAULT_LANGUAGES = [
-  "en",
-  "zh-Hans",
-  "fr",
-  "de",
-  "it",
-  "ar",
-  "ru",
-  "vi",
-];
+const DEFAULT_SELECTED_LANGUAGES: string[] = [];
 
-const DEFAULT_SOURCE_LANGUAGE = "cs";
+const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
+
+function getDefaultFormValues(): CreateSessionFormValues {
+    return {
+        durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
+        password: "",
+        selectedLanguages: [...DEFAULT_SELECTED_LANGUAGES],
+        translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
+    };
+}
+
+async function fetchAuthStatus(url: string) {
+    return fetchValidatedJson(url, undefined, authStatusResponseSchema);
+}
+
+const FORM_UPDATE_OPTIONS = {
+    shouldDirty: true,
+    shouldValidate: true,
+} as const;
 
 export default function Home() {
-  const t = useTranslations("Home");
-  const locale = useLocale();
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [passwordRequired, setPasswordRequired] = useState(false);
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [sourceLanguage, setSourceLanguage] = useState(DEFAULT_SOURCE_LANGUAGE);
-  const [durationMinutes, setDurationMinutes] = useState(
-    DEFAULT_SESSION_DURATION_MINUTES
-  );
-  const [enableTranscription, setEnableTranscription] = useState(false);
-  const [restrictLanguages, setRestrictLanguages] = useState(true);
-  const [selectedLanguages, setSelectedLanguages] =
-    useState<string[]>(DEFAULT_LANGUAGES);
-  const [langSearch, setLangSearch] = useState("");
+    const t = useTranslations("Home");
+    const locale = useLocale();
+    const router = useRouter();
+    const [error, setError] = useState<string | null>(null);
+    const [langSearch, setLangSearch] = useState("");
+    const { data: authStatus, isLoading: isAuthStatusLoading } = useSWR(
+        "/api/auth/status",
+        fetchAuthStatus,
+        {
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
+        },
+    );
+    const passwordRequired = authStatus?.passwordRequired === true;
+    const {
+        control,
+        formState: { errors, isSubmitting },
+        handleSubmit,
+        register,
+        setValue,
+    } = useForm<CreateSessionFormValues>({
+        defaultValues: getDefaultFormValues(),
+        resolver: zodResolver(createSessionFormSchema),
+    });
+    const durationMinutes =
+        useWatch({ control, name: "durationMinutes" }) ?? DEFAULT_SESSION_DURATION_MINUTES;
+    const translationOutputs =
+        useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
+    const selectedLanguages =
+        useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_SELECTED_LANGUAGES;
 
-  const languageOptions = useMemo(
-    () =>
-      SUPPORTED_LANGUAGES.map((lang) => ({
-        ...lang,
-        displayName: getLanguageDisplayName(lang, locale),
-      })).sort((a, b) =>
-        a.displayName.localeCompare(b.displayName, locale, {
-          sensitivity: "base",
-        })
-      ),
-    [locale]
-  );
+    function setSelectedLanguagesValue(next: string[]) {
+        setValue("selectedLanguages", next, FORM_UPDATE_OPTIONS);
+    }
 
-  const translationLanguageOptions = useMemo(
-    () => languageOptions.filter((lang) => lang.code !== sourceLanguage),
-    [languageOptions, sourceLanguage]
-  );
+    function setTranslationOutputsValue(next: TranslationOutputMode[]) {
+        setValue("translationOutputs", next, FORM_UPDATE_OPTIONS);
+    }
 
-  const selectedTranslationLanguages = useMemo(
-    () => selectedLanguages.filter((code) => code !== sourceLanguage),
-    [selectedLanguages, sourceLanguage]
-  );
+    function setLanguageSelected(languageCode: string, selected: boolean) {
+        setSelectedLanguagesValue(
+            selected
+                ? Array.from(new Set([...selectedLanguages, languageCode]))
+                : selectedLanguages.filter((code) => code !== languageCode),
+        );
+    }
 
-  const filteredLanguages = translationLanguageOptions.filter((lang) => {
-    const query = langSearch.trim().toLocaleLowerCase(locale);
+    const languageOptions = useMemo(
+        () =>
+            SUPPORTED_LANGUAGES.map((lang) => ({
+                ...lang,
+                displayName: getLanguageDisplayName(lang, locale),
+            })).sort((a, b) =>
+                a.displayName.localeCompare(b.displayName, locale, {
+                    sensitivity: "base",
+                }),
+            ),
+        [locale],
+    );
+
+    const filteredLanguages = useMemo(() => {
+        const query = langSearch.trim();
+
+        if (!query) {
+            return languageOptions;
+        }
+
+        const localeQuery = query.toLocaleLowerCase(locale);
+        const normalizedQuery = query.toLowerCase();
+
+        return languageOptions.filter(
+            (lang) =>
+                lang.displayName.toLocaleLowerCase(locale).includes(localeQuery) ||
+                lang.name.toLowerCase().includes(normalizedQuery) ||
+                lang.code.toLowerCase().includes(normalizedQuery),
+        );
+    }, [languageOptions, langSearch, locale]);
+
+    function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
+        switch (code) {
+            case API_ERROR_CODES.INCORRECT_PASSWORD:
+                return t("incorrectPassword");
+            case API_ERROR_CODES.INVALID_SESSION_DURATION:
+                return t("invalidSessionDuration");
+            case API_ERROR_CODES.INVALID_LOCALE:
+            case API_ERROR_CODES.INVALID_REQUEST:
+                return t("invalidSessionSettings");
+            default:
+                return t("createError");
+        }
+    }
+
+    async function createSession(values: CreateSessionFormValues) {
+        setError(null);
+        const valuesEnableAudioTranslation = values.translationOutputs.includes("audio");
+        const valuesEnableTranscription = values.translationOutputs.includes("text");
+
+        try {
+            const data = await fetchValidatedJson(
+                "/api/sessions",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        organizerName: "host",
+                        password: values.password,
+                        locale,
+                        translationOutputs: values.translationOutputs,
+                        enableAudioTranslation: valuesEnableAudioTranslation,
+                        enableTranscription: valuesEnableTranscription,
+                        durationMinutes: values.durationMinutes,
+                        allowedLanguages: values.selectedLanguages,
+                    }),
+                },
+                createSessionResponseSchema,
+            );
+
+            if (passwordRequired) {
+                sessionStorage.setItem("broadcast_password", values.password);
+            }
+            router.push(`/session/${data.sessionId}/broadcast`);
+        } catch (requestError) {
+            if (requestError instanceof ApiRequestError) {
+                setError(getCreateSessionErrorMessage(requestError.code));
+                return;
+            }
+
+            clientLogger.error("Failed to create session:", requestError);
+            setError(t("createError"));
+        }
+    }
+
     return (
-      lang.displayName.toLocaleLowerCase(locale).includes(query) ||
-      lang.name.toLowerCase().includes(query.toLowerCase()) ||
-      lang.code.toLowerCase().includes(query.toLowerCase())
-    );
-  });
+        <CenteredPage className="sm:px-6">
+            <section className="grid w-full max-w-xl gap-6">
+                <Card className="shadow-md shadow-foreground/5">
+                    <CardHeader className="px-5 pt-5 sm:px-6">
+                        <CardTitle className="text-left">{t("createSession")}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                        <form className="grid gap-6" onSubmit={handleSubmit(createSession)}>
+                            <FieldGroup className="gap-6">
+                                {isAuthStatusLoading && !authStatus ? (
+                                    <Field aria-hidden="true">
+                                        <Skeleton className="h-4 w-48" />
+                                        <Skeleton className="h-8 w-full rounded-lg" />
+                                    </Field>
+                                ) : passwordRequired ? (
+                                    <Field data-invalid={!!errors.password}>
+                                        <FieldLabel htmlFor="broadcast-password">
+                                            {t("passwordLabel")}
+                                        </FieldLabel>
+                                        <PasswordInput
+                                            id="broadcast-password"
+                                            autoComplete="new-password"
+                                            placeholder={t("passwordPlaceholder")}
+                                            disabled={isSubmitting}
+                                            aria-invalid={!!errors.password}
+                                            {...register("password")}
+                                        />
+                                        <FieldError errors={[errors.password]} />
+                                    </Field>
+                                ) : null}
 
-  function handleSourceLanguageChange(event: ChangeEvent<HTMLSelectElement>) {
-    const nextSourceLanguage = event.target.value;
-    setSourceLanguage(nextSourceLanguage);
-    setSelectedLanguages((prev) =>
-      prev.filter((code) => code !== nextSourceLanguage)
-    );
-  }
+                                <FieldSet className="gap-3">
+                                    <FieldLabel htmlFor="session-duration">
+                                        {t("duration")}
+                                    </FieldLabel>
+                                    <NativeSelect
+                                        id="session-duration"
+                                        className="w-full"
+                                        aria-label={t("duration")}
+                                        aria-invalid={!!errors.durationMinutes}
+                                        value={String(durationMinutes)}
+                                        onChange={(event) =>
+                                            setValue(
+                                                "durationMinutes",
+                                                Number(event.target.value),
+                                                FORM_UPDATE_OPTIONS,
+                                            )
+                                        }
+                                        disabled={isSubmitting}
+                                    >
+                                        {SESSION_DURATION_OPTIONS_MINUTES.map((duration) => (
+                                            <NativeSelectOption
+                                                key={duration}
+                                                value={String(duration)}
+                                            >
+                                                {formatSessionDurationLabel(duration, locale)}
+                                            </NativeSelectOption>
+                                        ))}
+                                    </NativeSelect>
+                                    <FieldDescription>{t("durationDescription")}</FieldDescription>
+                                    <FieldError errors={[errors.durationMinutes]} />
+                                </FieldSet>
 
-  useEffect(() => {
-    async function checkAuthStatus() {
-      try {
-        const res = await fetch("/api/auth/status");
-        const data = await res.json();
-        setPasswordRequired(data.passwordRequired);
-      } catch (err) {
-        console.error("Failed to check auth status:", err);
-      }
-    }
-    checkAuthStatus();
-  }, []);
+                                <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                                    <div className="grid gap-1">
+                                        <FieldLegend variant="label">
+                                            {t("translationOutputs")}
+                                        </FieldLegend>
+                                        <FieldDescription>
+                                            {t("translationOutputsDescription")}
+                                        </FieldDescription>
+                                    </div>
+                                    <ToggleGroup
+                                        type="multiple"
+                                        value={translationOutputs}
+                                        disabled={isSubmitting}
+                                        aria-label={t("translationOutputs")}
+                                        className="grid w-full gap-2 sm:grid-cols-2"
+                                        onValueChange={(value) =>
+                                            setTranslationOutputsValue(
+                                                TRANSLATION_OUTPUT_MODES.filter((mode) =>
+                                                    value.includes(mode),
+                                                ),
+                                            )
+                                        }
+                                    >
+                                        {[
+                                            {
+                                                description: t("enableVoiceTranslationDescription"),
+                                                icon: Volume2Icon,
+                                                label: t("enableVoiceTranslation"),
+                                                value: "audio" as const,
+                                            },
+                                            {
+                                                description: t("enableTextTranslationDescription"),
+                                                icon: CaptionsIcon,
+                                                label: t("enableTextTranslation"),
+                                                value: "text" as const,
+                                            },
+                                        ].map((option) => {
+                                            const Icon = option.icon;
+                                            const selected = translationOutputs.includes(
+                                                option.value,
+                                            );
 
-  function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
-    switch (code) {
-      case API_ERROR_CODES.INCORRECT_PASSWORD:
-        return t("incorrectPassword");
-      case API_ERROR_CODES.INVALID_SESSION_DURATION:
-        return t("invalidSessionDuration");
-      case API_ERROR_CODES.INVALID_LOCALE:
-      case API_ERROR_CODES.INVALID_REQUEST:
-      case API_ERROR_CODES.INVALID_SOURCE_LANGUAGE:
-      case API_ERROR_CODES.UNSUPPORTED_SOURCE_LANGUAGE:
-        return t("invalidSessionSettings");
-      default:
-        return t("createError");
-    }
-  }
+                                            return (
+                                                <ToggleGroupItem
+                                                    key={option.value}
+                                                    value={option.value}
+                                                    aria-label={option.label}
+                                                    className="h-auto min-h-24 w-full items-center justify-start gap-3 whitespace-normal border-transparent bg-muted/35 p-3 text-left shadow-none data-[state=on]:border-primary/70 data-[state=on]:bg-primary/12"
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            "flex size-8 shrink-0 items-center justify-center rounded-md",
+                                                            selected
+                                                                ? "bg-primary text-primary-foreground"
+                                                                : "bg-muted text-muted-foreground",
+                                                        )}
+                                                    >
+                                                        <Icon className="size-4" />
+                                                    </span>
+                                                    <span className="grid gap-1">
+                                                        <span className="font-medium">
+                                                            {option.label}
+                                                        </span>
+                                                        <span className="text-sm leading-5 text-muted-foreground">
+                                                            {option.description}
+                                                        </span>
+                                                    </span>
+                                                </ToggleGroupItem>
+                                            );
+                                        })}
+                                    </ToggleGroup>
+                                    <FieldError>
+                                        {errors.translationOutputs
+                                            ? t("selectAtLeastOneTranslationOutput")
+                                            : null}
+                                    </FieldError>
+                                </FieldSet>
 
-  async function createSession() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          organizerName: "host",
-          password,
-          locale,
-          sourceLanguage,
-          enableTranscription,
-          durationMinutes,
-          allowedLanguages: restrictLanguages
-            ? selectedTranslationLanguages
-            : undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(getCreateSessionErrorMessage(getApiErrorCode(data)));
-        setLoading(false);
-        return;
-      }
-      if (passwordRequired) {
-        sessionStorage.setItem("broadcast_password", password);
-      }
-      router.push(`/session/${data.sessionId}/broadcast`);
-    } catch (err) {
-      console.error("Failed to create session:", err);
-      setError(t("createError"));
-      setLoading(false);
-    }
-  }
+                                <div className="border-t border-border/35 pt-5">
+                                    <FieldSet className="gap-3">
+                                        <FieldLegend variant="label">
+                                            {t("restrictLanguages")}
+                                        </FieldLegend>
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!loading) {
-      createSession();
-    }
-  }
+                                        <div className="rounded-lg bg-muted/20 p-1">
+                                            <div className="p-1 pb-0">
+                                                <Input
+                                                    type="search"
+                                                    placeholder={t("searchLanguages")}
+                                                    value={langSearch}
+                                                    disabled={isSubmitting}
+                                                    onChange={(event) =>
+                                                        setLangSearch(event.target.value)
+                                                    }
+                                                />
+                                            </div>
+                                            <div
+                                                className="h-40 overflow-y-auto px-1 py-1"
+                                                role="group"
+                                                aria-label={t("restrictLanguages")}
+                                            >
+                                                {filteredLanguages.length === 0 ? (
+                                                    <p className="py-6 text-center text-base text-muted-foreground">
+                                                        {t("noLanguagesFound")}
+                                                    </p>
+                                                ) : (
+                                                    <div className="grid gap-1">
+                                                        {filteredLanguages.map((lang) => {
+                                                            const isChecked =
+                                                                selectedLanguages.includes(
+                                                                    lang.code,
+                                                                );
+                                                            const id = `allowed-language-${lang.code}`;
 
-  const title = t("title");
-  const titleHighlight = "BPR";
-  const titleHighlightIndex = title.indexOf(titleHighlight);
+                                                            return (
+                                                                <div
+                                                                    key={lang.code}
+                                                                    className="flex min-h-9 items-center gap-2 rounded-sm px-2 py-1.5 text-base transition-colors hover:bg-muted"
+                                                                >
+                                                                    <Checkbox
+                                                                        id={id}
+                                                                        checked={isChecked}
+                                                                        disabled={isSubmitting}
+                                                                        onCheckedChange={(
+                                                                            checked,
+                                                                        ) =>
+                                                                            setLanguageSelected(
+                                                                                lang.code,
+                                                                                checked === true,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <label
+                                                                        htmlFor={id}
+                                                                        className={cn(
+                                                                            "min-w-0 flex-1 cursor-pointer select-none",
+                                                                            isSubmitting &&
+                                                                                "cursor-not-allowed opacity-50",
+                                                                        )}
+                                                                    >
+                                                                        <span className="block truncate">
+                                                                            {lang.flag}{" "}
+                                                                            {lang.displayName}
+                                                                        </span>
+                                                                    </label>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
 
-  return (
-    <main className="flex min-h-svh items-center justify-center px-4 py-10 sm:px-6">
-      <section className="grid w-full max-w-xl gap-6">
-        <nav className="flex justify-center gap-1" aria-label="Language">
-          {locales.map((item) => (
-            <Button
-              key={item}
-              asChild
-              variant={item === locale ? "secondary" : "ghost"}
-              size="xs"
-            >
-              <Link
-                href="/"
-                locale={item}
-                aria-label={t("switchLocale", {
-                  locale: item.toUpperCase(),
-                })}
-              >
-                {item.toUpperCase()}
-              </Link>
-            </Button>
-          ))}
-        </nav>
+                                        <div className="flex justify-end gap-1">
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="xs"
+                                                onClick={() =>
+                                                    setSelectedLanguagesValue(
+                                                        languageOptions.map((lang) => lang.code),
+                                                    )
+                                                }
+                                            >
+                                                {t("selectAll")}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="xs"
+                                                onClick={() => setSelectedLanguagesValue([])}
+                                            >
+                                                {t("clear")}
+                                            </Button>
+                                        </div>
+                                        <FieldError>
+                                            {errors.selectedLanguages
+                                                ? t("selectAtLeastOneLanguage")
+                                                : null}
+                                        </FieldError>
+                                    </FieldSet>
+                                </div>
 
-        <div className="space-y-3 text-center">
-          <Badge variant="outline" className="mx-auto gap-1.5">
-            <LanguagesIcon className="size-3" />
-            {t("liveTranslation")}
-          </Badge>
-          <h1 className="text-balance font-heading text-4xl font-semibold tracking-tight sm:text-5xl">
-            {titleHighlightIndex >= 0 ? (
-              <>
-                {title.slice(0, titleHighlightIndex)}
-                <span className="text-primary">{titleHighlight}</span>
-                {title.slice(titleHighlightIndex + titleHighlight.length)}
-              </>
-            ) : (
-              title
-            )}
-          </h1>
-          <p className="mx-auto max-w-md text-sm leading-6 text-muted-foreground">
-            {t("subtitle")}
-          </p>
-        </div>
+                                {error && (
+                                    <Alert variant="destructive">
+                                        <AlertDescription>{error}</AlertDescription>
+                                    </Alert>
+                                )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t("createSession")}</CardTitle>
-            <CardDescription>{t("subtitle")}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="grid gap-4" onSubmit={handleSubmit}>
-              {passwordRequired && (
-                <div className="grid gap-2">
-                  <Label htmlFor="broadcast-password">
-                    {t("passwordPlaceholder")}
-                  </Label>
-                  <Input
-                    id="broadcast-password"
-                    type="password"
-                    autoComplete="new-password"
-                    placeholder={t("passwordPlaceholder")}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    disabled={loading}
-                  />
-                </div>
-              )}
+                                <Button
+                                    type="submit"
+                                    disabled={isSubmitting}
+                                    id="create-session-btn"
+                                    className="w-full"
+                                >
+                                    {isSubmitting ? (
+                                        <>
+                                            <Spinner />
+                                            {t("creating")}
+                                        </>
+                                    ) : (
+                                        <>
+                                            <RadioTowerIcon />
+                                            {t("createSession")}
+                                        </>
+                                    )}
+                                </Button>
+                            </FieldGroup>
+                        </form>
+                    </CardContent>
+                </Card>
 
-              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <Label
-                    htmlFor="session-duration"
-                    className="flex items-center gap-2"
-                  >
-                    <ClockIcon className="size-4 text-muted-foreground" />
-                    {t("duration")}
-                  </Label>
-                  <Badge variant="secondary" className="font-mono tabular-nums">
-                    {t("durationValue", { count: durationMinutes })}
-                  </Badge>
-                </div>
-                <Slider
-                  id="session-duration"
-                  aria-label={t("duration")}
-                  value={[durationMinutes]}
-                  min={MIN_SESSION_DURATION_MINUTES}
-                  max={MAX_SESSION_DURATION_MINUTES}
-                  step={1}
-                  onValueChange={(value) =>
-                    setDurationMinutes(
-                      value[0] ?? DEFAULT_SESSION_DURATION_MINUTES
-                    )
-                  }
-                  disabled={loading}
-                />
-                <p className="text-xs leading-5 text-muted-foreground">
-                  {t("durationDescription")}
+                <p className="text-center text-base text-muted-foreground">
+                    <a
+                        target="_blank"
+                        href="https://bpr.cz/"
+                        rel="noopener noreferrer"
+                        className="underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                        Powered by <span className="font-medium text-foreground">BPR s.r.o</span>
+                    </a>
                 </p>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="source-language">{t("sourceLanguage")}</Label>
-                <NativeSelect
-                  id="source-language"
-                  className="w-full"
-                  value={sourceLanguage}
-                  onChange={handleSourceLanguageChange}
-                  disabled={loading}
-                >
-                  {languageOptions.map((lang) => (
-                    <NativeSelectOption key={lang.code} value={lang.code}>
-                      {lang.displayName} {lang.flag}
-                    </NativeSelectOption>
-                  ))}
-                </NativeSelect>
-              </div>
-
-              <Label className="items-start gap-3 rounded-lg border bg-muted/30 p-3">
-                <Checkbox
-                  checked={enableTranscription}
-                  onCheckedChange={(checked) =>
-                    setEnableTranscription(checked === true)
-                  }
-                  disabled={loading}
-                  className="mt-0.5"
-                />
-                <span className="grid gap-1">
-                  <span>{t("enableTranscription")}</span>
-                  <span className="text-xs font-normal leading-5 text-muted-foreground">
-                    {t("enableTranscriptionDescription")}
-                  </span>
-                </span>
-              </Label>
-
-              <div className="grid gap-3 rounded-lg border bg-muted/30 p-3">
-                <Label className="items-start gap-3">
-                  <Checkbox
-                    checked={restrictLanguages}
-                    onCheckedChange={(checked) =>
-                      setRestrictLanguages(checked === true)
-                    }
-                    disabled={loading}
-                    className="mt-0.5"
-                  />
-                  <span className="grid gap-1">
-                    <span>{t("restrictLanguages")}</span>
-                    <span className="text-xs font-normal leading-5 text-muted-foreground">
-                      {t("selectedCount", {
-                        count: selectedTranslationLanguages.length,
-                      })}
-                    </span>
-                  </span>
-                </Label>
-
-                {restrictLanguages && (
-                  <div className="grid gap-3">
-                    {selectedTranslationLanguages.length > 0 && (
-                      <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto rounded-lg border border-dashed bg-background p-2 pr-1 [scrollbar-gutter:stable]">
-                        {selectedTranslationLanguages.map((code) => {
-                          const lang = languageOptions.find(
-                            (item) => item.code === code
-                          );
-                          if (!lang) return null;
-                          return (
-                            <Button
-                              key={code}
-                              type="button"
-                              variant="secondary"
-                              size="xs"
-                              title={t("removeLanguage")}
-                              onClick={() =>
-                                setSelectedLanguages((prev) =>
-                                  prev.filter((item) => item !== code)
-                                )
-                              }
-                            >
-                              <span>{lang.flag}</span>
-                              <span>{lang.displayName}</span>
-                              <XIcon className="size-3" />
-                            </Button>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    <div className="relative">
-                      <SearchIcon className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                      <Input
-                        type="search"
-                        placeholder={t("searchLanguages")}
-                        value={langSearch}
-                        onChange={(e) => setLangSearch(e.target.value)}
-                        disabled={loading}
-                        className="pl-8"
-                      />
-                    </div>
-
-                    <ScrollArea className="h-40 rounded-lg border bg-background">
-                      <div className="grid gap-1 p-2">
-                        {filteredLanguages.length === 0 ? (
-                          <p className="px-2 py-4 text-center text-xs text-muted-foreground">
-                            {t("noLanguagesFound")}
-                          </p>
-                        ) : (
-                          filteredLanguages.map((lang) => {
-                            const isChecked = selectedLanguages.includes(
-                              lang.code
-                            );
-                            return (
-                              <Label
-                                key={lang.code}
-                                className="flex cursor-pointer items-center rounded-md px-2 py-1.5 text-sm hover:bg-muted"
-                              >
-                                <Checkbox
-                                  checked={isChecked}
-                                  onCheckedChange={() => {
-                                    setSelectedLanguages((prev) =>
-                                      isChecked
-                                        ? prev.filter(
-                                            (code) => code !== lang.code
-                                          )
-                                        : [...prev, lang.code]
-                                    );
-                                  }}
-                                  disabled={loading}
-                                />
-                                <span>
-                                  {lang.flag} {lang.displayName}
-                                </span>
-                              </Label>
-                            );
-                          })
-                        )}
-                      </div>
-                    </ScrollArea>
-
-                    <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-                      <span>
-                        {t("selectedCount", {
-                          count: selectedTranslationLanguages.length,
-                        })}
-                      </span>
-                      <div className="flex gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="xs"
-                          onClick={() =>
-                            setSelectedLanguages(
-                              translationLanguageOptions.map((lang) => lang.code)
-                            )
-                          }
-                        >
-                          {t("selectAll")}
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => setSelectedLanguages([])}
-                        >
-                          {t("clear")}
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {error && (
-                <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button
-                type="submit"
-                disabled={loading}
-                id="create-session-btn"
-                className="w-full"
-              >
-                {loading ? (
-                  <>
-                    <Spinner />
-                    {t("creating")}
-                  </>
-                ) : (
-                  <>
-                    <RadioTowerIcon />
-                    {t("createSession")}
-                  </>
-                )}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        {/* <div className="grid">
-          <Separator />
-          {[t("steps.speak"), t("steps.share"), t("steps.languages")].map(
-            (text, index) => (
-              <div key={text}>
-                <div className="grid grid-cols-[2rem_1fr] gap-4 py-4">
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {text}
-                  </p>
-                </div>
-                <Separator />
-              </div>
-            )
-          )}
-        </div> */}
-
-        <p className="text-center font-mono text-xl text-muted-foreground">
-          <a
-            target="_blank"
-            href="https://bpr.cz/"
-            rel="noopener noreferrer"
-            className="whitespace-nowrap text-primary underline-offset-4 hover:underline"
-          >
-            Powered by BPR s.r.o
-          </a>
-        </p>
-      </section>
-    </main>
-  );
+            </section>
+        </CenteredPage>
+    );
 }
