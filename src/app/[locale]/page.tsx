@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CaptionsIcon, ClockIcon, RadioTowerIcon, Volume2Icon } from "lucide-react";
+import { CaptionsIcon, RadioTowerIcon, Volume2Icon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -10,7 +10,6 @@ import useSWR from "swr";
 import { CenteredPage } from "@/components/CenteredPage";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -96,7 +95,6 @@ export default function Home() {
     });
     const durationMinutes =
         useWatch({ control, name: "durationMinutes" }) ?? DEFAULT_SESSION_DURATION_MINUTES;
-    const durationLabel = formatSessionDurationLabel(durationMinutes, locale);
     const translationOutputs =
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const selectedLanguages =
@@ -236,21 +234,9 @@ export default function Home() {
                                 ) : null}
 
                                 <FieldSet className="gap-3">
-                                    <div className="flex items-center justify-between gap-3">
-                                        <FieldLabel
-                                            htmlFor="session-duration"
-                                            className="flex items-center gap-2"
-                                        >
-                                            <ClockIcon className="size-4 text-muted-foreground" />
-                                            {t("duration")}
-                                        </FieldLabel>
-                                        <Badge
-                                            variant="secondary"
-                                            className="font-mono tabular-nums"
-                                        >
-                                            {durationLabel}
-                                        </Badge>
-                                    </div>
+                                    <FieldLabel htmlFor="session-duration">
+                                        {t("duration")}
+                                    </FieldLabel>
                                     <NativeSelect
                                         id="session-duration"
                                         className="w-full"
