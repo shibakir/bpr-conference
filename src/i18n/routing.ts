@@ -1,15 +1,12 @@
 import { defineRouting } from "next-intl/routing";
 
-export const locales = ["en", "cs"] as const;
+import { defaultLocale, isLocale, locales } from "./locales";
 
-export type Locale = (typeof locales)[number];
-
-export function isLocale(value: string): value is Locale {
-    return locales.includes(value as Locale);
-}
+export { defaultLocale, isLocale, locales };
+export type { Locale } from "./locales";
 
 export const routing = defineRouting({
     locales,
-    defaultLocale: "cs",
+    defaultLocale,
     localePrefix: "always",
 });

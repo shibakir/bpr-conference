@@ -1,6 +1,6 @@
 import type { z } from "zod";
 
-import { type ApiErrorCode, getApiErrorCode } from "@/lib/api-errors";
+import { type ApiErrorCode, getApiErrorCode } from "./api-errors";
 
 type ApiRequestErrorOptions = {
     code?: ApiErrorCode;
