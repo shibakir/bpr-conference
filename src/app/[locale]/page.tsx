@@ -13,14 +13,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
     FieldDescription,
@@ -30,6 +23,7 @@ import {
     FieldLegend,
     FieldSet,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -114,6 +108,14 @@ export default function Home() {
 
     function setTranslationOutputsValue(next: TranslationOutputMode[]) {
         setValue("translationOutputs", next, FORM_UPDATE_OPTIONS);
+    }
+
+    function setLanguageSelected(languageCode: string, selected: boolean) {
+        setSelectedLanguagesValue(
+            selected
+                ? Array.from(new Set([...selectedLanguages, languageCode]))
+                : selectedLanguages.filter((code) => code !== languageCode),
+        );
     }
 
     const languageOptions = useMemo(
@@ -361,61 +363,74 @@ export default function Home() {
                                             {t("restrictLanguages")}
                                         </FieldLegend>
 
-                                        <Command
-                                            shouldFilter={false}
-                                            className="rounded-lg bg-muted/20"
-                                        >
-                                            <CommandInput
-                                                placeholder={t("searchLanguages")}
-                                                className="text-lg sm:text-base"
-                                                value={langSearch}
-                                                disabled={isSubmitting}
-                                                onValueChange={setLangSearch}
-                                            />
-                                            <CommandList className="h-40 max-h-40">
+                                        <div className="rounded-lg bg-muted/20 p-1">
+                                            <div className="p-1 pb-0">
+                                                <Input
+                                                    type="search"
+                                                    placeholder={t("searchLanguages")}
+                                                    value={langSearch}
+                                                    disabled={isSubmitting}
+                                                    onChange={(event) =>
+                                                        setLangSearch(event.target.value)
+                                                    }
+                                                />
+                                            </div>
+                                            <div
+                                                className="h-40 overflow-y-auto px-1 py-1"
+                                                role="group"
+                                                aria-label={t("restrictLanguages")}
+                                            >
                                                 {filteredLanguages.length === 0 ? (
-                                                    <CommandEmpty>
+                                                    <p className="py-6 text-center text-base text-muted-foreground">
                                                         {t("noLanguagesFound")}
-                                                    </CommandEmpty>
+                                                    </p>
                                                 ) : (
-                                                    <CommandGroup>
+                                                    <div className="grid gap-1">
                                                         {filteredLanguages.map((lang) => {
                                                             const isChecked =
                                                                 selectedLanguages.includes(
                                                                     lang.code,
                                                                 );
+                                                            const id = `allowed-language-${lang.code}`;
+
                                                             return (
-                                                                <CommandItem
+                                                                <div
                                                                     key={lang.code}
-                                                                    value={lang.code}
-                                                                    data-checked={isChecked}
-                                                                    disabled={isSubmitting}
-                                                                    onSelect={() => {
-                                                                        setSelectedLanguagesValue(
-                                                                            isChecked
-                                                                                ? selectedLanguages.filter(
-                                                                                      (code) =>
-                                                                                          code !==
-                                                                                          lang.code,
-                                                                                  )
-                                                                                : [
-                                                                                      ...selectedLanguages,
-                                                                                      lang.code,
-                                                                                  ],
-                                                                        );
-                                                                    }}
+                                                                    className="flex min-h-9 items-center gap-2 rounded-sm px-2 py-1.5 text-base transition-colors hover:bg-muted"
                                                                 >
-                                                                    <span>
-                                                                        {lang.flag}{" "}
-                                                                        {lang.displayName}
-                                                                    </span>
-                                                                </CommandItem>
+                                                                    <Checkbox
+                                                                        id={id}
+                                                                        checked={isChecked}
+                                                                        disabled={isSubmitting}
+                                                                        onCheckedChange={(
+                                                                            checked,
+                                                                        ) =>
+                                                                            setLanguageSelected(
+                                                                                lang.code,
+                                                                                checked === true,
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                    <label
+                                                                        htmlFor={id}
+                                                                        className={cn(
+                                                                            "min-w-0 flex-1 cursor-pointer select-none",
+                                                                            isSubmitting &&
+                                                                                "cursor-not-allowed opacity-50",
+                                                                        )}
+                                                                    >
+                                                                        <span className="block truncate">
+                                                                            {lang.flag}{" "}
+                                                                            {lang.displayName}
+                                                                        </span>
+                                                                    </label>
+                                                                </div>
                                                             );
                                                         })}
-                                                    </CommandGroup>
+                                                    </div>
                                                 )}
-                                            </CommandList>
-                                        </Command>
+                                            </div>
+                                        </div>
 
                                         <div className="flex justify-end gap-1">
                                             <Button

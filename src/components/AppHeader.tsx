@@ -75,6 +75,7 @@ function LanguagePopover() {
                                 <Link
                                     href={pathname}
                                     locale={item}
+                                    scroll={false}
                                     aria-label={t("switchLanguage", { language })}
                                 >
                                     <span className="flex min-w-0 items-center gap-2">
