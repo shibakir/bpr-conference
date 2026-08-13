@@ -62,7 +62,7 @@ function ColorPicker({
     return (
         <div ref={setRootNode} className={cn("grid gap-2", className)}>
             <div className="flex items-center justify-between gap-3">
-                <Label htmlFor={id} className="text-xs text-muted-foreground">
+                <Label htmlFor={id} className="text-sm text-muted-foreground">
                     {label}
                 </Label>
                 <div className="flex items-center gap-2">
@@ -72,7 +72,7 @@ function ColorPicker({
                         onBlur={handleInputBlur}
                         onChange={handleInputChange}
                         spellCheck={false}
-                        className="h-7 w-24 font-mono text-xs uppercase"
+                        className="h-7 w-24 font-mono text-sm uppercase"
                         maxLength={7}
                     />
                     <Popover open={open} onOpenChange={onOpenChange}>

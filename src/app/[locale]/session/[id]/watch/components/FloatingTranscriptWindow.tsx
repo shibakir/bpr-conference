@@ -377,8 +377,8 @@ function SettingRow({
     return (
         <div className="grid gap-2">
             <div className="flex items-center justify-between gap-3">
-                <FieldLabel className="text-xs text-muted-foreground">{label}</FieldLabel>
-                <span className="font-mono text-xs text-muted-foreground">{value}</span>
+                <FieldLabel className="text-sm text-muted-foreground">{label}</FieldLabel>
+                <span className="font-mono text-sm text-muted-foreground">{value}</span>
             </div>
             {children}
         </div>
@@ -552,8 +552,8 @@ function CaptionSettingsPanel({
         <div className="grid gap-4">
             <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="grid gap-0.5">
-                    <span className="text-sm font-medium">{t("captionSettings")}</span>
-                    <span className="text-xs text-muted-foreground">{modeLabel}</span>
+                    <span className="text-base font-medium">{t("captionSettings")}</span>
+                    <span className="text-sm text-muted-foreground">{modeLabel}</span>
                 </div>
                 <Button
                     type="button"
@@ -603,7 +603,7 @@ function CaptionSettingsPanel({
                 <div className="grid gap-2">
                     <FieldLabel
                         htmlFor="caption-font-family"
-                        className="text-xs text-muted-foreground"
+                        className="text-sm text-muted-foreground"
                     >
                         {t("captionFontFamily")}
                     </FieldLabel>

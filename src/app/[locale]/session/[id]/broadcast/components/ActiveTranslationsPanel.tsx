@@ -16,13 +16,13 @@ export function ActiveTranslationsPanel({ translations }: { translations: Transl
     return (
         <section className="grid gap-3">
             <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">
+                <span className="text-base font-medium">
                     {t("translationsCount", { count: translations.length })}
                 </span>
             </div>
 
             {translations.length === 0 ? (
-                <p className="rounded-lg bg-muted/20 p-3 text-sm text-muted-foreground">
+                <p className="rounded-lg bg-muted/20 p-3 text-base text-muted-foreground">
                     {t("noTranslations")}
                 </p>
             ) : (
@@ -41,15 +41,15 @@ export function ActiveTranslationsPanel({ translations }: { translations: Transl
                                         <TableCell className="min-w-0 p-3">
                                             <div className="flex min-w-0 items-center gap-2">
                                                 {lang?.flag && (
-                                                    <span className="text-base">{lang.flag}</span>
+                                                    <span className="text-lg">{lang.flag}</span>
                                                 )}
-                                                <span className="truncate text-sm font-medium">
+                                                <span className="truncate text-base font-medium">
                                                     {languageName}
                                                 </span>
                                             </div>
                                         </TableCell>
                                         <TableCell className="p-3 text-right">
-                                            <span className="font-mono text-xs text-muted-foreground">
+                                            <span className="font-mono text-sm text-muted-foreground">
                                                 {t("listenerCount", {
                                                     count: translation.subscriberCount,
                                                 })}

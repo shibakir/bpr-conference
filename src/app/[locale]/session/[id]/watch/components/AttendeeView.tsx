@@ -265,7 +265,7 @@ export function AttendeeView({
                         <HeadphonesIcon className="size-5 text-primary" />
                         {t("title")}
                     </CardTitle>
-                    <CardDescription className="font-mono text-xs">
+                    <CardDescription className="font-mono text-sm">
                         {t("session", { sessionId })}
                     </CardDescription>
                 </CardHeader>
@@ -349,7 +349,9 @@ function SubtitleLanguageSelector({
             <ScrollArea className="max-h-48 rounded-lg bg-muted/20">
                 <div className="grid gap-2 p-3">
                     {languages.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("noSubtitleLanguages")}</p>
+                        <p className="text-base text-muted-foreground">
+                            {t("noSubtitleLanguages")}
+                        </p>
                     ) : (
                         languages.map((language) => {
                             const id = `subtitle-language-${language.code}`;
@@ -368,7 +370,7 @@ function SubtitleLanguageSelector({
                                     />
                                     <FieldLabel
                                         htmlFor={id}
-                                        className="min-w-0 flex-1 cursor-pointer text-sm font-normal"
+                                        className="min-w-0 flex-1 cursor-pointer text-base font-normal"
                                     >
                                         <span className="truncate">
                                             {language.flag} {language.label}

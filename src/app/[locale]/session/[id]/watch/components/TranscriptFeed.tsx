@@ -28,7 +28,7 @@ export function TranscriptFeed({
 
     if (paragraphs.length === 0) {
         return (
-            <p className="text-sm italic text-muted-foreground">
+            <p className="text-base italic text-muted-foreground">
                 {currentLanguage === "original"
                     ? t("selectLanguageForTranscription")
                     : t("waitingForSpeech")}

@@ -42,7 +42,7 @@ export function WatchStartGate({
                         <Volume2Icon />
                         {t("startListening")}
                     </Button>
-                    <p className="font-mono text-xs text-muted-foreground">
+                    <p className="font-mono text-sm text-muted-foreground">
                         {t("session", { sessionId })}
                     </p>
                 </CardContent>

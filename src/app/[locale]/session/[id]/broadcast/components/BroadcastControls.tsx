@@ -82,7 +82,7 @@ export function BroadcastControls({
                                 <RadioTowerIcon className="size-5 text-primary" />
                                 {t("title")}
                             </CardTitle>
-                            <CardDescription className="font-mono text-xs">
+                            <CardDescription className="font-mono text-sm">
                                 {t("session", { sessionId })}
                             </CardDescription>
                         </div>

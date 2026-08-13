@@ -36,7 +36,7 @@ export function TranscriptPanel({
     return (
         <section className="grid gap-3">
             <div className="flex items-center justify-between gap-3">
-                <span className="text-sm font-medium">{t("transcription")}</span>
+                <span className="text-base font-medium">{t("transcription")}</span>
                 <div className="flex items-center gap-1">
                     {floatingWindowControl}
                     <Button

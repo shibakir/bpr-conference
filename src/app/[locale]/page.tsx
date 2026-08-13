@@ -332,7 +332,7 @@ export default function Home() {
                                                         <span className="font-medium">
                                                             {option.label}
                                                         </span>
-                                                        <span className="text-xs leading-5 text-muted-foreground">
+                                                        <span className="text-sm leading-5 text-muted-foreground">
                                                             {option.description}
                                                         </span>
                                                     </span>
@@ -359,7 +359,7 @@ export default function Home() {
                                         >
                                             <CommandInput
                                                 placeholder={t("searchLanguages")}
-                                                className="text-base sm:text-sm"
+                                                className="text-lg sm:text-base"
                                                 value={langSearch}
                                                 disabled={isSubmitting}
                                                 onValueChange={(value) =>
@@ -480,10 +480,10 @@ export default function Home() {
             (text, index) => (
               <div key={text}>
                 <div className="grid grid-cols-[2rem_1fr] gap-4 py-4">
-                  <span className="font-mono text-xs text-muted-foreground">
+                  <span className="font-mono text-sm text-muted-foreground">
                     {String(index + 1).padStart(2, "0")}
                   </span>
-                  <p className="text-sm leading-6 text-muted-foreground">
+                  <p className="text-base leading-6 text-muted-foreground">
                     {text}
                   </p>
                 </div>
@@ -493,7 +493,7 @@ export default function Home() {
           )}
         </div> */}
 
-                <p className="text-center text-sm text-muted-foreground">
+                <p className="text-center text-base text-muted-foreground">
                     <a
                         target="_blank"
                         href="https://bpr.cz/"

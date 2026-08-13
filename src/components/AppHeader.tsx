@@ -78,7 +78,7 @@ function LanguagePopover() {
                                     aria-label={t("switchLanguage", { language })}
                                 >
                                     <span className="flex min-w-0 items-center gap-2">
-                                        <span className="font-mono text-xs uppercase">{item}</span>
+                                        <span className="font-mono text-sm uppercase">{item}</span>
                                         <span className="truncate">{language}</span>
                                     </span>
                                     <CheckIcon
@@ -133,7 +133,7 @@ export function AppHeader() {
                 <div className="flex min-w-0 flex-col items-center gap-1">
                     <Link
                         href="/"
-                        className="min-w-0 text-center font-heading text-base font-semibold tracking-normal sm:text-lg"
+                        className="min-w-0 text-center font-heading text-lg font-semibold tracking-normal sm:text-xl"
                         aria-label="BPR Conference"
                     >
                         <span className="text-primary">BPR</span>{" "}

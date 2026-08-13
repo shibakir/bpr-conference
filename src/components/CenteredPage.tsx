@@ -22,7 +22,7 @@ export function CenteredLoadingState({ label }: { label?: string }) {
             {label ? (
                 <div className="flex flex-col items-center gap-3 text-muted-foreground">
                     <Spinner className="size-5" />
-                    <p className="font-mono text-xs">{label}</p>
+                    <p className="font-mono text-sm">{label}</p>
                 </div>
             ) : (
                 <Spinner className="size-5 text-muted-foreground" />
