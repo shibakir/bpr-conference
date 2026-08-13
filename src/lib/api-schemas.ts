@@ -67,7 +67,6 @@ export const createSessionFormSchema = z.object({
         .int()
         .min(MIN_SESSION_DURATION_MINUTES)
         .max(MAX_SESSION_DURATION_MINUTES),
-    langSearch: z.string(),
     password: z.string(),
     selectedLanguages: z.array(z.string()).min(1),
     translationOutputs: z.array(translationOutputModeSchema).min(1, {

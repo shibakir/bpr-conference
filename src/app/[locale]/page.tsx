@@ -60,7 +60,6 @@ const DEFAULT_TRANSLATION_OUTPUTS: TranslationOutputMode[] = ["audio"];
 function getDefaultFormValues(): CreateSessionFormValues {
     return {
         durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
-        langSearch: "",
         password: "",
         selectedLanguages: [...DEFAULT_SELECTED_LANGUAGES],
         translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
@@ -81,6 +80,7 @@ export default function Home() {
     const locale = useLocale();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
+    const [langSearch, setLangSearch] = useState("");
     const { data: authStatus, isLoading: isAuthStatusLoading } = useSWR(
         "/api/auth/status",
         fetchAuthStatus,
@@ -107,7 +107,6 @@ export default function Home() {
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const selectedLanguages =
         useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_SELECTED_LANGUAGES;
-    const langSearch = useWatch({ control, name: "langSearch" }) ?? "";
 
     function setSelectedLanguagesValue(next: string[]) {
         setValue("selectedLanguages", next, FORM_UPDATE_OPTIONS);
@@ -130,14 +129,23 @@ export default function Home() {
         [locale],
     );
 
-    const filteredLanguages = languageOptions.filter((lang) => {
-        const query = langSearch.trim().toLocaleLowerCase(locale);
-        return (
-            lang.displayName.toLocaleLowerCase(locale).includes(query) ||
-            lang.name.toLowerCase().includes(query.toLowerCase()) ||
-            lang.code.toLowerCase().includes(query.toLowerCase())
+    const filteredLanguages = useMemo(() => {
+        const query = langSearch.trim();
+
+        if (!query) {
+            return languageOptions;
+        }
+
+        const localeQuery = query.toLocaleLowerCase(locale);
+        const normalizedQuery = query.toLowerCase();
+
+        return languageOptions.filter(
+            (lang) =>
+                lang.displayName.toLocaleLowerCase(locale).includes(localeQuery) ||
+                lang.name.toLowerCase().includes(normalizedQuery) ||
+                lang.code.toLowerCase().includes(normalizedQuery),
         );
-    });
+    }, [languageOptions, langSearch, locale]);
 
     function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
         switch (code) {
@@ -362,13 +370,7 @@ export default function Home() {
                                                 className="text-lg sm:text-base"
                                                 value={langSearch}
                                                 disabled={isSubmitting}
-                                                onValueChange={(value) =>
-                                                    setValue(
-                                                        "langSearch",
-                                                        value,
-                                                        FORM_UPDATE_OPTIONS,
-                                                    )
-                                                }
+                                                onValueChange={setLangSearch}
                                             />
                                             <CommandList className="h-40 max-h-40">
                                                 {filteredLanguages.length === 0 ? (
