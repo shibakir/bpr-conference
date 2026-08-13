@@ -18,6 +18,7 @@ import {
 } from "./server-env";
 import { DEFAULT_SESSION_DURATION_MINUTES } from "./session-duration";
 import { type BridgeStatus, TranslationBridge } from "./translation-bridge";
+import { participantWantsTranslation } from "./translation-bridge/participant-attributes";
 
 export interface TranslationInfo {
     language: string;
@@ -526,7 +527,7 @@ class TranslationSessionManager {
                 return false;
             }
 
-            return participant.attributes?.["language"] === targetLanguage;
+            return participantWantsTranslation(participant.attributes, targetLanguage);
         }).length;
     }
 

@@ -1,29 +1,11 @@
 import type { Room } from "@livekit/rtc-node";
 
 import { createLogger } from "../logger";
+import { participantWantsTranslation } from "./participant-attributes";
 
 export type TranslationDataPublisherOptions = {
     targetLanguage: string;
 };
-
-function parseCaptionLanguages(value: unknown): string[] {
-    if (typeof value !== "string") return [];
-
-    return value
-        .split(",")
-        .map((language) => language.trim())
-        .filter(Boolean);
-}
-
-function participantWantsTranscription(
-    participantAttributes: Record<string, string> | undefined,
-    targetLanguage: string,
-) {
-    return (
-        participantAttributes?.["language"] === targetLanguage ||
-        parseCaptionLanguages(participantAttributes?.["captionLanguages"]).includes(targetLanguage)
-    );
-}
 
 /** Publishes translated text through LiveKit data channels. */
 export class TranslationDataPublisher {
@@ -49,7 +31,7 @@ export class TranslationDataPublisher {
         try {
             const destinationIdentities = Array.from(room.remoteParticipants.values())
                 .filter((participant) =>
-                    participantWantsTranscription(
+                    participantWantsTranslation(
                         participant.attributes,
                         this.options.targetLanguage,
                     ),
