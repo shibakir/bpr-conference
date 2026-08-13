@@ -44,7 +44,7 @@ export function BroadcastPasswordGate({
                         <form className="grid gap-4" onSubmit={onSubmit}>
                             <Field data-invalid={!!passwordError}>
                                 <FieldLabel htmlFor="broadcast-password">
-                                    {t("passwordPlaceholder")}
+                                    {t("password")}
                                 </FieldLabel>
                                 <PasswordInput
                                     id="broadcast-password"

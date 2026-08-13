@@ -219,7 +219,7 @@ export default function Home() {
                                 ) : passwordRequired ? (
                                     <Field data-invalid={!!errors.password}>
                                         <FieldLabel htmlFor="broadcast-password">
-                                            {t("passwordPlaceholder")}
+                                            {t("passwordLabel")}
                                         </FieldLabel>
                                         <PasswordInput
                                             id="broadcast-password"
@@ -475,25 +475,6 @@ export default function Home() {
                         </form>
                     </CardContent>
                 </Card>
-
-                {/* <div className="grid">
-          <Separator />
-          {[t("steps.speak"), t("steps.share"), t("steps.languages")].map(
-            (text, index) => (
-              <div key={text}>
-                <div className="grid grid-cols-[2rem_1fr] gap-4 py-4">
-                  <span className="font-mono text-sm text-muted-foreground">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <p className="text-base leading-6 text-muted-foreground">
-                    {text}
-                  </p>
-                </div>
-                <Separator />
-              </div>
-            )
-          )}
-        </div> */}
 
                 <p className="text-center text-base text-muted-foreground">
                     <a
