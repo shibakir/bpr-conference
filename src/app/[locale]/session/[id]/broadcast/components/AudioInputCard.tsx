@@ -12,6 +12,8 @@ type AudioInputDeviceOption = {
     value: string;
 };
 
+const MAX_VOLUME_PERCENT = 200;
+
 export function AudioInputCard({
     title,
     enabled,
@@ -45,7 +47,7 @@ export function AudioInputCard({
         deviceSelectLabel !== undefined &&
         deviceSelectOptions !== undefined &&
         deviceSelectValue !== undefined ? (
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
                 <label
                     htmlFor={deviceSelectId}
                     className="text-sm font-medium text-muted-foreground"
@@ -71,8 +73,8 @@ export function AudioInputCard({
         ) : null;
 
     return (
-        <div className="grid gap-3 rounded-lg bg-muted/35 p-3">
-            <div className="flex items-center justify-between gap-3">
+        <div className="grid min-w-0 gap-3 rounded-lg bg-muted/35 p-3">
+            <div className="flex min-w-0 flex-col items-stretch gap-3 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
                 <div className="flex min-w-0 items-center gap-2 text-base font-medium">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                         {icon}
@@ -84,24 +86,31 @@ export function AudioInputCard({
                     variant={enabled ? "destructive" : "default"}
                     size="sm"
                     onClick={onToggle}
+                    className="w-full min-[400px]:w-auto"
                 >
                     {enabled ? stopLabel : actionLabel}
                 </Button>
             </div>
             {deviceSelect}
             {enabled && (
-                <div className="grid grid-cols-[4.75rem_minmax(0,1fr)_3rem] items-center gap-x-4 gap-y-2">
-                    <span className="font-mono text-sm text-muted-foreground">{t("volume")}</span>
+                <div className="grid min-w-0 gap-2">
+                    <div className="flex min-w-0 items-center justify-between gap-3">
+                        <span className="min-w-0 truncate font-mono text-sm text-muted-foreground">
+                            {t("volume")}
+                        </span>
+                        <span className="shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
+                            {volume}%
+                        </span>
+                    </div>
                     <Slider
                         value={[volume]}
                         min={0}
-                        max={100}
+                        max={MAX_VOLUME_PERCENT}
                         step={1}
+                        aria-label={t("volume")}
                         onValueChange={(value) => onVolumeChange(value[0] ?? 0)}
+                        className="min-w-0 px-1.5 py-2"
                     />
-                    <span className="text-right font-mono text-sm tabular-nums text-muted-foreground">
-                        {volume}%
-                    </span>
                 </div>
             )}
         </div>

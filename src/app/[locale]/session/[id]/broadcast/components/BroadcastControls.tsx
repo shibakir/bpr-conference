@@ -103,9 +103,9 @@ export function BroadcastControls({
     };
 
     return (
-        <section className="grid w-full max-w-xl gap-6">
-            <Card className="shadow-md shadow-foreground/5">
-                <CardHeader className="px-5 pt-5 sm:px-6">
+        <section className="grid w-full min-w-0 max-w-xl gap-6">
+            <Card className="min-w-0 shadow-md shadow-foreground/5">
+                <CardHeader className="px-4 pt-4 sm:px-6 sm:pt-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="grid min-w-0 gap-1">
                             <CardTitle className="flex items-center gap-2 text-left">
@@ -121,7 +121,7 @@ export function BroadcastControls({
                         </Badge>
                     </div>
                 </CardHeader>
-                <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
+                <CardContent className="px-4 pb-4 sm:px-6 sm:pb-6">
                     <FieldGroup className="gap-6">
                         <BroadcastStatus
                             expiresAt={expiresAt}
@@ -132,9 +132,9 @@ export function BroadcastControls({
                             onSessionExpired={onSessionExpired}
                         />
 
-                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                        <FieldSet className="min-w-0 gap-3 border-t border-border/35 pt-5">
                             <FieldTitle>{t("audioSources")}</FieldTitle>
-                            <div className="grid gap-3">
+                            <div className="grid min-w-0 gap-3">
                                 <AudioInputCard
                                     title={t("microphone")}
                                     enabled={audioMixer.isMicEnabled}
