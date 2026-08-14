@@ -22,13 +22,25 @@ The easiest way to see exactly what is failing is to use your browser's Develope
   {
     "sessionId": "c62f85dd",
     "organizerIdentity": "organizer-host",
+    "organizerKey": "...",
     "joinUrl": "https://...",
     "broadcastUrl": "https://..."
   }
   ```
 
-### Request 2: `GET /api/token?room=...&identity=...&role=organizer`
-- **Purpose**: Generates the LiveKit JWT token using your secret key.
+### Request 2: `POST /api/sessions/<SESSION_ID>/presenter`
+- **Purpose**: Claims or refreshes the active presenter lease for this browser.
+- **Status**: Should be `200 OK`.
+- **Payload**: Should return a JSON body like:
+  ```json
+  {
+    "active": true,
+    "leaseExpiresAt": "2026-08-14T10:00:00.000Z"
+  }
+  ```
+
+### Request 3: `POST /api/token`
+- **Purpose**: Generates the LiveKit JWT token after presenter lease validation.
 - **Status**: Should be `200 OK`.
 - **Payload**: Should return a JSON body containing your JWT token:
   ```json
@@ -70,10 +82,20 @@ If you want to verify that the Next.js API logic works independently of Cloud Ru
    ```
    *Expected output: A JSON object containing a 8-character `sessionId`.*
 
-   **Test 2: Generate Token**
-   *(Replace `<SESSION_ID>` with the ID returned by Test 1)*
+   **Test 2: Claim Presenter Lease**
+   *(Replace `<SESSION_ID>` and `<ORGANIZER_KEY>` with the values returned by Test 1)*
    ```bash
-   curl "http://localhost:3000/api/token?room=<SESSION_ID>&identity=organizer-host&role=organizer"
+   curl -X POST "http://localhost:3000/api/sessions/<SESSION_ID>/presenter" \
+     -H "Content-Type: application/json" \
+     -d '{"clientId":"diagnostic-client","organizerKey":"<ORGANIZER_KEY>"}'
+   ```
+   *Expected output: A JSON object containing `active: true` and `leaseExpiresAt`.*
+
+   **Test 3: Generate Token**
+   ```bash
+   curl -X POST "http://localhost:3000/api/token" \
+     -H "Content-Type: application/json" \
+     -d '{"room":"<SESSION_ID>","identity":"organizer-host","role":"organizer","presenterClientId":"diagnostic-client","organizerKey":"<ORGANIZER_KEY>"}'
    ```
    *Expected output: A JSON object containing the `token` JWT string.*
 

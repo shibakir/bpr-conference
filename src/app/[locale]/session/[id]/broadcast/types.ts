@@ -4,5 +4,3 @@ export interface TranslationInfo {
     status: string;
     subscriberCount: number;
 }
-
-export type FetchTokenResult = { ok: true } | { ok: false; reason: "password" | "error" };

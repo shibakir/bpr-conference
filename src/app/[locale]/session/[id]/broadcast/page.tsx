@@ -3,6 +3,7 @@
 import "@livekit/components-styles";
 
 import { LiveKitRoom } from "@livekit/components-react";
+import { DisconnectReason } from "livekit-client";
 import { useTranslations } from "next-intl";
 import { use, useCallback, useRef } from "react";
 
@@ -11,7 +12,7 @@ import { useRouter } from "@/i18n/navigation";
 
 import { BroadcastControls } from "./components/BroadcastControls";
 import { BroadcastErrorState } from "./components/BroadcastErrorState";
-import { BroadcastPasswordGate } from "./components/BroadcastPasswordGate";
+import { BroadcastPresenterGate } from "./components/BroadcastPresenterGate";
 import { useBroadcastToken } from "./hooks/useBroadcastToken";
 
 export default function BroadcastPage({
@@ -34,15 +35,18 @@ export default function BroadcastPage({
         broadcastToken.markExpired();
     }, [broadcastToken]);
 
-    if (broadcastToken.passwordPromptRequired) {
+    if (
+        broadcastToken.accessState === "active_elsewhere" ||
+        broadcastToken.accessState === "missing_key"
+    ) {
         return (
-            <BroadcastPasswordGate
-                localPassword={broadcastToken.localPassword}
-                passwordError={broadcastToken.passwordError}
+            <BroadcastPresenterGate
+                canTakeOver={broadcastToken.canTakeOver}
+                state={broadcastToken.accessState}
                 verifying={broadcastToken.verifying}
-                onCancel={() => router.push("/")}
-                onPasswordChange={broadcastToken.setLocalPassword}
-                onSubmit={broadcastToken.handlePasswordSubmit}
+                onGoHome={() => router.push("/")}
+                onOpenListenerPage={() => router.push(`/session/${sessionId}/watch`)}
+                onTakeOver={broadcastToken.takeOver}
             />
         );
     }
@@ -53,7 +57,11 @@ export default function BroadcastPage({
         );
     }
 
-    if (!broadcastToken.token || !broadcastToken.livekitUrl) {
+    if (
+        broadcastToken.accessState !== "ready" ||
+        !broadcastToken.token ||
+        !broadcastToken.livekitUrl
+    ) {
         return <CenteredLoadingState />;
     }
 
@@ -66,13 +74,18 @@ export default function BroadcastPage({
                 serverUrl={broadcastToken.livekitUrl}
                 options={{ disconnectOnPageLeave: false }}
                 className="flex w-full flex-col items-center"
-                onDisconnected={() => {
+                onDisconnected={(reason) => {
                     if (!isEndingRef.current) {
-                        broadcastToken.setError(t("disconnectError"));
+                        broadcastToken.setError(
+                            reason === DisconnectReason.DUPLICATE_IDENTITY
+                                ? t("duplicatePresenterDisconnected")
+                                : t("disconnectError"),
+                        );
                     }
                 }}
             >
                 <BroadcastControls
+                    organizerKey={broadcastToken.organizerKey}
                     sessionId={sessionId}
                     expiresAt={broadcastToken.expiresAt}
                     onEndBroadcast={handleEndBroadcast}
