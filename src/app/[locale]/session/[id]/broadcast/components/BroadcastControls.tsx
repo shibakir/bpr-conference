@@ -56,6 +56,13 @@ export function BroadcastControls({
         micAccessErrorMessage: (message) => t("micAccessError", { message }),
         tabAudioErrorMessage: (message) => t("tabAudioError", { message }),
     });
+    const audioInputDeviceOptions = [
+        { label: t("defaultAudioInput"), value: "" },
+        ...audioMixer.audioInputDevices.map((device, index) => ({
+            label: device.label || t("audioInputFallback", { number: index + 1 }),
+            value: device.deviceId,
+        })),
+    ];
 
     const endBroadcast = async () => {
         onEndBroadcast();
@@ -110,8 +117,12 @@ export function BroadcastControls({
                                     enabled={audioMixer.isMicEnabled}
                                     volume={audioMixer.micVolume}
                                     actionLabel={t("enable")}
+                                    deviceSelectLabel={t("audioInputDevice")}
+                                    deviceSelectOptions={audioInputDeviceOptions}
+                                    deviceSelectValue={audioMixer.selectedAudioInputDeviceId}
                                     stopLabel={t("disable")}
                                     icon={<MicIcon className="size-4 text-muted-foreground" />}
+                                    onDeviceSelectChange={audioMixer.handleAudioInputDeviceChange}
                                     onToggle={audioMixer.toggleMicrophone}
                                     onVolumeChange={audioMixer.handleMicVolumeChange}
                                 />
