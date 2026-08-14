@@ -16,12 +16,14 @@ import { clientLogger } from "@/lib/client-logger";
 
 import { useActiveTranslations } from "../hooks/useActiveTranslations";
 import { useBroadcastAudioMixer } from "../hooks/useBroadcastAudioMixer";
+import { useControlRecoveryUrl } from "../hooks/useControlRecoveryUrl";
 import { useJoinUrl } from "../hooks/useJoinUrl";
 import { useListenerCount } from "../hooks/useListenerCount";
 import { ActiveTranslationsPanel } from "./ActiveTranslationsPanel";
 import { AudioInputCard } from "./AudioInputCard";
 import { AudioSignalMonitor } from "./AudioSignalMonitor";
 import { BroadcastStatus } from "./BroadcastStatus";
+import { ControlRecoveryPanel } from "./ControlRecoveryPanel";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { SharePanel } from "./SharePanel";
 
@@ -66,6 +68,7 @@ export function BroadcastControls({
     const translations = useActiveTranslations(sessionId);
     const isWakeLockActive = useWakeLock();
     const join = useJoinUrl(sessionId);
+    const recovery = useControlRecoveryUrl(sessionId, organizerKey);
     const { trigger: deleteSession } = useSWRMutation(
         `/api/sessions/${sessionId}`,
         deleteSessionRequest,
@@ -171,6 +174,14 @@ export function BroadcastControls({
                                 joinPath={join.joinPath}
                                 joinUrl={join.joinUrl}
                                 onCopyJoinUrl={join.copyJoinUrl}
+                            />
+                        </FieldSet>
+
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <ControlRecoveryPanel
+                                isCopied={recovery.isCopied}
+                                recoveryUrl={recovery.recoveryUrl}
+                                onCopyRecoveryUrl={recovery.copyRecoveryUrl}
                             />
                         </FieldSet>
 
