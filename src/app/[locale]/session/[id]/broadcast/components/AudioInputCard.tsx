@@ -90,7 +90,7 @@ export function AudioInputCard({
             </div>
             {deviceSelect}
             {enabled && (
-                <div className="grid grid-cols-[2.5rem_minmax(0,1fr)_3rem] items-center gap-3">
+                <div className="grid grid-cols-[4.75rem_minmax(0,1fr)_3rem] items-center gap-x-4 gap-y-2">
                     <span className="font-mono text-sm text-muted-foreground">{t("volume")}</span>
                     <Slider
                         value={[volume]}

@@ -124,6 +124,11 @@ function closeAudioContext(ctx: AudioContext | null) {
     ctx?.close().catch(() => {});
 }
 
+function configureAudioAnalyser(analyser: AnalyserNode) {
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.68;
+}
+
 function getAudioInputDevices(devices: MediaDeviceInfo[]): AudioInputDevice[] {
     const seenDeviceIds = new Set<string>();
 
@@ -181,6 +186,7 @@ export function useBroadcastAudioMixer({
     );
     const [tabVolume, setTabVolume] = useState(100);
     const audioContextRef = useRef<AudioContext | null>(null);
+    const mixedAudioAnalyserNodeRef = useRef<AnalyserNode | null>(null);
     const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
     const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -286,6 +292,10 @@ export function useBroadcastAudioMixer({
                 const dest = ctx.createMediaStreamDestination();
                 localDestinationNode = dest;
 
+                const analyser = ctx.createAnalyser();
+                configureAudioAnalyser(analyser);
+                analyser.connect(dest);
+
                 const mixedTrack = dest.stream.getAudioTracks()[0];
                 if (!mixedTrack) {
                     throw new Error("Failed to create mixed audio track.");
@@ -293,6 +303,7 @@ export function useBroadcastAudioMixer({
                 localMixedTrack = mixedTrack;
 
                 audioContextRef.current = ctx;
+                mixedAudioAnalyserNodeRef.current = analyser;
                 destinationNodeRef.current = dest;
 
                 if (active && localRoom.localParticipant) {
@@ -357,6 +368,10 @@ export function useBroadcastAudioMixer({
                 disconnectNode(tabGainNodeRef.current);
                 tabGainNodeRef.current = null;
             }
+            if (mixedAudioAnalyserNodeRef.current?.context === localAudioContext) {
+                disconnectNode(mixedAudioAnalyserNodeRef.current);
+                mixedAudioAnalyserNodeRef.current = null;
+            }
             clearRefIfCurrent(audioContextRef, localAudioContext);
             clearRefIfCurrent(destinationNodeRef, localDestinationNode);
             clearRefIfCurrent(publishedTrackPubRef, localPub);
@@ -392,7 +407,7 @@ export function useBroadcastAudioMixer({
             const gainNode = ctx.createGain();
             gainNode.gain.setValueAtTime(micVolume / 100, ctx.currentTime);
             source.connect(gainNode);
-            gainNode.connect(dest);
+            gainNode.connect(mixedAudioAnalyserNodeRef.current ?? dest);
 
             disconnectCurrentMicrophoneInput();
 
@@ -501,7 +516,7 @@ export function useBroadcastAudioMixer({
             tabGainNodeRef.current = gainNode;
 
             source.connect(gainNode);
-            gainNode.connect(dest);
+            gainNode.connect(mixedAudioAnalyserNodeRef.current ?? dest);
 
             setIsTabAudioEnabled(true);
 
@@ -575,6 +590,7 @@ export function useBroadcastAudioMixer({
         audioInputDevices,
         handleMicVolumeChange,
         handleTabVolumeChange,
+        mixedAudioAnalyserNodeRef,
         isAudioActive: isMicEnabled || isTabAudioEnabled,
         isMicEnabled,
         isTabAudioEnabled,

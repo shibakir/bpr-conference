@@ -20,6 +20,7 @@ import { useJoinUrl } from "../hooks/useJoinUrl";
 import { useListenerCount } from "../hooks/useListenerCount";
 import { ActiveTranslationsPanel } from "./ActiveTranslationsPanel";
 import { AudioInputCard } from "./AudioInputCard";
+import { AudioSignalMonitor } from "./AudioSignalMonitor";
 import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { SharePanel } from "./SharePanel";
@@ -139,6 +140,10 @@ export function BroadcastControls({
                                     onVolumeChange={audioMixer.handleTabVolumeChange}
                                 />
                             </div>
+                            <AudioSignalMonitor
+                                analyserNodeRef={audioMixer.mixedAudioAnalyserNodeRef}
+                                isActive={audioMixer.isAudioActive}
+                            />
                         </FieldSet>
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">
