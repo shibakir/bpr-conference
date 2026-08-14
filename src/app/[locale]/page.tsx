@@ -36,6 +36,7 @@ import {
     type CreateSessionFormValues,
     createSessionResponseSchema,
 } from "@/lib/api-schemas";
+import { setStoredBroadcastOwnerKey } from "@/lib/broadcast-owner";
 import { clientLogger } from "@/lib/client-logger";
 import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
@@ -186,8 +187,8 @@ export default function Home() {
                 createSessionResponseSchema,
             );
 
-            if (passwordRequired) {
-                sessionStorage.setItem("broadcast_password", values.password);
+            if (data.organizerKey) {
+                setStoredBroadcastOwnerKey(data.sessionId, data.organizerKey);
             }
             router.push(`/session/${data.sessionId}/broadcast`);
         } catch (requestError) {

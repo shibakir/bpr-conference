@@ -1,7 +1,7 @@
 "use client";
 
 import { type LocalTrackPublication, type Room, Track } from "livekit-client";
-import { type MutableRefObject, useEffect, useRef, useState } from "react";
+import { type MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 
 import { clientLogger } from "@/lib/client-logger";
 
@@ -19,6 +19,12 @@ function disconnectNode(node: AudioNode | null) {
 }
 
 type MediaCaptureMethod = "getUserMedia" | "getDisplayMedia";
+
+export type AudioInputDevice = {
+    deviceId: string;
+    groupId: string;
+    label: string;
+};
 
 function getLocalPresenterOrigin() {
     const url = new URL(window.location.href);
@@ -46,6 +52,7 @@ function requireMediaCaptureMethod<T extends MediaCaptureMethod>(method: T, feat
 }
 
 const BROADCAST_AUDIO_TRACK_NAME = "broadcast-audio";
+const DEFAULT_AUDIO_INPUT_DEVICE_ID = "";
 const mixerGenerationByRoom = new WeakMap<Room, number>();
 
 function nextMixerGeneration(room: Room) {
@@ -117,6 +124,48 @@ function closeAudioContext(ctx: AudioContext | null) {
     ctx?.close().catch(() => {});
 }
 
+function configureAudioAnalyser(analyser: AnalyserNode) {
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.68;
+}
+
+function getAudioInputDevices(devices: MediaDeviceInfo[]): AudioInputDevice[] {
+    const seenDeviceIds = new Set<string>();
+
+    return devices.flatMap((device) => {
+        if (
+            device.kind !== "audioinput" ||
+            !device.deviceId ||
+            device.deviceId === "default" ||
+            seenDeviceIds.has(device.deviceId)
+        ) {
+            return [];
+        }
+
+        seenDeviceIds.add(device.deviceId);
+
+        return [
+            {
+                deviceId: device.deviceId,
+                groupId: device.groupId,
+                label: device.label,
+            },
+        ];
+    });
+}
+
+function getMicrophoneAudioConstraints(deviceId: string): boolean | MediaTrackConstraints {
+    if (!deviceId) {
+        return true;
+    }
+
+    return {
+        deviceId: {
+            exact: deviceId,
+        },
+    };
+}
+
 export function useBroadcastAudioMixer({
     noTabAudioMessage,
     room,
@@ -128,11 +177,16 @@ export function useBroadcastAudioMixer({
     tabAudioErrorMessage: (message: string) => string;
     micAccessErrorMessage: (message: string) => string;
 }) {
+    const [audioInputDevices, setAudioInputDevices] = useState<AudioInputDevice[]>([]);
     const [isMicEnabled, setIsMicEnabled] = useState(false);
     const [isTabAudioEnabled, setIsTabAudioEnabled] = useState(false);
     const [micVolume, setMicVolume] = useState(100);
+    const [selectedAudioInputDeviceId, setSelectedAudioInputDeviceId] = useState(
+        DEFAULT_AUDIO_INPUT_DEVICE_ID,
+    );
     const [tabVolume, setTabVolume] = useState(100);
     const audioContextRef = useRef<AudioContext | null>(null);
+    const mixedAudioAnalyserNodeRef = useRef<AnalyserNode | null>(null);
     const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
     const micStreamRef = useRef<MediaStream | null>(null);
     const micSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
@@ -143,14 +197,69 @@ export function useBroadcastAudioMixer({
     const publishedTrackPubRef = useRef<LocalTrackPublication | null>(null);
     const isMicEnabledRef = useRef(isMicEnabled);
     const isTabAudioEnabledRef = useRef(isTabAudioEnabled);
+    const microphoneGenerationRef = useRef(0);
+    const selectedAudioInputDeviceIdRef = useRef(selectedAudioInputDeviceId);
+
+    const refreshAudioInputDevices = useCallback(async () => {
+        const mediaDevices = navigator.mediaDevices;
+        if (typeof mediaDevices?.enumerateDevices !== "function") {
+            return;
+        }
+
+        try {
+            const devices = getAudioInputDevices(await mediaDevices.enumerateDevices());
+            setAudioInputDevices(devices);
+            setSelectedAudioInputDeviceId((currentDeviceId) =>
+                currentDeviceId && !devices.some((device) => device.deviceId === currentDeviceId)
+                    ? DEFAULT_AUDIO_INPUT_DEVICE_ID
+                    : currentDeviceId,
+            );
+        } catch (err) {
+            clientLogger.error("Failed to enumerate audio input devices:", err);
+        }
+    }, []);
+
+    const disconnectCurrentMicrophoneInput = useCallback(() => {
+        disconnectNode(micSourceNodeRef.current);
+        micSourceNodeRef.current = null;
+        disconnectNode(micGainNodeRef.current);
+        micGainNodeRef.current = null;
+        stopStream(micStreamRef.current);
+        micStreamRef.current = null;
+    }, []);
 
     useEffect(() => {
         isMicEnabledRef.current = isMicEnabled;
     }, [isMicEnabled]);
 
     useEffect(() => {
+        selectedAudioInputDeviceIdRef.current = selectedAudioInputDeviceId;
+    }, [selectedAudioInputDeviceId]);
+
+    useEffect(() => {
         isTabAudioEnabledRef.current = isTabAudioEnabled;
     }, [isTabAudioEnabled]);
+
+    useEffect(() => {
+        const mediaDevices = navigator.mediaDevices;
+        if (typeof mediaDevices?.enumerateDevices !== "function") {
+            return;
+        }
+
+        const handleDeviceChange = () => {
+            void refreshAudioInputDevices();
+        };
+        const refreshTimeoutId = window.setTimeout(() => {
+            void refreshAudioInputDevices();
+        }, 0);
+
+        mediaDevices.addEventListener?.("devicechange", handleDeviceChange);
+
+        return () => {
+            window.clearTimeout(refreshTimeoutId);
+            mediaDevices.removeEventListener?.("devicechange", handleDeviceChange);
+        };
+    }, [refreshAudioInputDevices]);
 
     useEffect(() => {
         if (!room || !room.localParticipant) return;
@@ -183,6 +292,10 @@ export function useBroadcastAudioMixer({
                 const dest = ctx.createMediaStreamDestination();
                 localDestinationNode = dest;
 
+                const analyser = ctx.createAnalyser();
+                configureAudioAnalyser(analyser);
+                analyser.connect(dest);
+
                 const mixedTrack = dest.stream.getAudioTracks()[0];
                 if (!mixedTrack) {
                     throw new Error("Failed to create mixed audio track.");
@@ -190,6 +303,7 @@ export function useBroadcastAudioMixer({
                 localMixedTrack = mixedTrack;
 
                 audioContextRef.current = ctx;
+                mixedAudioAnalyserNodeRef.current = analyser;
                 destinationNodeRef.current = dest;
 
                 if (active && localRoom.localParticipant) {
@@ -233,6 +347,7 @@ export function useBroadcastAudioMixer({
 
         return () => {
             active = false;
+            microphoneGenerationRef.current += 1;
             if (localPub) {
                 void unpublishBroadcastAudioPublication(localRoom, localPub, "mixed");
             }
@@ -253,6 +368,10 @@ export function useBroadcastAudioMixer({
                 disconnectNode(tabGainNodeRef.current);
                 tabGainNodeRef.current = null;
             }
+            if (mixedAudioAnalyserNodeRef.current?.context === localAudioContext) {
+                disconnectNode(mixedAudioAnalyserNodeRef.current);
+                mixedAudioAnalyserNodeRef.current = null;
+            }
             clearRefIfCurrent(audioContextRef, localAudioContext);
             clearRefIfCurrent(destinationNodeRef, localDestinationNode);
             clearRefIfCurrent(publishedTrackPubRef, localPub);
@@ -262,6 +381,60 @@ export function useBroadcastAudioMixer({
             }
         };
     }, [room]);
+
+    const connectMicrophoneInput = async (deviceId: string) => {
+        const ctx = audioContextRef.current;
+        const dest = destinationNodeRef.current;
+        if (!ctx || !dest) return;
+
+        const generation = microphoneGenerationRef.current + 1;
+        microphoneGenerationRef.current = generation;
+        let stream: MediaStream | null = null;
+
+        try {
+            await ctx.resume();
+            const getUserMedia = requireMediaCaptureMethod("getUserMedia", "Microphone capture");
+            stream = await getUserMedia({
+                audio: getMicrophoneAudioConstraints(deviceId),
+            });
+
+            if (microphoneGenerationRef.current !== generation) {
+                stopStream(stream);
+                return;
+            }
+
+            const source = ctx.createMediaStreamSource(stream);
+            const gainNode = ctx.createGain();
+            gainNode.gain.setValueAtTime(micVolume / 100, ctx.currentTime);
+            source.connect(gainNode);
+            gainNode.connect(mixedAudioAnalyserNodeRef.current ?? dest);
+
+            disconnectCurrentMicrophoneInput();
+
+            micStreamRef.current = stream;
+            micSourceNodeRef.current = source;
+            micGainNodeRef.current = gainNode;
+            setIsMicEnabled(true);
+
+            const handleTrackEnded = () => {
+                if (micStreamRef.current !== stream) {
+                    return;
+                }
+
+                disconnectCurrentMicrophoneInput();
+                setIsMicEnabled(false);
+            };
+
+            stream.getAudioTracks().forEach((track) => {
+                track.onended = handleTrackEnded;
+            });
+
+            void refreshAudioInputDevices();
+        } catch (err) {
+            stopStream(stream);
+            throw err;
+        }
+    };
 
     useEffect(() => {
         const pub = publishedTrackPubRef.current;
@@ -285,35 +458,14 @@ export function useBroadcastAudioMixer({
         if (!ctx || !dest) return;
 
         if (isMicEnabled) {
-            disconnectNode(micSourceNodeRef.current);
-            micSourceNodeRef.current = null;
-            disconnectNode(micGainNodeRef.current);
-            micGainNodeRef.current = null;
-            stopStream(micStreamRef.current);
-            micStreamRef.current = null;
+            microphoneGenerationRef.current += 1;
+            disconnectCurrentMicrophoneInput();
             setIsMicEnabled(false);
             return;
         }
 
         try {
-            await ctx.resume();
-            const getUserMedia = requireMediaCaptureMethod("getUserMedia", "Microphone capture");
-            const stream = await getUserMedia({
-                audio: true,
-            });
-            micStreamRef.current = stream;
-
-            const source = ctx.createMediaStreamSource(stream);
-            micSourceNodeRef.current = source;
-
-            const gainNode = ctx.createGain();
-            gainNode.gain.setValueAtTime(micVolume / 100, ctx.currentTime);
-            micGainNodeRef.current = gainNode;
-
-            source.connect(gainNode);
-            gainNode.connect(dest);
-
-            setIsMicEnabled(true);
+            await connectMicrophoneInput(selectedAudioInputDeviceIdRef.current);
         } catch (err) {
             clientLogger.error("Failed to access microphone:", err);
             alert(micAccessErrorMessage((err as Error).message));
@@ -364,7 +516,7 @@ export function useBroadcastAudioMixer({
             tabGainNodeRef.current = gainNode;
 
             source.connect(gainNode);
-            gainNode.connect(dest);
+            gainNode.connect(mixedAudioAnalyserNodeRef.current ?? dest);
 
             setIsTabAudioEnabled(true);
 
@@ -395,6 +547,25 @@ export function useBroadcastAudioMixer({
         }
     };
 
+    const handleAudioInputDeviceChange = async (deviceId: string) => {
+        const previousDeviceId = selectedAudioInputDeviceIdRef.current;
+        selectedAudioInputDeviceIdRef.current = deviceId;
+        setSelectedAudioInputDeviceId(deviceId);
+
+        if (!isMicEnabledRef.current) {
+            return;
+        }
+
+        try {
+            await connectMicrophoneInput(deviceId);
+        } catch (err) {
+            selectedAudioInputDeviceIdRef.current = previousDeviceId;
+            setSelectedAudioInputDeviceId(previousDeviceId);
+            clientLogger.error("Failed to switch microphone input:", err);
+            alert(micAccessErrorMessage((err as Error).message));
+        }
+    };
+
     const handleMicVolumeChange = (vol: number) => {
         setMicVolume(vol);
         if (micGainNodeRef.current && audioContextRef.current) {
@@ -416,12 +587,16 @@ export function useBroadcastAudioMixer({
     };
 
     return {
+        audioInputDevices,
         handleMicVolumeChange,
         handleTabVolumeChange,
+        mixedAudioAnalyserNodeRef,
         isAudioActive: isMicEnabled || isTabAudioEnabled,
         isMicEnabled,
         isTabAudioEnabled,
         micVolume,
+        selectedAudioInputDeviceId,
+        handleAudioInputDeviceChange,
         tabVolume,
         toggleMicrophone,
         toggleTabAudio,

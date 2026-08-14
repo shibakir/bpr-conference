@@ -20,21 +20,41 @@ import { useJoinUrl } from "../hooks/useJoinUrl";
 import { useListenerCount } from "../hooks/useListenerCount";
 import { ActiveTranslationsPanel } from "./ActiveTranslationsPanel";
 import { AudioInputCard } from "./AudioInputCard";
+import { AudioSignalMonitor } from "./AudioSignalMonitor";
 import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { SharePanel } from "./SharePanel";
 
-function deleteSessionRequest(url: string) {
-    return fetchValidatedJson(url, { method: "DELETE" }, successResponseSchema);
+function deleteSessionRequest(
+    url: string,
+    {
+        arg,
+    }: {
+        arg: {
+            organizerKey: string;
+        };
+    },
+) {
+    return fetchValidatedJson(
+        url,
+        {
+            body: JSON.stringify(arg),
+            headers: { "Content-Type": "application/json" },
+            method: "DELETE",
+        },
+        successResponseSchema,
+    );
 }
 
 export function BroadcastControls({
     sessionId,
+    organizerKey,
     expiresAt,
     onEndBroadcast,
     onSessionExpired,
 }: {
     sessionId: string;
+    organizerKey: string;
     expiresAt: string | null;
     onEndBroadcast: () => void;
     onSessionExpired: () => void;
@@ -56,11 +76,18 @@ export function BroadcastControls({
         micAccessErrorMessage: (message) => t("micAccessError", { message }),
         tabAudioErrorMessage: (message) => t("tabAudioError", { message }),
     });
+    const audioInputDeviceOptions = [
+        { label: t("defaultAudioInput"), value: "" },
+        ...audioMixer.audioInputDevices.map((device, index) => ({
+            label: device.label || t("audioInputFallback", { number: index + 1 }),
+            value: device.deviceId,
+        })),
+    ];
 
     const endBroadcast = async () => {
         onEndBroadcast();
         try {
-            await deleteSession();
+            await deleteSession({ organizerKey });
         } catch (err) {
             clientLogger.error("Failed to explicitly delete session on broadcast end:", err);
         }
@@ -110,8 +137,12 @@ export function BroadcastControls({
                                     enabled={audioMixer.isMicEnabled}
                                     volume={audioMixer.micVolume}
                                     actionLabel={t("enable")}
+                                    deviceSelectLabel={t("audioInputDevice")}
+                                    deviceSelectOptions={audioInputDeviceOptions}
+                                    deviceSelectValue={audioMixer.selectedAudioInputDeviceId}
                                     stopLabel={t("disable")}
                                     icon={<MicIcon className="size-4 text-muted-foreground" />}
+                                    onDeviceSelectChange={audioMixer.handleAudioInputDeviceChange}
                                     onToggle={audioMixer.toggleMicrophone}
                                     onVolumeChange={audioMixer.handleMicVolumeChange}
                                 />
@@ -128,6 +159,10 @@ export function BroadcastControls({
                                     onVolumeChange={audioMixer.handleTabVolumeChange}
                                 />
                             </div>
+                            <AudioSignalMonitor
+                                analyserNodeRef={audioMixer.mixedAudioAnalyserNodeRef}
+                                isActive={audioMixer.isAudioActive}
+                            />
                         </FieldSet>
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">
