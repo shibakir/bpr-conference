@@ -11,12 +11,14 @@ import {
     clearStoredBroadcastOwnerKey,
     getOrCreateBroadcastPresenterClientId,
     getStoredBroadcastOwnerKey,
+    setStoredBroadcastOwnerKey,
 } from "@/lib/broadcast-owner";
 
 export type BroadcastPresenterAccessState =
     "loading" | "missing_key" | "active_elsewhere" | "ready" | "error";
 
 const PRESENTER_HEARTBEAT_MS = 5_000;
+const ORGANIZER_KEY_SEARCH_PARAM = "organizerKey";
 
 type PresenterClaimArg = {
     clientId: string;
@@ -97,6 +99,22 @@ function fetchOrganizerTokenRequest(
         },
         tokenResponseSchema,
     );
+}
+
+function getOrganizerKeyFromCurrentUrl() {
+    const url = new URL(window.location.href);
+    const organizerKey = url.searchParams.get(ORGANIZER_KEY_SEARCH_PARAM)?.trim() ?? "";
+
+    if (!organizerKey) return "";
+
+    url.searchParams.delete(ORGANIZER_KEY_SEARCH_PARAM);
+    window.history.replaceState(
+        window.history.state,
+        "",
+        `${url.pathname}${url.search}${url.hash}`,
+    );
+
+    return organizerKey;
 }
 
 export function useBroadcastToken(sessionId: string) {
@@ -199,7 +217,12 @@ export function useBroadcastToken(sessionId: string) {
         const initializeTimeoutId = window.setTimeout(() => {
             if (!active) return;
 
-            const key = getStoredBroadcastOwnerKey(sessionId);
+            const recoveryKey = getOrganizerKeyFromCurrentUrl();
+            if (recoveryKey) {
+                setStoredBroadcastOwnerKey(sessionId, recoveryKey);
+            }
+
+            const key = recoveryKey || getStoredBroadcastOwnerKey(sessionId);
             const clientId = getOrCreateBroadcastPresenterClientId(sessionId);
 
             setOrganizerKey(key);
