@@ -128,6 +128,8 @@
         "floatingCaptions": "Floating captions",
         "openFloatingCaptions": "Open floating captions",
         "closeFloatingCaptions": "Close floating captions",
+        "expandCaptionWindow": "Expand captions",
+        "restoreCaptionWindow": "Restore captions",
         "captionSettings": "Caption settings",
         "closeCaptionSettings": "Close settings",
         "captionAlwaysOnTop": "Always on top",

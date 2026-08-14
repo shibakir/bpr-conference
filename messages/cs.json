@@ -128,6 +128,8 @@
         "floatingCaptions": "Plovoucí titulky",
         "openFloatingCaptions": "Otevřít plovoucí titulky",
         "closeFloatingCaptions": "Zavřít plovoucí titulky",
+        "expandCaptionWindow": "Rozšířit titulky",
+        "restoreCaptionWindow": "Obnovit titulky",
         "captionSettings": "Nastavení titulků",
         "closeCaptionSettings": "Zavřít nastavení",
         "captionAlwaysOnTop": "Vždy navrchu",

@@ -1,6 +1,13 @@
 "use client";
 
-import { CaptionsIcon, PictureInPicture2Icon, Settings2Icon, XIcon } from "lucide-react";
+import {
+    CaptionsIcon,
+    Maximize2Icon,
+    Minimize2Icon,
+    PictureInPicture2Icon,
+    Settings2Icon,
+    XIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import {
     type CSSProperties,
@@ -77,8 +84,15 @@ type CaptionCanvasLine = {
     text: string;
 };
 
-const PIP_WINDOW_WIDTH = 720;
-const PIP_WINDOW_HEIGHT = 360;
+type CaptionWindowSize = {
+    height: number;
+    width: number;
+};
+
+const DEFAULT_PIP_WINDOW_SIZE: CaptionWindowSize = {
+    height: 360,
+    width: 720,
+};
 const PIP_CANVAS_FRAME_RATE = 10;
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -88,6 +102,27 @@ function hexToRgba(hex: string, alpha: number): string {
     const g = (value >> 8) & 255;
     const b = value & 255;
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getExpandedCaptionWindowSize(targetWindow: Window = window): CaptionWindowSize {
+    return {
+        height: Math.max(
+            DEFAULT_PIP_WINDOW_SIZE.height,
+            Math.floor(targetWindow.screen.availHeight || targetWindow.innerHeight),
+        ),
+        width: Math.max(
+            DEFAULT_PIP_WINDOW_SIZE.width,
+            Math.floor(targetWindow.screen.availWidth || targetWindow.innerWidth),
+        ),
+    };
+}
+
+function getCaptionWindowSize(expanded: boolean): CaptionWindowSize {
+    if (!expanded || typeof window === "undefined") {
+        return DEFAULT_PIP_WINDOW_SIZE;
+    }
+
+    return getExpandedCaptionWindowSize(window);
 }
 
 function wrapCanvasLine(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
@@ -165,27 +200,29 @@ function drawCaptionsOnCanvas({
     emptyMessage,
     panels,
     settings,
+    size,
 }: {
     canvas: HTMLCanvasElement | null;
     emptyMessage: string;
     panels: CaptionCanvasPanel[];
     settings: CaptionWindowSettings;
+    size: CaptionWindowSize;
 }) {
     if (!canvas) return;
 
-    if (canvas.width !== PIP_WINDOW_WIDTH) {
-        canvas.width = PIP_WINDOW_WIDTH;
+    if (canvas.width !== size.width) {
+        canvas.width = size.width;
     }
-    if (canvas.height !== PIP_WINDOW_HEIGHT) {
-        canvas.height = PIP_WINDOW_HEIGHT;
+    if (canvas.height !== size.height) {
+        canvas.height = size.height;
     }
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    ctx.clearRect(0, 0, PIP_WINDOW_WIDTH, PIP_WINDOW_HEIGHT);
+    ctx.clearRect(0, 0, size.width, size.height);
     ctx.fillStyle = getCaptionBackground(settings);
-    ctx.fillRect(0, 0, PIP_WINDOW_WIDTH, PIP_WINDOW_HEIGHT);
+    ctx.fillRect(0, 0, size.width, size.height);
 
     const visiblePanels =
         panels.length > 0
@@ -202,7 +239,7 @@ function drawCaptionsOnCanvas({
     const gap = visiblePanels.length > 1 ? Math.max(12, Math.round(settings.fontSize * 0.45)) : 0;
     const availableHeight = Math.max(
         1,
-        PIP_WINDOW_HEIGHT - padding * 2 - gap * (visiblePanels.length - 1),
+        size.height - padding * 2 - gap * (visiblePanels.length - 1),
     );
     const panelHeight = availableHeight / visiblePanels.length;
     const titleFontSize = Math.max(11, Math.round(settings.fontSize * 0.42));
@@ -212,7 +249,7 @@ function drawCaptionsOnCanvas({
     visiblePanels.forEach((panel, index) => {
         const panelY = padding + index * (panelHeight + gap);
         const panelX = padding;
-        const panelWidth = PIP_WINDOW_WIDTH - padding * 2;
+        const panelWidth = size.width - padding * 2;
         const panelPadding = visiblePanels.length > 1 ? Math.max(10, Math.round(padding * 0.6)) : 0;
         const textX = panelX + panelPadding;
         const textWidth = panelWidth - panelPadding * 2;
@@ -429,23 +466,27 @@ function CaptionPanelContent({
 
 function CaptionSurface({
     emptyMessage,
+    expanded,
     fill,
     limits,
     modeLabel,
     onClose,
     onReset,
     onSettingsChange,
+    onToggleExpanded,
     panels,
     settings,
     title,
 }: {
     emptyMessage: string;
+    expanded?: boolean;
     fill?: boolean;
     limits: ReturnType<typeof useCaptionWindowPreference>["limits"];
     modeLabel: string;
     onClose?: () => void;
     onReset: () => void;
     onSettingsChange: (patch: Partial<CaptionWindowSettings>) => void;
+    onToggleExpanded?: () => void;
     panels: FloatingCaptionPanel[];
     settings: CaptionWindowSettings;
     title: string;
@@ -564,6 +605,19 @@ function CaptionSurface({
             <div style={headerStyle}>
                 <span style={titleStyle}>{title}</span>
                 <span style={actionGroupStyle}>
+                    {onToggleExpanded && (
+                        <button
+                            type="button"
+                            onClick={onToggleExpanded}
+                            aria-label={
+                                expanded ? t("restoreCaptionWindow") : t("expandCaptionWindow")
+                            }
+                            title={expanded ? t("restoreCaptionWindow") : t("expandCaptionWindow")}
+                            style={closeStyle}
+                        >
+                            {expanded ? <Minimize2Icon size={14} /> : <Maximize2Icon size={14} />}
+                        </button>
+                    )}
                     <Popover open={settingsOpen} onOpenChange={setSettingsOpen}>
                         <PopoverTrigger asChild>
                             <button
@@ -649,8 +703,11 @@ export function FloatingTranscriptWindow({
     const [mode, setMode] = useState<CaptionMode | null>(null);
     const [documentPipRoot, setDocumentPipRoot] = useState<HTMLElement | null>(null);
     const [documentPipWindow, setDocumentPipWindow] = useState<Window | null>(null);
+    const [captionWindowExpanded, setCaptionWindowExpanded] = useState(false);
+    const [inlineFullscreen, setInlineFullscreen] = useState(false);
     const [videoSettingsOpen, setVideoSettingsOpen] = useState(false);
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const inlineWindowRef = useRef<HTMLDivElement | null>(null);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const documentPipWindowRef = useRef<Window | null>(null);
@@ -658,6 +715,10 @@ export function FloatingTranscriptWindow({
     const emptyMessage =
         panels.length === 0 ? t("selectLanguageForTranscription") : t("waitingForSpeech");
     const title = t("floatingCaptions");
+    const captionWindowSize = useMemo(
+        () => getCaptionWindowSize(captionWindowExpanded),
+        [captionWindowExpanded],
+    );
     const captionCanvasPanels = useMemo<CaptionCanvasPanel[]>(
         () =>
             panels.map((panel) => ({
@@ -675,6 +736,17 @@ export function FloatingTranscriptWindow({
     useEffect(() => {
         onOpenChange?.(mode !== null);
     }, [mode, onOpenChange]);
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setInlineFullscreen(document.fullscreenElement === inlineWindowRef.current);
+        };
+
+        document.addEventListener("fullscreenchange", handleFullscreenChange);
+        return () => {
+            document.removeEventListener("fullscreenchange", handleFullscreenChange);
+        };
+    }, []);
 
     const cleanupVideoStream = useCallback(() => {
         mediaStreamRef.current?.getTracks().forEach((track) => {
@@ -695,6 +767,14 @@ export function FloatingTranscriptWindow({
         setDocumentPipWindow(null);
         setDocumentPipRoot(null);
 
+        if (document.fullscreenElement === inlineWindowRef.current) {
+            try {
+                await document.exitFullscreen();
+            } catch {
+                // The browser may already have left fullscreen.
+            }
+        }
+
         const video = videoRef.current;
         if (video) {
             try {
@@ -708,13 +788,26 @@ export function FloatingTranscriptWindow({
         setMode(null);
     }, [cleanupVideoStream]);
 
+    const resizeDocumentPipWindow = useCallback((expanded: boolean) => {
+        const pipWindow = documentPipWindowRef.current;
+        if (!pipWindow || pipWindow.closed) return;
+
+        const size = expanded ? getExpandedCaptionWindowSize(pipWindow) : DEFAULT_PIP_WINDOW_SIZE;
+
+        try {
+            pipWindow.resizeTo(size.width, size.height);
+        } catch (error) {
+            clientLogger.warn("[WatchCaptions] Document PiP resize failed:", error);
+        }
+    }, []);
+
     const openDocumentPip = useCallback(async () => {
         const docPip = (window as WindowWithDocumentPictureInPicture).documentPictureInPicture;
         if (!docPip?.requestWindow) return false;
 
         const pipWindow = await docPip.requestWindow({
-            height: PIP_WINDOW_HEIGHT,
-            width: PIP_WINDOW_WIDTH,
+            height: captionWindowSize.height,
+            width: captionWindowSize.width,
             disallowReturnToOpener: false,
         });
         const root = prepareDocumentPipWindow(pipWindow, title);
@@ -729,7 +822,7 @@ export function FloatingTranscriptWindow({
         setDocumentPipRoot(root);
         setMode("document-pip");
         return true;
-    }, [title]);
+    }, [captionWindowSize.height, captionWindowSize.width, title]);
 
     const openVideoPip = useCallback(async () => {
         const canvas = canvasRef.current;
@@ -743,6 +836,7 @@ export function FloatingTranscriptWindow({
             emptyMessage,
             panels: captionCanvasPanels,
             settings,
+            size: captionWindowSize,
         });
 
         cleanupVideoStream();
@@ -752,6 +846,8 @@ export function FloatingTranscriptWindow({
         video.srcObject = stream;
         video.muted = true;
         video.playsInline = true;
+        video.height = captionWindowSize.height;
+        video.width = captionWindowSize.width;
 
         await video.play();
         const opened = await requestVideoPictureInPicture(video);
@@ -762,7 +858,7 @@ export function FloatingTranscriptWindow({
 
         setMode("video-pip");
         return true;
-    }, [captionCanvasPanels, cleanupVideoStream, emptyMessage, settings]);
+    }, [captionCanvasPanels, captionWindowSize, cleanupVideoStream, emptyMessage, settings]);
 
     const openFloatingWindow = useCallback(async () => {
         try {
@@ -789,6 +885,32 @@ export function FloatingTranscriptWindow({
         void openFloatingWindow();
     }, [closeFloatingWindow, mode, openFloatingWindow]);
 
+    const toggleExpandedCaptionWindow = useCallback(() => {
+        if (mode === "inline") {
+            if (document.fullscreenElement === inlineWindowRef.current) {
+                void document.exitFullscreen().catch((error: unknown) => {
+                    clientLogger.warn("[WatchCaptions] Inline fullscreen exit failed:", error);
+                });
+                return;
+            }
+
+            const inlineWindow = inlineWindowRef.current;
+            if (!inlineWindow?.requestFullscreen) return;
+
+            void inlineWindow.requestFullscreen().catch((error: unknown) => {
+                clientLogger.warn("[WatchCaptions] Inline fullscreen failed:", error);
+            });
+            return;
+        }
+
+        const nextExpanded = !captionWindowExpanded;
+        setCaptionWindowExpanded(nextExpanded);
+
+        if (mode === "document-pip") {
+            resizeDocumentPipWindow(nextExpanded);
+        }
+    }, [captionWindowExpanded, mode, resizeDocumentPipWindow]);
+
     useEffect(() => {
         if (mode !== "video-pip") return;
 
@@ -797,9 +919,14 @@ export function FloatingTranscriptWindow({
             emptyMessage,
             panels: captionCanvasPanels,
             settings,
+            size: captionWindowSize,
         });
+        if (videoRef.current) {
+            videoRef.current.height = captionWindowSize.height;
+            videoRef.current.width = captionWindowSize.width;
+        }
         requestCanvasFrame(mediaStreamRef.current);
-    }, [captionCanvasPanels, emptyMessage, mode, settings]);
+    }, [captionCanvasPanels, captionWindowSize, emptyMessage, mode, settings]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -861,44 +988,78 @@ export function FloatingTranscriptWindow({
             </Button>
 
             {mode === "video-pip" && (
-                <Popover open={videoSettingsOpen} onOpenChange={setVideoSettingsOpen}>
-                    <PopoverTrigger asChild>
-                        <Button
-                            type="button"
-                            variant={videoSettingsOpen ? "secondary" : "outline"}
-                            size="icon-xs"
-                            title={t("captionSettings")}
-                            aria-label={t("captionSettings")}
-                        >
-                            <Settings2Icon className="size-3" />
-                        </Button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                        align="end"
-                        sideOffset={8}
-                        className="max-h-[calc(100vh-4rem)] w-[min(88vw,22rem)] overflow-y-auto p-3"
+                <>
+                    <Button
+                        type="button"
+                        variant={captionWindowExpanded ? "secondary" : "outline"}
+                        size="icon-xs"
+                        onClick={toggleExpandedCaptionWindow}
+                        title={
+                            captionWindowExpanded
+                                ? t("restoreCaptionWindow")
+                                : t("expandCaptionWindow")
+                        }
+                        aria-label={
+                            captionWindowExpanded
+                                ? t("restoreCaptionWindow")
+                                : t("expandCaptionWindow")
+                        }
                     >
-                        <CaptionSettingsPanel
-                            limits={limits}
-                            modeLabel={modeLabel}
-                            onClose={() => setVideoSettingsOpen(false)}
-                            onReset={resetSettings}
-                            onSettingsChange={updateSettings}
-                            settings={settings}
-                        />
-                    </PopoverContent>
-                </Popover>
+                        {captionWindowExpanded ? (
+                            <Minimize2Icon className="size-3" />
+                        ) : (
+                            <Maximize2Icon className="size-3" />
+                        )}
+                    </Button>
+                    <Popover open={videoSettingsOpen} onOpenChange={setVideoSettingsOpen}>
+                        <PopoverTrigger asChild>
+                            <Button
+                                type="button"
+                                variant={videoSettingsOpen ? "secondary" : "outline"}
+                                size="icon-xs"
+                                title={t("captionSettings")}
+                                aria-label={t("captionSettings")}
+                            >
+                                <Settings2Icon className="size-3" />
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                            align="end"
+                            sideOffset={8}
+                            className="max-h-[calc(100vh-4rem)] w-[min(88vw,22rem)] overflow-y-auto p-3"
+                        >
+                            <CaptionSettingsPanel
+                                limits={limits}
+                                modeLabel={modeLabel}
+                                onClose={() => setVideoSettingsOpen(false)}
+                                onReset={resetSettings}
+                                onSettingsChange={updateSettings}
+                                settings={settings}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </>
             )}
 
             {mode === "inline" && (
-                <div className="fixed right-4 bottom-4 left-4 z-50 overflow-visible">
+                <div
+                    ref={inlineWindowRef}
+                    className={
+                        inlineFullscreen
+                            ? "fixed inset-0 z-50 overflow-visible"
+                            : "fixed right-4 bottom-4 left-4 z-50 overflow-visible"
+                    }
+                >
                     <CaptionSurface
                         emptyMessage={emptyMessage}
+                        expanded={inlineFullscreen}
+                        fill={inlineFullscreen}
                         limits={limits}
                         modeLabel={modeLabel}
                         onClose={() => void closeFloatingWindow()}
                         onReset={resetSettings}
                         onSettingsChange={updateSettings}
+                        onToggleExpanded={toggleExpandedCaptionWindow}
                         panels={panels}
                         settings={settings}
                         title={title}
@@ -911,12 +1072,14 @@ export function FloatingTranscriptWindow({
                 createPortal(
                     <CaptionSurface
                         emptyMessage={emptyMessage}
+                        expanded={captionWindowExpanded}
                         fill
                         limits={limits}
                         modeLabel={modeLabel}
                         onClose={() => void closeFloatingWindow()}
                         onReset={resetSettings}
                         onSettingsChange={updateSettings}
+                        onToggleExpanded={toggleExpandedCaptionWindow}
                         panels={panels}
                         settings={settings}
                         title={title}
