@@ -53,6 +53,8 @@ function requireMediaCaptureMethod<T extends MediaCaptureMethod>(method: T, feat
 
 const BROADCAST_AUDIO_TRACK_NAME = "broadcast-audio";
 const DEFAULT_AUDIO_INPUT_DEVICE_ID = "";
+const MAX_VOLUME_PERCENT = 200;
+const MIN_VOLUME_PERCENT = 0;
 const mixerGenerationByRoom = new WeakMap<Room, number>();
 
 function nextMixerGeneration(room: Room) {
@@ -127,6 +129,14 @@ function closeAudioContext(ctx: AudioContext | null) {
 function configureAudioAnalyser(analyser: AnalyserNode) {
     analyser.fftSize = 1024;
     analyser.smoothingTimeConstant = 0.68;
+}
+
+function clampVolumePercent(volume: number) {
+    return Math.min(MAX_VOLUME_PERCENT, Math.max(MIN_VOLUME_PERCENT, volume));
+}
+
+function getGainValue(volume: number) {
+    return clampVolumePercent(volume) / 100;
 }
 
 function getAudioInputDevices(devices: MediaDeviceInfo[]): AudioInputDevice[] {
@@ -405,7 +415,7 @@ export function useBroadcastAudioMixer({
 
             const source = ctx.createMediaStreamSource(stream);
             const gainNode = ctx.createGain();
-            gainNode.gain.setValueAtTime(micVolume / 100, ctx.currentTime);
+            gainNode.gain.setValueAtTime(getGainValue(micVolume), ctx.currentTime);
             source.connect(gainNode);
             gainNode.connect(mixedAudioAnalyserNodeRef.current ?? dest);
 
@@ -512,7 +522,7 @@ export function useBroadcastAudioMixer({
             tabSourceNodeRef.current = source;
 
             const gainNode = ctx.createGain();
-            gainNode.gain.setValueAtTime(tabVolume / 100, ctx.currentTime);
+            gainNode.gain.setValueAtTime(getGainValue(tabVolume), ctx.currentTime);
             tabGainNodeRef.current = gainNode;
 
             source.connect(gainNode);
@@ -567,20 +577,22 @@ export function useBroadcastAudioMixer({
     };
 
     const handleMicVolumeChange = (vol: number) => {
-        setMicVolume(vol);
+        const nextVolume = clampVolumePercent(vol);
+        setMicVolume(nextVolume);
         if (micGainNodeRef.current && audioContextRef.current) {
             micGainNodeRef.current.gain.setValueAtTime(
-                vol / 100,
+                getGainValue(nextVolume),
                 audioContextRef.current.currentTime,
             );
         }
     };
 
     const handleTabVolumeChange = (vol: number) => {
-        setTabVolume(vol);
+        const nextVolume = clampVolumePercent(vol);
+        setTabVolume(nextVolume);
         if (tabGainNodeRef.current && audioContextRef.current) {
             tabGainNodeRef.current.gain.setValueAtTime(
-                vol / 100,
+                getGainValue(nextVolume),
                 audioContextRef.current.currentTime,
             );
         }

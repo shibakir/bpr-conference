@@ -219,19 +219,21 @@ export function AudioSignalMonitor({
     }, [analyserNodeRef, isActive, signalIdle, signalPresent, signalQuiet]);
 
     return (
-        <div className="grid gap-3 rounded-lg bg-muted/35 p-3">
+        <div className="grid min-w-0 gap-3 rounded-lg bg-muted/35 p-3">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="grid min-w-0 gap-0.5">
                     <div className="text-base font-medium">{t("audioSignal")}</div>
                     <div className="text-sm text-muted-foreground">{t("mixedOutput")}</div>
                 </div>
-                <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
                     <span
                         ref={statusDotRef}
                         className="size-2 rounded-full bg-muted-foreground/50"
                         aria-hidden="true"
                     />
-                    <span ref={statusTextRef}>{isActive ? signalQuiet : signalIdle}</span>
+                    <span ref={statusTextRef} className="truncate">
+                        {isActive ? signalQuiet : signalIdle}
+                    </span>
                 </div>
             </div>
 
