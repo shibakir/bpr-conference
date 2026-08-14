@@ -217,7 +217,7 @@ To protect broadcast/session creation without restricting the public watch pages
       --update-secrets="BROADCAST_PASSWORD=broadcast-password:latest"
     ```
 
-When configured, the application will automatically prompt organizers for the password before creating a session or accessing the broadcast page. The password is cached in the host's `sessionStorage` to allow page reloads.
+When configured, the application will prompt organizers for the password before creating a session. A newly created session returns a session-specific organizer key that is cached in the host's `sessionStorage`; only browsers with that key can open broadcast controls, take over an active presenter lease, or end the broadcast.
 
 ### 2. Full Access Control (Identity-Aware Proxy)
 

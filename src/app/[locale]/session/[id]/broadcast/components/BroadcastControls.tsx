@@ -25,17 +25,36 @@ import { BroadcastStatus } from "./BroadcastStatus";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { SharePanel } from "./SharePanel";
 
-function deleteSessionRequest(url: string) {
-    return fetchValidatedJson(url, { method: "DELETE" }, successResponseSchema);
+function deleteSessionRequest(
+    url: string,
+    {
+        arg,
+    }: {
+        arg: {
+            organizerKey: string;
+        };
+    },
+) {
+    return fetchValidatedJson(
+        url,
+        {
+            body: JSON.stringify(arg),
+            headers: { "Content-Type": "application/json" },
+            method: "DELETE",
+        },
+        successResponseSchema,
+    );
 }
 
 export function BroadcastControls({
     sessionId,
+    organizerKey,
     expiresAt,
     onEndBroadcast,
     onSessionExpired,
 }: {
     sessionId: string;
+    organizerKey: string;
     expiresAt: string | null;
     onEndBroadcast: () => void;
     onSessionExpired: () => void;
@@ -68,7 +87,7 @@ export function BroadcastControls({
     const endBroadcast = async () => {
         onEndBroadcast();
         try {
-            await deleteSession();
+            await deleteSession({ organizerKey });
         } catch (err) {
             clientLogger.error("Failed to explicitly delete session on broadcast end:", err);
         }
