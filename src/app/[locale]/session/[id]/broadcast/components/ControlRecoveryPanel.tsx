@@ -36,7 +36,7 @@ export function ControlRecoveryPanel({
                         className="font-mono text-xs"
                         onFocus={(event) => event.currentTarget.select()}
                     />
-                    <Button type="button" variant="outline" onClick={onCopyRecoveryUrl}>
+                    <Button type="button" variant="outline" size="lg" onClick={onCopyRecoveryUrl}>
                         {isCopied ? <CheckIcon className="text-success" /> : <CopyIcon />}
                         {isCopied ? t("linkCopied") : t("copyLink")}
                     </Button>
