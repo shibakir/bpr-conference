@@ -36,3 +36,14 @@ export function filterLanguageOptions(languages: readonly LanguageOption[], quer
         words.every((word) => language.searchText.includes(word)),
     );
 }
+
+export function prioritizeSelectedLanguages(
+    languages: readonly LanguageOption[],
+    selected: ReadonlySet<string>,
+) {
+    // Preserve the localized alphabetical order within each group.
+    return [
+        ...languages.filter((language) => selected.has(language.code)),
+        ...languages.filter((language) => !selected.has(language.code)),
+    ];
+}

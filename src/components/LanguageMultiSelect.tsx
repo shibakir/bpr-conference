@@ -8,7 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { filterLanguageOptions, type LanguageOption } from "@/lib/language-search";
+import { useListScrollAnchor } from "@/hooks/use-list-scroll-anchor";
+import {
+    filterLanguageOptions,
+    type LanguageOption,
+    prioritizeSelectedLanguages,
+} from "@/lib/language-search";
 import { cn } from "@/lib/utils";
 
 interface LanguageMultiSelectProps {
@@ -35,16 +40,31 @@ export function LanguageMultiSelect({
     const t = useTranslations("LanguagePicker");
     const id = useId();
     const searchRef = useRef<HTMLInputElement>(null);
+    const { listRef, preserveScroll } = useListScrollAnchor();
     const [query, setQuery] = useState("");
     const selected = useMemo(() => new Set(selectedLanguages), [selectedLanguages]);
     const selectedOptions = useMemo(
         () => languages.filter((language) => selected.has(language.code)),
         [languages, selected],
     );
-    const filtered = useMemo(() => filterLanguageOptions(languages, query), [languages, query]);
+    const filtered = useMemo(
+        () => prioritizeSelectedLanguages(filterLanguageOptions(languages, query), selected),
+        [languages, query, selected],
+    );
+
+    function changeSelection(next: string[]) {
+        const nextSelected = new Set(next);
+        const changedKeys = new Set(
+            [...selected, ...nextSelected].filter(
+                (code) => selected.has(code) !== nextSelected.has(code),
+            ),
+        );
+        preserveScroll(changedKeys);
+        onSelectionChange(next);
+    }
 
     function setLanguageSelected(code: string, checked: boolean) {
-        onSelectionChange(
+        changeSelection(
             checked
                 ? Array.from(new Set([...selectedLanguages, code]))
                 : selectedLanguages.filter((language) => language !== code),
@@ -56,36 +76,13 @@ export function LanguageMultiSelect({
             <FieldLabel id={`${id}-label`} htmlFor={`${id}-search`}>
                 {label}
             </FieldLabel>
-            {showSelectionChips && selectedOptions.length > 0 && (
-                <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto p-0.5">
-                    {selectedOptions.map((language) => (
-                        <Button
-                            key={language.code}
-                            type="button"
-                            variant="secondary"
-                            size="xs"
-                            disabled={disabled}
-                            className="max-w-full"
-                            aria-label={t("removeLanguage", { language: language.displayName })}
-                            onClick={() => {
-                                setLanguageSelected(language.code, false);
-                                searchRef.current?.focus();
-                            }}
-                        >
-                            <span className="truncate">
-                                {language.flag} {language.displayName}
-                            </span>
-                            <XIcon aria-hidden="true" />
-                        </Button>
-                    ))}
-                </div>
-            )}
             <div className="rounded-lg bg-muted/20 p-1">
                 <div className="p-1 pb-0">
                     <Input
                         ref={searchRef}
                         id={`${id}-search`}
                         type="search"
+                        className="text-base"
                         autoComplete="off"
                         placeholder={t("searchLanguages")}
                         aria-label={t("searchIn", { label })}
@@ -99,7 +96,11 @@ export function LanguageMultiSelect({
                         }}
                     />
                 </div>
-                <div id={`${id}-list`} className="h-40 overflow-y-auto px-1 py-1">
+                <div
+                    ref={listRef}
+                    id={`${id}-list`}
+                    className="h-60 scroll-auto overflow-y-auto px-1 py-1 [overflow-anchor:none]"
+                >
                     {filtered.length === 0 ? (
                         <p
                             role="status"
@@ -114,6 +115,7 @@ export function LanguageMultiSelect({
                             {filtered.map((language) => (
                                 <div
                                     key={language.code}
+                                    data-scroll-anchor={language.code}
                                     className="flex min-h-9 items-center gap-2 rounded-sm px-2 py-1.5 text-base transition-colors hover:bg-muted"
                                 >
                                     <Checkbox
@@ -153,7 +155,7 @@ export function LanguageMultiSelect({
                             size="xs"
                             disabled={disabled || languages.length === 0}
                             onClick={() =>
-                                onSelectionChange(languages.map((language) => language.code))
+                                changeSelection(languages.map((language) => language.code))
                             }
                         >
                             {t("selectAll")}
@@ -164,12 +166,36 @@ export function LanguageMultiSelect({
                         variant="ghost"
                         size="xs"
                         disabled={disabled || selectedOptions.length === 0}
-                        onClick={() => onSelectionChange([])}
+                        onClick={() => changeSelection([])}
                     >
                         {t("clear")}
                     </Button>
                 </div>
             </div>
+            {showSelectionChips && selectedOptions.length > 0 && (
+                <div className="flex max-h-24 flex-wrap gap-1.5 overflow-y-auto p-0.5">
+                    {selectedOptions.map((language) => (
+                        <Button
+                            key={language.code}
+                            type="button"
+                            variant="secondary"
+                            size="xs"
+                            disabled={disabled}
+                            className="max-w-full"
+                            aria-label={t("removeLanguage", { language: language.displayName })}
+                            onClick={() => {
+                                setLanguageSelected(language.code, false);
+                                searchRef.current?.focus();
+                            }}
+                        >
+                            <span className="truncate">
+                                {language.flag} {language.displayName}
+                            </span>
+                            <XIcon aria-hidden="true" />
+                        </Button>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { filterLanguageOptions, getLanguageOptions } from "../language-search";
+import {
+    filterLanguageOptions,
+    getLanguageOptions,
+    prioritizeSelectedLanguages,
+} from "../language-search";
 import { SUPPORTED_LANGUAGES } from "../languages";
 
 describe("Language search", () => {
@@ -42,5 +46,28 @@ describe("Language search", () => {
         expect(filterLanguageOptions(restricted, "not-a-language")).toEqual([]);
         expect(filterLanguageOptions(restricted, " \t")).toEqual(restricted);
         expect(restricted.map((language) => language.code)).toEqual(["cs", "de"]);
+    });
+
+    it("groups selected languages first in localized alphabetical order, not selection order", () => {
+        const selected = new Set(["de", "cs", "en"]);
+        const sorted = prioritizeSelectedLanguages(czechOptions, selected);
+        expect(sorted.slice(0, 3).map((language) => language.code)).toEqual(["en", "cs", "de"]);
+        expect(sorted.slice(3)).toEqual(
+            czechOptions.filter((language) => !selected.has(language.code)),
+        );
+        expect(prioritizeSelectedLanguages(czechOptions, new Set())).toEqual(czechOptions);
+    });
+
+    it("keeps selected matches first during search and returns deselected languages to the alphabetical group", () => {
+        const matches = filterLanguageOptions(englishOptions, "portuguese");
+        expect(
+            prioritizeSelectedLanguages(matches, new Set(["pt-PT", "cs"])).map(
+                (language) => language.code,
+            ),
+        ).toEqual(["pt-PT", "pt-BR"]);
+        expect(
+            prioritizeSelectedLanguages(matches, new Set(["cs"])).map((language) => language.code),
+        ).toEqual(["pt-BR", "pt-PT"]);
+        expect(matches.map((language) => language.code)).toEqual(["pt-BR", "pt-PT"]);
     });
 });
