@@ -1,18 +1,24 @@
 "use client";
 
-import { Volume2Icon, VolumeXIcon } from "lucide-react";
+import { CheckIcon, ChevronsUpDownIcon, Volume2Icon, VolumeXIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useMemo } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { FieldLabel } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 import {
-    NativeSelect,
-    NativeSelectOptGroup,
-    NativeSelectOption,
-} from "@/components/ui/native-select";
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import { FieldLabel } from "@/components/ui/field";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { Toggle } from "@/components/ui/toggle";
+import { filterLanguageOptions, getLanguageOptions } from "@/lib/language-search";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 interface LanguageSelectorProps {
@@ -39,26 +45,12 @@ export default function LanguageSelector({
     translationsEnabled,
 }: LanguageSelectorProps) {
     const t = useTranslations("LanguageSelector");
+    const pickerT = useTranslations("LanguagePicker");
     const locale = useLocale();
-
-    const handleChange = useCallback(
-        (e: React.ChangeEvent<HTMLSelectElement>) => {
-            const langCode = e.target.value;
-
-            if (langCode === "original") {
-                onLanguageChange("original");
-                return;
-            }
-
-            if (!translationsEnabled) {
-                onLanguageChange("original");
-                return;
-            }
-
-            onLanguageChange(langCode);
-        },
-        [onLanguageChange, translationsEnabled],
-    );
+    const id = useId();
+    const [open, setOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const searchRef = useRef<HTMLInputElement>(null);
 
     const currentLang = getLanguageByCode(currentLanguage);
     const currentLangName = currentLang
@@ -72,51 +64,113 @@ export default function LanguageSelector({
                 : SUPPORTED_LANGUAGES
             : [];
 
-        return baseTranslationLanguages
-            .map((lang) => ({
-                ...lang,
-                displayName: getLanguageDisplayName(lang, locale),
-            }))
-            .sort((a, b) =>
-                a.displayName.localeCompare(b.displayName, locale, {
-                    sensitivity: "base",
-                }),
-            );
+        return getLanguageOptions(baseTranslationLanguages, locale);
     }, [allowedLanguages, locale, translationsEnabled]);
+    const filteredLanguages = useMemo(
+        () => filterLanguageOptions(visibleLanguages, query),
+        [visibleLanguages, query],
+    );
+
+    function selectLanguage(code: string) {
+        if (disabled || translationLoading) return;
+        if (code !== "original" && !visibleLanguages.some((language) => language.code === code))
+            return;
+        onLanguageChange(code);
+        setOpen(false);
+    }
 
     return (
         <div className="grid gap-2">
-            <FieldLabel htmlFor="language-select">{t("voiceLanguage")}</FieldLabel>
+            <FieldLabel id={`${id}-label`} htmlFor={id}>
+                {t("voiceLanguage")}
+            </FieldLabel>
 
             <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
-                    <NativeSelect
-                        id="language-select"
-                        className="w-full"
-                        value={currentLanguage}
-                        onChange={handleChange}
-                        disabled={translationLoading || disabled}
+                <Popover
+                    open={open && !disabled && !translationLoading}
+                    onOpenChange={(nextOpen) => {
+                        setOpen(nextOpen);
+                        if (nextOpen) setQuery("");
+                    }}
+                >
+                    <PopoverTrigger asChild>
+                        <Button
+                            id={id}
+                            type="button"
+                            variant="outline"
+                            className="min-w-0 flex-1 justify-between font-normal"
+                            disabled={translationLoading || disabled}
+                            aria-labelledby={`${id}-label ${id}-value`}
+                        >
+                            <span id={`${id}-value`} className="truncate">
+                                {currentLanguage === "original"
+                                    ? t("originalAudio")
+                                    : `${currentLang?.flag ?? ""} ${currentLangName}`}
+                            </span>
+                            {translationLoading ? (
+                                <Spinner className="size-3.5" />
+                            ) : (
+                                <ChevronsUpDownIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                        align="start"
+                        className="max-h-(--radix-popover-content-available-height) w-(--radix-popover-trigger-width) gap-0 overflow-hidden p-1"
+                        aria-labelledby={`${id}-label`}
+                        onOpenAutoFocus={(event) => {
+                            if (translationsEnabled) {
+                                event.preventDefault();
+                                searchRef.current?.focus();
+                            }
+                        }}
                     >
-                        <NativeSelectOption value="original">
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            className="w-full shrink-0 justify-between px-2 font-normal"
+                            aria-pressed={currentLanguage === "original"}
+                            onClick={() => selectLanguage("original")}
+                        >
                             {t("originalAudio")}
-                        </NativeSelectOption>
+                            {currentLanguage === "original" && (
+                                <CheckIcon aria-hidden="true" className="size-4" />
+                            )}
+                        </Button>
                         {translationsEnabled && (
-                            <NativeSelectOptGroup label={t("translations")}>
-                                {visibleLanguages.map((lang) => (
-                                    <NativeSelectOption key={lang.code} value={lang.code}>
-                                        {lang.displayName} {lang.flag}
-                                    </NativeSelectOption>
-                                ))}
-                            </NativeSelectOptGroup>
+                            <Command
+                                shouldFilter={false}
+                                defaultValue={currentLanguage}
+                                className="min-h-0 rounded-none! border-t"
+                                label={pickerT("searchIn", { label: t("voiceLanguage") })}
+                            >
+                                <CommandInput
+                                    ref={searchRef}
+                                    value={query}
+                                    onValueChange={setQuery}
+                                    placeholder={pickerT("searchLanguages")}
+                                />
+                                <CommandList>
+                                    <CommandEmpty>{pickerT("noMatches")}</CommandEmpty>
+                                    <CommandGroup heading={t("translations")}>
+                                        {filteredLanguages.map((language) => (
+                                            <CommandItem
+                                                key={language.code}
+                                                value={language.code}
+                                                data-checked={currentLanguage === language.code}
+                                                onSelect={selectLanguage}
+                                            >
+                                                <span className="min-w-0 truncate">
+                                                    {language.flag} {language.displayName}
+                                                </span>
+                                            </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                </CommandList>
+                            </Command>
                         )}
-                    </NativeSelect>
-
-                    {translationLoading && (
-                        <div className="absolute right-9 top-1/2 -translate-y-1/2">
-                            <Spinner className="size-3.5 text-muted-foreground" />
-                        </div>
-                    )}
-                </div>
+                    </PopoverContent>
+                </Popover>
 
                 <Toggle
                     type="button"

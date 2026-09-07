@@ -6,11 +6,11 @@ import { HeadphonesIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useRef, useState } from "react";
 
+import { LanguageMultiSelect } from "@/components/LanguageMultiSelect";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { FieldGroup, FieldLabel, FieldSet } from "@/components/ui/field";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { FieldGroup, FieldSet } from "@/components/ui/field";
 import { useWakeLock } from "@/hooks/use-wake-lock";
+import { getLanguageOptions } from "@/lib/language-search";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
 import { useAudioDeliveryStats } from "../hooks/useAudioDeliveryStats";
@@ -28,12 +28,6 @@ import { type FloatingCaptionPanel, FloatingTranscriptWindow } from "./FloatingT
 import LanguageSelector from "./LanguageSelector";
 import { ListenerStatus } from "./ListenerStatus";
 import { TranscriptPanel } from "./TranscriptPanel";
-
-type CaptionLanguageOption = {
-    code: string;
-    flag: string;
-    label: string;
-};
 
 export function AttendeeView({
     sessionId,
@@ -59,7 +53,7 @@ export function AttendeeView({
     const fontSizePreference = useFontSizePreference();
     const translationOutputsEnabled =
         sessionDetails.enableAudioTranslation || sessionDetails.enableTranscription;
-    const availableTranslationLanguages = useMemo<CaptionLanguageOption[]>(() => {
+    const availableTranslationLanguages = useMemo(() => {
         if (!sessionDetails.loaded) return [];
 
         const baseTranslationLanguages = sessionDetails.allowedLanguages
@@ -68,13 +62,7 @@ export function AttendeeView({
               )
             : SUPPORTED_LANGUAGES;
 
-        return baseTranslationLanguages
-            .map((lang) => ({
-                code: lang.code,
-                flag: lang.flag,
-                label: getLanguageDisplayName(lang, locale),
-            }))
-            .sort((a, b) => a.label.localeCompare(b.label, locale, { sensitivity: "base" }));
+        return getLanguageOptions(baseTranslationLanguages, locale);
     }, [locale, sessionDetails.allowedLanguages, sessionDetails.loaded]);
     const availableCaptionLanguages = useMemo(
         () => (sessionDetails.enableTranscription ? availableTranslationLanguages : []),
@@ -159,7 +147,7 @@ export function AttendeeView({
         return new Map(
             availableCaptionLanguages.map((language) => [
                 language.code,
-                `${language.flag} ${language.label}`,
+                `${language.flag} ${language.displayName}`,
             ]),
         );
     }, [availableCaptionLanguages]);
@@ -256,18 +244,11 @@ export function AttendeeView({
         setCurrentLanguage(langCode);
     }, []);
 
-    const handleCaptionLanguageToggle = useCallback(
-        (language: string, enabled: boolean) => {
-            setSelectedCaptionLanguages((prev) => {
-                const next = new Set(prev);
-                if (enabled) {
-                    next.add(language);
-                } else {
-                    next.delete(language);
-                }
-
-                return availableCaptionLanguageCodes.filter((code) => next.has(code));
-            });
+    const handleCaptionLanguagesChange = useCallback(
+        (languages: string[]) => {
+            setSelectedCaptionLanguages(
+                availableCaptionLanguageCodes.filter((code) => languages.includes(code)),
+            );
         },
         [availableCaptionLanguageCodes],
     );
@@ -312,10 +293,12 @@ export function AttendeeView({
                                     : {})}
                             />
                             {sessionDetails.enableTranscription && (
-                                <SubtitleLanguageSelector
+                                <LanguageMultiSelect
+                                    label={t("subtitleLanguages")}
+                                    emptyMessage={t("noSubtitleLanguages")}
                                     disabled={!sessionDetails.loaded}
                                     languages={availableCaptionLanguages}
-                                    onLanguageToggle={handleCaptionLanguageToggle}
+                                    onSelectionChange={handleCaptionLanguagesChange}
                                     selectedLanguages={visibleSelectedCaptionLanguages}
                                 />
                             )}
@@ -342,62 +325,5 @@ export function AttendeeView({
                 </CardContent>
             </Card>
         </section>
-    );
-}
-
-function SubtitleLanguageSelector({
-    disabled,
-    languages,
-    onLanguageToggle,
-    selectedLanguages,
-}: {
-    disabled: boolean;
-    languages: CaptionLanguageOption[];
-    onLanguageToggle: (language: string, enabled: boolean) => void;
-    selectedLanguages: string[];
-}) {
-    const t = useTranslations("Watch");
-    const selectedLanguageSet = useMemo(() => new Set(selectedLanguages), [selectedLanguages]);
-
-    return (
-        <div className="grid gap-2">
-            <FieldLabel>{t("subtitleLanguages")}</FieldLabel>
-            <ScrollArea className="max-h-48 rounded-lg bg-muted/20">
-                <div className="grid gap-2 p-3">
-                    {languages.length === 0 ? (
-                        <p className="text-base text-muted-foreground">
-                            {t("noSubtitleLanguages")}
-                        </p>
-                    ) : (
-                        languages.map((language) => {
-                            const id = `subtitle-language-${language.code}`;
-                            return (
-                                <div
-                                    key={language.code}
-                                    className="flex min-h-9 items-center gap-3 rounded-lg bg-background/60 px-3 py-2 shadow-xs shadow-foreground/5"
-                                >
-                                    <Checkbox
-                                        id={id}
-                                        checked={selectedLanguageSet.has(language.code)}
-                                        disabled={disabled}
-                                        onCheckedChange={(checked) =>
-                                            onLanguageToggle(language.code, checked === true)
-                                        }
-                                    />
-                                    <FieldLabel
-                                        htmlFor={id}
-                                        className="min-w-0 flex-1 cursor-pointer text-base font-normal"
-                                    >
-                                        <span className="truncate">
-                                            {language.flag} {language.label}
-                                        </span>
-                                    </FieldLabel>
-                                </div>
-                            );
-                        })
-                    )}
-                </div>
-            </ScrollArea>
-        </div>
     );
 }

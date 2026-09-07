@@ -234,5 +234,15 @@
         },
         "presetSummary": "Fronta zvuku: {queue} s · Zvukové úseky: {frame} ms",
         "milliseconds": "{value} ms"
+    },
+    "LanguagePicker": {
+        "searchLanguages": "Hledat jazyk…",
+        "searchIn": "Hledat v seznamu: {label}",
+        "noMatches": "Žádné odpovídající jazyky.",
+        "noLanguages": "Nejsou dostupné žádné jazyky.",
+        "selectedCount": "Vybráno: {count}",
+        "removeLanguage": "Odebrat jazyk: {language}",
+        "clear": "Vymazat",
+        "selectAll": "Vybrat vše"
     }
 }

@@ -8,11 +8,11 @@ import { useForm, useWatch } from "react-hook-form";
 import useSWR from "swr";
 
 import { CenteredPage } from "@/components/CenteredPage";
+import { LanguageMultiSelect } from "@/components/LanguageMultiSelect";
 import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
     FieldDescription,
@@ -22,7 +22,6 @@ import {
     FieldLegend,
     FieldSet,
 } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
@@ -38,7 +37,8 @@ import {
 } from "@/lib/api-schemas";
 import { setStoredBroadcastOwnerKey } from "@/lib/broadcast-owner";
 import { clientLogger } from "@/lib/client-logger";
-import { getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { getLanguageOptions } from "@/lib/language-search";
+import { SUPPORTED_LANGUAGES } from "@/lib/languages";
 import {
     DEFAULT_SESSION_DURATION_MINUTES,
     formatSessionDurationLabel,
@@ -74,7 +74,6 @@ export default function Home() {
     const locale = useLocale();
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
-    const [langSearch, setLangSearch] = useState("");
     const { data: authStatus, isLoading: isAuthStatusLoading } = useSWR(
         "/api/auth/status",
         fetchAuthStatus,
@@ -109,44 +108,10 @@ export default function Home() {
         setValue("translationOutputs", next, FORM_UPDATE_OPTIONS);
     }
 
-    function setLanguageSelected(languageCode: string, selected: boolean) {
-        setSelectedLanguagesValue(
-            selected
-                ? Array.from(new Set([...selectedLanguages, languageCode]))
-                : selectedLanguages.filter((code) => code !== languageCode),
-        );
-    }
-
     const languageOptions = useMemo(
-        () =>
-            SUPPORTED_LANGUAGES.map((lang) => ({
-                ...lang,
-                displayName: getLanguageDisplayName(lang, locale),
-            })).sort((a, b) =>
-                a.displayName.localeCompare(b.displayName, locale, {
-                    sensitivity: "base",
-                }),
-            ),
+        () => getLanguageOptions(SUPPORTED_LANGUAGES, locale),
         [locale],
     );
-
-    const filteredLanguages = useMemo(() => {
-        const query = langSearch.trim();
-
-        if (!query) {
-            return languageOptions;
-        }
-
-        const localeQuery = query.toLocaleLowerCase(locale);
-        const normalizedQuery = query.toLowerCase();
-
-        return languageOptions.filter(
-            (lang) =>
-                lang.displayName.toLocaleLowerCase(locale).includes(localeQuery) ||
-                lang.name.toLowerCase().includes(normalizedQuery) ||
-                lang.code.toLowerCase().includes(normalizedQuery),
-        );
-    }, [languageOptions, langSearch, locale]);
 
     function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
         switch (code) {
@@ -346,101 +311,15 @@ export default function Home() {
 
                                 <div className="border-t border-border/35 pt-5">
                                     <FieldSet className="gap-3">
-                                        <FieldLegend variant="label">
-                                            {t("restrictLanguages")}
-                                        </FieldLegend>
-
-                                        <div className="rounded-lg bg-muted/20 p-1">
-                                            <div className="p-1 pb-0">
-                                                <Input
-                                                    type="search"
-                                                    placeholder={t("searchLanguages")}
-                                                    value={langSearch}
-                                                    disabled={isSubmitting}
-                                                    onChange={(event) =>
-                                                        setLangSearch(event.target.value)
-                                                    }
-                                                />
-                                            </div>
-                                            <div
-                                                className="h-40 overflow-y-auto px-1 py-1"
-                                                role="group"
-                                                aria-label={t("restrictLanguages")}
-                                            >
-                                                {filteredLanguages.length === 0 ? (
-                                                    <p className="py-6 text-center text-base text-muted-foreground">
-                                                        {t("noLanguagesFound")}
-                                                    </p>
-                                                ) : (
-                                                    <div className="grid gap-1">
-                                                        {filteredLanguages.map((lang) => {
-                                                            const isChecked =
-                                                                selectedLanguages.includes(
-                                                                    lang.code,
-                                                                );
-                                                            const id = `allowed-language-${lang.code}`;
-
-                                                            return (
-                                                                <div
-                                                                    key={lang.code}
-                                                                    className="flex min-h-9 items-center gap-2 rounded-sm px-2 py-1.5 text-base transition-colors hover:bg-muted"
-                                                                >
-                                                                    <Checkbox
-                                                                        id={id}
-                                                                        checked={isChecked}
-                                                                        disabled={isSubmitting}
-                                                                        onCheckedChange={(
-                                                                            checked,
-                                                                        ) =>
-                                                                            setLanguageSelected(
-                                                                                lang.code,
-                                                                                checked === true,
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                    <label
-                                                                        htmlFor={id}
-                                                                        className={cn(
-                                                                            "min-w-0 flex-1 cursor-pointer select-none",
-                                                                            isSubmitting &&
-                                                                                "cursor-not-allowed opacity-50",
-                                                                        )}
-                                                                    >
-                                                                        <span className="block truncate">
-                                                                            {lang.flag}{" "}
-                                                                            {lang.displayName}
-                                                                        </span>
-                                                                    </label>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex justify-end gap-1">
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="xs"
-                                                onClick={() =>
-                                                    setSelectedLanguagesValue(
-                                                        languageOptions.map((lang) => lang.code),
-                                                    )
-                                                }
-                                            >
-                                                {t("selectAll")}
-                                            </Button>
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="xs"
-                                                onClick={() => setSelectedLanguagesValue([])}
-                                            >
-                                                {t("clear")}
-                                            </Button>
-                                        </div>
+                                        <LanguageMultiSelect
+                                            label={t("restrictLanguages")}
+                                            languages={languageOptions}
+                                            selectedLanguages={selectedLanguages}
+                                            onSelectionChange={setSelectedLanguagesValue}
+                                            disabled={isSubmitting}
+                                            allowSelectAll
+                                            showSelectionChips={false}
+                                        />
                                         <FieldError>
                                             {errors.selectedLanguages
                                                 ? t("selectAtLeastOneLanguage")

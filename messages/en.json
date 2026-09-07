@@ -234,5 +234,15 @@
         },
         "presetSummary": "Audio queue: {queue} s · Audio chunks: {frame} ms",
         "milliseconds": "{value} ms"
+    },
+    "LanguagePicker": {
+        "searchLanguages": "Search languages…",
+        "searchIn": "Search in {label}",
+        "noMatches": "No matching languages.",
+        "noLanguages": "No languages are available.",
+        "selectedCount": "Selected: {count}",
+        "removeLanguage": "Remove {language}",
+        "clear": "Clear",
+        "selectAll": "Select all"
     }
 }
