@@ -96,10 +96,11 @@ export function LanguageMultiSelect({
                         }}
                     />
                 </div>
+                {/* Contain Radix's hidden form inputs so they cannot extend the page height. */}
                 <div
                     ref={listRef}
                     id={`${id}-list`}
-                    className="h-60 scroll-auto overflow-y-auto px-1 py-1 [overflow-anchor:none]"
+                    className="relative h-60 scroll-auto overflow-y-auto px-1 py-1 [overflow-anchor:none]"
                 >
                     {filtered.length === 0 ? (
                         <p
