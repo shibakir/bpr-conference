@@ -188,10 +188,8 @@
         "queueLabel": "Maximum translated audio queue",
         "queueHelp": "A smaller queue keeps audio closer to live but may skip speech under load. Translation generation and delivery to listeners are not included.",
         "frameLabel": "Audio chunk duration",
-        "frameHelp": "100 ms is the standard. Other sizes change how often audio is sent; their effect depends on speech and network conditions.",
+        "frameHelp": "Shorter chunks send speech sooner. Longer chunks send fewer messages but add waiting time before translation.",
         "seconds": "{value, plural, one {# second} other {# seconds}}",
-        "standardFrame": "{value} ms — standard",
-        "experimentalFrame": "{value} ms — experimental",
         "loading": "Loading translation settings…",
         "loadFailed": "Could not load translation settings.",
         "retry": "Retry",
@@ -217,6 +215,24 @@
             "recovering": "Reconnecting"
         },
         "serverTiming": "Input packaging: {input} ms · Output publication: ≈{output} ms (server only)",
-        "captionDeliveryLoss": "Caption segments skipped during delivery: {skipped} · Failed updates: {failed}"
+        "captionDeliveryLoss": "Caption segments skipped during delivery: {skipped} · Failed updates: {failed}",
+        "presetLabel": "Translation preset",
+        "presetsUnavailable": "This broadcast currently supports manual settings only.",
+        "presets": {
+            "balanced": "Balance",
+            "speed": "Best speed",
+            "quality": "Best quality",
+            "poorConnection": "Poor connection",
+            "manual": "Manual"
+        },
+        "presetHelp": {
+            "balanced": "Balances responsiveness and continuity of translated speech.",
+            "speed": "Keeps playback closer to live. More speech may be skipped when the queue fills.",
+            "quality": "Allows more queued speech before skipping it, at the cost of extra delay. Translation accuracy is unchanged.",
+            "poorConnection": "Sends audio less often and allows more queued speech. This adds delay and cannot fix connection dropouts.",
+            "manual": "Choose the maximum audio queue and chunk duration below."
+        },
+        "presetSummary": "Audio queue: {queue} s · Audio chunks: {frame} ms",
+        "milliseconds": "{value} ms"
     }
 }

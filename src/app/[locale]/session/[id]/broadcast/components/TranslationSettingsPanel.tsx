@@ -10,7 +10,11 @@ import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select"
 import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
 import { getLanguageByCode, getLanguageDisplayName } from "@/lib/languages";
 import {
+    getTranslationPreset,
     OUTPUT_BACKLOG_OPTIONS_MS,
+    TRANSLATION_PRESET_OPTIONS,
+    TRANSLATION_PRESETS,
+    translationPresetSchema,
     type TranslationSettingsSnapshot,
     translationSettingsSnapshotSchema,
 } from "@/lib/translation-settings";
@@ -64,12 +68,15 @@ export function TranslationSettingsPanel({
         null,
     );
     const value = draft ?? data?.settings;
+    const supportsPresets = data?.settings.preset !== undefined;
+    const preset = value ? getTranslationPreset(value) : "balanced";
     const partial =
         data?.translations.some((item) => item.settings.version !== data.settings.version) ?? false;
     const dirty =
         !!draft &&
         (draft.inputFrameSizeMs !== data?.settings.inputFrameSizeMs ||
-            draft.maxOutputBacklogMs !== data?.settings.maxOutputBacklogMs);
+            draft.maxOutputBacklogMs !== data?.settings.maxOutputBacklogMs ||
+            (data && getTranslationPreset(draft) !== getTranslationPreset(data.settings)));
 
     async function save(event: FormEvent<HTMLFormElement>) {
         event.preventDefault();
@@ -87,6 +94,7 @@ export function TranslationSettingsPanel({
                         expectedVersion: value.version,
                         inputFrameSizeMs: value.inputFrameSizeMs,
                         maxOutputBacklogMs: value.maxOutputBacklogMs,
+                        ...(supportsPresets ? { preset } : {}),
                     }),
                 },
                 responseSchema,
@@ -125,65 +133,118 @@ export function TranslationSettingsPanel({
             </h2>
             <form onSubmit={save} className="grid gap-4">
                 <div className="grid gap-2">
-                    <label htmlFor={`${id}-queue`} className="text-sm font-medium">
-                        {t("queueLabel")}
+                    <label htmlFor={`${id}-preset`} className="text-sm font-medium">
+                        {t("presetLabel")}
                     </label>
                     <NativeSelect
-                        id={`${id}-queue`}
-                        value={value.maxOutputBacklogMs}
-                        disabled={saving}
-                        aria-describedby={`${id}-queue-help`}
+                        id={`${id}-preset`}
+                        className="w-full"
+                        value={preset}
+                        disabled={saving || !supportsPresets}
+                        aria-describedby={`${id}-preset-help`}
                         onChange={(event) => {
+                            const nextPreset = translationPresetSchema.parse(event.target.value);
                             setDraft({
                                 ...value,
-                                maxOutputBacklogMs: Number(
-                                    event.target.value,
-                                ) as TranslationSettingsSnapshot["maxOutputBacklogMs"],
+                                ...(nextPreset === "manual" ? {} : TRANSLATION_PRESETS[nextPreset]),
+                                preset: nextPreset,
                             });
                             setMessage(null);
                         }}
                     >
-                        {OUTPUT_BACKLOG_OPTIONS_MS.map((ms) => (
-                            <NativeSelectOption key={ms} value={ms}>
-                                {t("seconds", { value: ms / 1000 })}
+                        {TRANSLATION_PRESET_OPTIONS.map((option) => (
+                            <NativeSelectOption
+                                key={option}
+                                value={option}
+                                disabled={
+                                    option !== "manual" &&
+                                    !data?.availableInputFrameSizesMs.includes(
+                                        TRANSLATION_PRESETS[option].inputFrameSizeMs,
+                                    )
+                                }
+                            >
+                                {t(`presets.${option}`)}
                             </NativeSelectOption>
                         ))}
                     </NativeSelect>
-                    <p id={`${id}-queue-help`} className="text-sm text-muted-foreground">
-                        {t("queueHelp")}
+                    <p id={`${id}-preset-help`} className="text-sm text-muted-foreground">
+                        {t(supportsPresets ? `presetHelp.${preset}` : "presetsUnavailable")}
                     </p>
+                    {preset !== "manual" && (
+                        <p className="text-sm text-muted-foreground">
+                            {t("presetSummary", {
+                                queue: value.maxOutputBacklogMs / 1000,
+                                frame: value.inputFrameSizeMs,
+                            })}
+                        </p>
+                    )}
                 </div>
-                <div className="grid gap-2">
-                    <label htmlFor={`${id}-frame`} className="text-sm font-medium">
-                        {t("frameLabel")}
-                    </label>
-                    <NativeSelect
-                        id={`${id}-frame`}
-                        value={value.inputFrameSizeMs}
-                        disabled={saving}
-                        aria-describedby={`${id}-frame-help`}
-                        onChange={(event) => {
-                            setDraft({
-                                ...value,
-                                inputFrameSizeMs: Number(
-                                    event.target.value,
-                                ) as TranslationSettingsSnapshot["inputFrameSizeMs"],
-                            });
-                            setMessage(null);
-                        }}
-                    >
-                        {(data?.availableInputFrameSizesMs ?? [100]).map((ms) => (
-                            <NativeSelectOption key={ms} value={ms}>
-                                {t(ms === 100 ? "standardFrame" : "experimentalFrame", {
-                                    value: ms,
-                                })}
-                            </NativeSelectOption>
-                        ))}
-                    </NativeSelect>
-                    <p id={`${id}-frame-help`} className="text-sm text-muted-foreground">
-                        {t("frameHelp")}
-                    </p>
-                </div>
+                {preset === "manual" && (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                        <div className="row-span-3 grid min-w-0 grid-rows-subgrid gap-2">
+                            <label htmlFor={`${id}-queue`} className="text-sm font-medium">
+                                {t("queueLabel")}
+                            </label>
+                            <NativeSelect
+                                id={`${id}-queue`}
+                                className="w-full"
+                                value={value.maxOutputBacklogMs}
+                                disabled={saving}
+                                aria-describedby={`${id}-queue-help`}
+                                onChange={(event) => {
+                                    setDraft({
+                                        ...value,
+                                        preset: "manual",
+                                        maxOutputBacklogMs: Number(
+                                            event.target.value,
+                                        ) as TranslationSettingsSnapshot["maxOutputBacklogMs"],
+                                    });
+                                    setMessage(null);
+                                }}
+                            >
+                                {OUTPUT_BACKLOG_OPTIONS_MS.map((ms) => (
+                                    <NativeSelectOption key={ms} value={ms}>
+                                        {t("seconds", { value: ms / 1000 })}
+                                    </NativeSelectOption>
+                                ))}
+                            </NativeSelect>
+                            <p id={`${id}-queue-help`} className="text-sm text-muted-foreground">
+                                {t("queueHelp")}
+                            </p>
+                        </div>
+                        <div className="row-span-3 grid min-w-0 grid-rows-subgrid gap-2">
+                            <label htmlFor={`${id}-frame`} className="text-sm font-medium">
+                                {t("frameLabel")}
+                            </label>
+                            <NativeSelect
+                                id={`${id}-frame`}
+                                className="w-full"
+                                value={value.inputFrameSizeMs}
+                                disabled={saving}
+                                aria-describedby={`${id}-frame-help`}
+                                onChange={(event) => {
+                                    setDraft({
+                                        ...value,
+                                        preset: "manual",
+                                        inputFrameSizeMs: Number(
+                                            event.target.value,
+                                        ) as TranslationSettingsSnapshot["inputFrameSizeMs"],
+                                    });
+                                    setMessage(null);
+                                }}
+                            >
+                                {(data?.availableInputFrameSizesMs ?? [100]).map((ms) => (
+                                    <NativeSelectOption key={ms} value={ms}>
+                                        {t("milliseconds", { value: ms })}
+                                    </NativeSelectOption>
+                                ))}
+                            </NativeSelect>
+                            <p id={`${id}-frame-help`} className="text-sm text-muted-foreground">
+                                {t("frameHelp")}
+                            </p>
+                        </div>
+                    </div>
+                )}
                 <div className="flex flex-wrap items-center gap-2">
                     <Button type="submit" size="sm" disabled={saving || (!dirty && !partial)}>
                         {t(saving ? "saving" : "apply")}

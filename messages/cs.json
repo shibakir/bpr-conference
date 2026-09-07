@@ -188,10 +188,8 @@
         "queueLabel": "Maximální fronta přeloženého zvuku",
         "queueHelp": "Menší fronta přibližuje zvuk živému přenosu, při zatížení ale může část řeči přeskočit. Nezahrnuje vytvoření překladu ani doručení posluchači.",
         "frameLabel": "Délka zvukového úseku",
-        "frameHelp": "Standard je 100 ms. Jiné délky mění četnost odesílání zvuku; výsledek závisí na řeči a připojení.",
+        "frameHelp": "Kratší úseky odesílají řeč dříve. Delší úseky znamenají méně zpráv, ale delší čekání před překladem.",
         "seconds": "{value, plural, one {# sekunda} few {# sekundy} other {# sekund}}",
-        "standardFrame": "{value} ms — standardní",
-        "experimentalFrame": "{value} ms — experimentální",
         "loading": "Načítání nastavení překladu…",
         "loadFailed": "Nastavení překladu se nepodařilo načíst.",
         "retry": "Zkusit znovu",
@@ -217,6 +215,24 @@
             "recovering": "Obnovování spojení"
         },
         "serverTiming": "Balení vstupu: {input} ms · Publikace výstupu: ≈{output} ms (pouze server)",
-        "captionDeliveryLoss": "Přeskočené úseky titulků při doručování: {skipped} · Nezdařené aktualizace: {failed}"
+        "captionDeliveryLoss": "Přeskočené úseky titulků při doručování: {skipped} · Nezdařené aktualizace: {failed}",
+        "presetLabel": "Předvolba překladu",
+        "presetsUnavailable": "Toto vysílání zatím podporuje pouze ruční nastavení.",
+        "presets": {
+            "balanced": "Vyvážené",
+            "speed": "Nejlepší rychlost",
+            "quality": "Nejlepší kvalita",
+            "poorConnection": "Slabé připojení",
+            "manual": "Ručně"
+        },
+        "presetHelp": {
+            "balanced": "Vyvažuje rychlou odezvu a plynulost přeložené řeči.",
+            "speed": "Udržuje přehrávání blíže živému přenosu. Při zaplnění fronty může přeskočit více řeči.",
+            "quality": "Umožňuje delší frontu řeči před přeskočením za cenu většího zpoždění. Přesnost překladu se nemění.",
+            "poorConnection": "Odesílá zvuk méně často a umožňuje delší frontu řeči. Přidává zpoždění a nevyřeší výpadky připojení.",
+            "manual": "Níže vyberte maximální frontu zvuku a délku zvukového úseku."
+        },
+        "presetSummary": "Fronta zvuku: {queue} s · Zvukové úseky: {frame} ms",
+        "milliseconds": "{value} ms"
     }
 }
