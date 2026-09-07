@@ -1,0 +1,164 @@
+{
+    "date": "2026-09-07",
+    "baselineServerCommit": "ee9557c",
+    "audioControllerCommit": "417ca03",
+    "model": "gemini-3.5-live-translate-preview",
+    "pcmSha256": "4da420a9797b5becdc509e4d96df5e4ddd5d09a90ff7601aa41958d433cf52f2",
+    "frameSizeProbes": [
+        {
+            "frameMs": 50,
+            "reason": "completed",
+            "inputDurationMs": 15781.375,
+            "outputDurationMs": 21500,
+            "firstAudioMs": 3651,
+            "firstTextMs": 3645,
+            "textChunks": 14
+        },
+        {
+            "frameMs": 100,
+            "reason": "completed",
+            "inputDurationMs": 15781.375,
+            "outputDurationMs": 21250,
+            "firstAudioMs": 3706,
+            "firstTextMs": 3697,
+            "textChunks": 14
+        },
+        {
+            "frameMs": 200,
+            "reason": "completed",
+            "inputDurationMs": 15781.375,
+            "outputDurationMs": 21000,
+            "firstAudioMs": 3737,
+            "firstTextMs": 3731,
+            "textChunks": 14
+        }
+    ],
+    "soak": {
+        "durationMs": 1800389,
+        "inputMs": 1784495.375,
+        "cpuMicroseconds": {
+            "user": 36873541,
+            "system": 12377537
+        },
+        "maxRssBytes": 133627904,
+        "transport": "simulated native source 300ms, shared media clock slowed to 70% every fifth minute; no per-frame artificial penalty",
+        "speech": "synthetic English repeated; identical model output fed to baseline and new controller",
+        "languages": [
+            {
+                "language": "cs",
+                "frames": 7118,
+                "outputMs": 1779500,
+                "text": 1761,
+                "transcriptionKeys": [
+                    "text",
+                    "languageCode"
+                ],
+                "baseline": {
+                    "backlog": {
+                        "median": 646.3698749998584,
+                        "p95": 840.4434579999652,
+                        "max": 983.9105828999891
+                    },
+                    "publishedMs": 1673000,
+                    "droppedMs": 106000
+                },
+                "updated": {
+                    "backlog": {
+                        "median": 553.6094535000157,
+                        "p95": 866.5728331690694,
+                        "max": 980.5177581130547
+                    },
+                    "publishedMs": 1672443.625,
+                    "outputBacklogMs": 20,
+                    "droppedOutputMs": 103829,
+                    "playbackSpeed": 1,
+                    "state": "dropping",
+                    "speed": {
+                        "median": 1,
+                        "p95": 1.02,
+                        "max": 1.07
+                    },
+                    "acceleratedSeconds": 149
+                },
+                "input": {
+                    "droppedInputMs": 0,
+                    "bufferedBytes": 0,
+                    "resets": 0,
+                    "recovering": false
+                }
+            },
+            {
+                "language": "de",
+                "frames": 7116,
+                "outputMs": 1779000,
+                "text": 1771,
+                "transcriptionKeys": [
+                    "text",
+                    "languageCode"
+                ],
+                "baseline": {
+                    "backlog": {
+                        "median": 553.2212920000311,
+                        "p95": 817.4111249999842,
+                        "max": 996.3927953999955
+                    },
+                    "publishedMs": 1673000,
+                    "droppedMs": 106000
+                },
+                "updated": {
+                    "backlog": {
+                        "median": 556.9297080000397,
+                        "p95": 883.5947499998729,
+                        "max": 991.5589296097519
+                    },
+                    "publishedMs": 1672641.6666666665,
+                    "outputBacklogMs": 20,
+                    "droppedOutputMs": 103610,
+                    "playbackSpeed": 1,
+                    "state": "dropping",
+                    "speed": {
+                        "median": 1,
+                        "p95": 1.01,
+                        "max": 1.08
+                    },
+                    "acceleratedSeconds": 142
+                },
+                "input": {
+                    "droppedInputMs": 0,
+                    "bufferedBytes": 0,
+                    "resets": 0,
+                    "recovering": false
+                }
+            }
+        ]
+    },
+    "browser": {
+        "engine": "Chromium via agent-browser 0.36.0",
+        "realLiveKitAndGemini": true,
+        "languages": [
+            "cs",
+            "de"
+        ],
+        "ownerSettingsAfterReload": {
+            "maxOutputBacklogMs": 3000,
+            "inputFrameSizeMs": 200,
+            "version": 3
+        },
+        "invalidOwnerStatus": 403,
+        "invalidSettingsStatus": 400,
+        "staleVersionStatus": 409,
+        "liveUpdateAppliedToBothLanguages": true,
+        "documentPip": true,
+        "videoPip": true,
+        "mobileViewport": [
+            390,
+            844
+        ],
+        "observedTranslatedAudioStats": {
+            "jitterBufferMs": 107,
+            "networkJitterMs": 6,
+            "packetLossPercent": 0
+        },
+        "pageErrors": 0
+    }
+}
