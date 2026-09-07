@@ -178,5 +178,39 @@
         "unsupportedTargetLanguage": "Tento jazyk není podporovaný.",
         "translatingTo": "Poslech v jazyce {language}",
         "startingTranslation": "Překlad se spouští..."
+    },
+    "TranslationDelay": {
+        "title": "Překlad a zpoždění",
+        "queueLabel": "Maximální fronta přeloženého zvuku",
+        "queueHelp": "Menší fronta přibližuje zvuk živému přenosu, při zatížení ale může část řeči přeskočit. Nezahrnuje vytvoření překladu ani doručení posluchači.",
+        "frameLabel": "Délka zvukového úseku",
+        "frameHelp": "Standard je 100 ms. Jiné délky mění četnost odesílání zvuku; výsledek závisí na řeči a připojení.",
+        "seconds": "{value} sekund",
+        "standardFrame": "{value} ms — standardní",
+        "experimentalFrame": "{value} ms — experimentální",
+        "loading": "Načítání nastavení překladu…",
+        "loadFailed": "Nastavení překladu se nepodařilo načíst.",
+        "retry": "Zkusit znovu",
+        "saving": "Používání…",
+        "apply": "Použít",
+        "resetDraft": "Načíst aktuální nastavení",
+        "appliesLive": "Platí během přenosu pro všechny jazyky.",
+        "saved": "Nastavení použito.",
+        "failed": "Nastavení se nepodařilo použít. Zkuste to znovu.",
+        "conflict": "Nastavení se změnilo v jiném okně. Nejprve načtěte aktuální hodnoty.",
+        "partial": "Některé jazyky nastavení nepřevzaly. Zkuste je použít znovu.",
+        "diagnostics": "Stav překladu podle jazyka",
+        "queueMetric": "Fronta zvuku: {value} / {limit} ms",
+        "speedMetric": "Rychlost: {value}×",
+        "dropMetric": "Přeskočeno: {input} s vstupu, {output} s zvuku",
+        "languagePending": "Nastavení pro tento jazyk ještě nebylo použito.",
+        "fullDelayUnavailable": "Celkové zpoždění vůči řečníkovi zatím nelze měřit. Krátká fronta zvuku neznamená, že překlad dohnal živý přenos.",
+        "stale": "Spojení přerušeno. Zobrazené hodnoty mohou být zastaralé.",
+        "states": {
+            "normal": "Běžný provoz",
+            "accelerating": "Dohánění přenosu",
+            "dropping": "Přeskakování staršího zvuku",
+            "recovering": "Obnovování spojení"
+        }
     }
 }

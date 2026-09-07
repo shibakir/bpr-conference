@@ -26,6 +26,7 @@ import { BroadcastStatus } from "./BroadcastStatus";
 import { ControlRecoveryPanel } from "./ControlRecoveryPanel";
 import { EndBroadcastControl } from "./EndBroadcastControl";
 import { SharePanel } from "./SharePanel";
+import { TranslationSettingsPanel } from "./TranslationSettingsPanel";
 
 function deleteSessionRequest(
     url: string,
@@ -187,6 +188,13 @@ export function BroadcastControls({
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">
                             <ActiveTranslationsPanel translations={translations} />
+                        </FieldSet>
+
+                        <FieldSet className="gap-3 border-t border-border/35 pt-5">
+                            <TranslationSettingsPanel
+                                sessionId={sessionId}
+                                organizerKey={organizerKey}
+                            />
                         </FieldSet>
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">

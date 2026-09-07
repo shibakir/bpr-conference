@@ -178,5 +178,39 @@
         "unsupportedTargetLanguage": "This language isn't supported.",
         "translatingTo": "Listening in {language}",
         "startingTranslation": "Starting translation..."
+    },
+    "TranslationDelay": {
+        "title": "Translation and delay",
+        "queueLabel": "Maximum translated audio queue",
+        "queueHelp": "A smaller queue keeps audio closer to live but may skip speech under load. Translation generation and delivery to listeners are not included.",
+        "frameLabel": "Audio chunk duration",
+        "frameHelp": "100 ms is the standard. Other sizes change how often audio is sent; their effect depends on speech and network conditions.",
+        "seconds": "{value} seconds",
+        "standardFrame": "{value} ms — standard",
+        "experimentalFrame": "{value} ms — experimental",
+        "loading": "Loading translation settings…",
+        "loadFailed": "Could not load translation settings.",
+        "retry": "Retry",
+        "saving": "Applying…",
+        "apply": "Apply",
+        "resetDraft": "Use current settings",
+        "appliesLive": "Applies during the broadcast to all languages.",
+        "saved": "Settings applied.",
+        "failed": "Could not apply settings. Retry.",
+        "conflict": "Settings changed in another window. Load current settings before trying again.",
+        "partial": "Some languages have not applied these settings. Retry to apply them.",
+        "diagnostics": "Translation status by language",
+        "queueMetric": "Audio queue: {value} / {limit} ms",
+        "speedMetric": "Speed: {value}×",
+        "dropMetric": "Skipped: {input} s input, {output} s audio",
+        "languagePending": "These settings have not been applied to this language.",
+        "fullDelayUnavailable": "Full delay from the speaker is not currently measurable. A short audio queue does not mean the translation has caught up.",
+        "stale": "Connection interrupted. Displayed values may be out of date.",
+        "states": {
+            "normal": "Normal",
+            "accelerating": "Catching up",
+            "dropping": "Skipping older audio",
+            "recovering": "Reconnecting"
+        }
     }
 }
