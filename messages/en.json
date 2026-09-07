@@ -161,7 +161,11 @@
         "readyCopy": "Tap below to join and turn on audio.",
         "startListening": "Start listening",
         "enableAudio": "Turn on audio",
-        "session": "Broadcast {sessionId}"
+        "session": "Broadcast {sessionId}",
+        "audioDeliveryTitle": "Audio delivery on this device · measured by WebRTC",
+        "audioDeliveryMetrics": "Playout buffer: {buffer} · Network jitter: {jitter} · Packet loss: {loss}",
+        "audioDeliveryExplanation": "These values describe reception on this device, not the full delay from the speaker. — means unavailable.",
+        "captionTimingExplanation": "Captions appear as soon as they arrive. Audio synchronization is unavailable because the translation model does not provide reliable text-to-audio timing."
     },
     "LanguageSelector": {
         "voiceLanguage": "Listen in",
@@ -185,7 +189,7 @@
         "queueHelp": "A smaller queue keeps audio closer to live but may skip speech under load. Translation generation and delivery to listeners are not included.",
         "frameLabel": "Audio chunk duration",
         "frameHelp": "100 ms is the standard. Other sizes change how often audio is sent; their effect depends on speech and network conditions.",
-        "seconds": "{value} seconds",
+        "seconds": "{value, plural, one {# second} other {# seconds}}",
         "standardFrame": "{value} ms — standard",
         "experimentalFrame": "{value} ms — experimental",
         "loading": "Loading translation settings…",
@@ -211,6 +215,8 @@
             "accelerating": "Catching up",
             "dropping": "Skipping older audio",
             "recovering": "Reconnecting"
-        }
+        },
+        "serverTiming": "Input packaging: {input} ms · Output publication: ≈{output} ms (server only)",
+        "captionDeliveryLoss": "Caption segments skipped during delivery: {skipped} · Failed updates: {failed}"
     }
 }

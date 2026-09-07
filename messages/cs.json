@@ -161,7 +161,11 @@
         "readyCopy": "Klepnutím níže se připojíte a zapnete zvuk.",
         "startListening": "Začít poslouchat",
         "enableAudio": "Zapnout zvuk",
-        "session": "Vysílání {sessionId}"
+        "session": "Vysílání {sessionId}",
+        "audioDeliveryTitle": "Doručení zvuku na tomto zařízení · měřeno pomocí WebRTC",
+        "audioDeliveryMetrics": "Vyrovnávací paměť: {buffer} · Kolísání sítě: {jitter} · Ztráta paketů: {loss}",
+        "audioDeliveryExplanation": "Hodnoty popisují příjem na tomto zařízení, nikoli celkové zpoždění vůči řečníkovi. — znamená nedostupné měření.",
+        "captionTimingExplanation": "Titulky se zobrazují ihned po přijetí. Synchronizace se zvukem není dostupná, protože model neposkytuje spolehlivé časové přiřazení textu ke zvuku."
     },
     "LanguageSelector": {
         "voiceLanguage": "Poslouchat v jazyce",
@@ -185,7 +189,7 @@
         "queueHelp": "Menší fronta přibližuje zvuk živému přenosu, při zatížení ale může část řeči přeskočit. Nezahrnuje vytvoření překladu ani doručení posluchači.",
         "frameLabel": "Délka zvukového úseku",
         "frameHelp": "Standard je 100 ms. Jiné délky mění četnost odesílání zvuku; výsledek závisí na řeči a připojení.",
-        "seconds": "{value} sekund",
+        "seconds": "{value, plural, one {# sekunda} few {# sekundy} other {# sekund}}",
         "standardFrame": "{value} ms — standardní",
         "experimentalFrame": "{value} ms — experimentální",
         "loading": "Načítání nastavení překladu…",
@@ -211,6 +215,8 @@
             "accelerating": "Dohánění přenosu",
             "dropping": "Přeskakování staršího zvuku",
             "recovering": "Obnovování spojení"
-        }
+        },
+        "serverTiming": "Balení vstupu: {input} ms · Publikace výstupu: ≈{output} ms (pouze server)",
+        "captionDeliveryLoss": "Přeskočené úseky titulků při doručování: {skipped} · Nezdařené aktualizace: {failed}"
     }
 }

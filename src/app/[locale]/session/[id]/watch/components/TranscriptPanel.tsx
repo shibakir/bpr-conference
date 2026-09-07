@@ -64,6 +64,8 @@ export function TranscriptPanel({
                 </div>
             </div>
 
+            <p className="text-xs text-muted-foreground">{t("captionTimingExplanation")}</p>
+
             <ScrollArea className="h-80 rounded-lg bg-muted/20">
                 <div className="p-4">
                     <TranscriptFeed

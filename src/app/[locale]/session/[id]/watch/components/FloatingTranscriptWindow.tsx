@@ -1149,6 +1149,8 @@ function CaptionSettingsPanel({
                     onChange={(value) => onSettingsChange({ backgroundColor: value })}
                 />
 
+                <p className="text-xs text-muted-foreground">{t("captionTimingExplanation")}</p>
+
                 <SettingRow label={t("captionOpacity")} value={`${settings.backgroundOpacity}%`}>
                     <Slider
                         min={limits.opacity.min}

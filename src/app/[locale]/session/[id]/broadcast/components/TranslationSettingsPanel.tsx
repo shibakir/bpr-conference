@@ -24,6 +24,10 @@ const diagnosticsSchema = z.object({
     playbackSpeed: z.number(),
     state: z.enum(["normal", "accelerating", "dropping", "recovering"]),
     bufferedBytes: z.number(),
+    inputPackagingMs: z.number().nullable().optional(),
+    outputPublishDelayMs: z.number().nullable().optional(),
+    droppedCaptionSegments: z.number().optional(),
+    failedCaptionUpdates: z.number().optional(),
 });
 const responseSchema = z.object({
     settings: translationSettingsSnapshotSchema,
@@ -236,6 +240,21 @@ export function TranslationSettingsPanel({
                                         output: (item.droppedOutputMs / 1000).toFixed(1),
                                     })}
                                 </p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("serverTiming", {
+                                        input: item.inputPackagingMs ?? "—",
+                                        output: item.outputPublishDelayMs ?? "—",
+                                    })}
+                                </p>
+                                {((item.droppedCaptionSegments ?? 0) > 0 ||
+                                    (item.failedCaptionUpdates ?? 0) > 0) && (
+                                    <p className="text-warning">
+                                        {t("captionDeliveryLoss", {
+                                            skipped: item.droppedCaptionSegments ?? 0,
+                                            failed: item.failedCaptionUpdates ?? 0,
+                                        })}
+                                    </p>
+                                )}
                                 {item.settings.version !== data.settings.version && (
                                     <p className="text-warning">{t("languagePending")}</p>
                                 )}

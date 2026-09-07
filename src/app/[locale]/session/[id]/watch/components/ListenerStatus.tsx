@@ -5,8 +5,10 @@ import { useTranslations } from "next-intl";
 
 import SessionCountdown from "@/components/SessionCountdown";
 import { Badge } from "@/components/ui/badge";
+import type { AudioDeliveryMetrics } from "@/lib/audio-delivery-stats";
 
 export function ListenerStatus({
+    audioDelivery,
     audioMuted,
     currentLanguage,
     expiresAt,
@@ -15,6 +17,7 @@ export function ListenerStatus({
     isWakeLockActive,
     onSessionExpired,
 }: {
+    audioDelivery: AudioDeliveryMetrics;
     audioMuted: boolean;
     currentLanguage: string;
     expiresAt: string | null;
@@ -64,6 +67,28 @@ export function ListenerStatus({
                     onExpire={onSessionExpired}
                 />
             </div>
+            {!audioMuted && isReceivingAudio && (
+                <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
+                    <p>{t("audioDeliveryTitle")}</p>
+                    <p>
+                        {t("audioDeliveryMetrics", {
+                            buffer:
+                                audioDelivery.jitterBufferMs === null
+                                    ? "—"
+                                    : `${audioDelivery.jitterBufferMs} ms`,
+                            jitter:
+                                audioDelivery.networkJitterMs === null
+                                    ? "—"
+                                    : `${audioDelivery.networkJitterMs} ms`,
+                            loss:
+                                audioDelivery.packetLossPercent === null
+                                    ? "—"
+                                    : `${audioDelivery.packetLossPercent}%`,
+                        })}
+                    </p>
+                    <p>{t("audioDeliveryExplanation")}</p>
+                </div>
+            )}
         </section>
     );
 }

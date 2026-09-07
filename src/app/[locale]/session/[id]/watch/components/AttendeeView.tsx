@@ -1,7 +1,7 @@
 "use client";
 
 import { useRoomContext, useTracks } from "@livekit/components-react";
-import { Track } from "livekit-client";
+import { RemoteAudioTrack, Track } from "livekit-client";
 import { HeadphonesIcon } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
 
+import { useAudioDeliveryStats } from "../hooks/useAudioDeliveryStats";
 import { useFontSizePreference } from "../hooks/useFontSizePreference";
 import { useOrganizerAudioPresence } from "../hooks/useOrganizerAudioPresence";
 import { useParticipantLanguageAttribute } from "../hooks/useParticipantLanguageAttribute";
@@ -237,6 +238,20 @@ export function AttendeeView({
             );
         });
 
+    const selectedAudioTrack = audioMuted
+        ? undefined
+        : audioTracks.find(
+              ({ participant, publication }) =>
+                  publication.isSubscribed &&
+                  !publication.isMuted &&
+                  (currentLanguage === "original"
+                      ? participant.identity.startsWith("organizer-")
+                      : participant.identity === translatorIdentity),
+          )?.publication.track;
+    const audioDelivery = useAudioDeliveryStats(
+        selectedAudioTrack instanceof RemoteAudioTrack ? selectedAudioTrack : undefined,
+    );
+
     const handleLanguageChange = useCallback((langCode: string) => {
         setCurrentLanguage(langCode);
     }, []);
@@ -272,6 +287,7 @@ export function AttendeeView({
                 <CardContent className="px-5 pb-5 sm:px-6 sm:pb-6">
                     <FieldGroup className="gap-6">
                         <ListenerStatus
+                            audioDelivery={audioDelivery}
                             audioMuted={audioMuted}
                             currentLanguage={currentLanguage}
                             expiresAt={expiresAt}
