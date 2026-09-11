@@ -1,7 +1,13 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CaptionsIcon, RadioTowerIcon, Volume2Icon } from "lucide-react";
+import {
+    CaptionsIcon,
+    ClipboardPasteIcon,
+    CopyIcon,
+    RadioTowerIcon,
+    Volume2Icon,
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
@@ -13,8 +19,10 @@ import { PasswordInput } from "@/components/PasswordInput";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
     Field,
+    FieldContent,
     FieldDescription,
     FieldError,
     FieldGroup,
@@ -25,6 +33,7 @@ import {
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useRouter } from "@/i18n/navigation";
 import { ApiRequestError, fetchValidatedJson } from "@/lib/api-client";
@@ -56,7 +65,9 @@ function getDefaultFormValues(): CreateSessionFormValues {
         durationMinutes: DEFAULT_SESSION_DURATION_MINUTES,
         password: "",
         selectedLanguages: [...DEFAULT_SELECTED_LANGUAGES],
+        systemInstruction: "",
         translationOutputs: [...DEFAULT_TRANSLATION_OUTPUTS],
+        useCustomContext: false,
     };
 }
 
@@ -99,6 +110,8 @@ export default function Home() {
         useWatch({ control, name: "translationOutputs" }) ?? DEFAULT_TRANSLATION_OUTPUTS;
     const selectedLanguages =
         useWatch({ control, name: "selectedLanguages" }) ?? DEFAULT_SELECTED_LANGUAGES;
+    const useCustomContext = useWatch({ control, name: "useCustomContext" }) ?? false;
+    const systemInstructionFormat = t("systemInstructionFormat");
 
     function setSelectedLanguagesValue(next: string[]) {
         setValue("selectedLanguages", next, FORM_UPDATE_OPTIONS);
@@ -112,6 +125,22 @@ export default function Home() {
         () => getLanguageOptions(SUPPORTED_LANGUAGES, locale),
         [locale],
     );
+
+    function setUseCustomContextValue(next: boolean) {
+        setValue("useCustomContext", next, FORM_UPDATE_OPTIONS);
+    }
+
+    function copySystemInstructionFormat() {
+        if (typeof navigator === "undefined" || !navigator.clipboard) return;
+
+        void navigator.clipboard.writeText(systemInstructionFormat).catch((error: unknown) => {
+            clientLogger.error("Failed to copy system instruction format:", error);
+        });
+    }
+
+    function copySystemInstructionFormatToField() {
+        setValue("systemInstruction", systemInstructionFormat, FORM_UPDATE_OPTIONS);
+    }
 
     function getCreateSessionErrorMessage(code: ApiErrorCode | undefined) {
         switch (code) {
@@ -131,6 +160,9 @@ export default function Home() {
         setError(null);
         const valuesEnableAudioTranslation = values.translationOutputs.includes("audio");
         const valuesEnableTranscription = values.translationOutputs.includes("text");
+        const systemInstruction = values.useCustomContext
+            ? values.systemInstruction?.trim()
+            : undefined;
 
         try {
             const data = await fetchValidatedJson(
@@ -147,6 +179,7 @@ export default function Home() {
                         enableTranscription: valuesEnableTranscription,
                         durationMinutes: values.durationMinutes,
                         allowedLanguages: values.selectedLanguages,
+                        systemInstruction: systemInstruction || undefined,
                     }),
                 },
                 createSessionResponseSchema,
@@ -327,6 +360,74 @@ export default function Home() {
                                         </FieldError>
                                     </FieldSet>
                                 </div>
+
+                                <Field>
+                                    <FieldContent>
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox
+                                                id="use-custom-context"
+                                                checked={useCustomContext}
+                                                disabled={isSubmitting}
+                                                onCheckedChange={(checked) =>
+                                                    setUseCustomContextValue(checked === true)
+                                                }
+                                            />
+                                            <FieldLabel htmlFor="use-custom-context">
+                                                {t("useCustomContext")}
+                                            </FieldLabel>
+                                        </div>
+                                        <FieldDescription>
+                                            {t("useCustomContextDescription")}
+                                        </FieldDescription>
+                                    </FieldContent>
+                                </Field>
+
+                                {useCustomContext ? (
+                                    <Field data-invalid={!!errors.systemInstruction}>
+                                        <FieldLabel htmlFor="system-instruction">
+                                            {t("systemInstruction")}
+                                        </FieldLabel>
+                                        <div className="grid gap-3 rounded-lg border border-border/60 bg-muted/30 p-3">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <p className="text-sm font-medium">
+                                                    {t("systemInstructionFormatLabel")}
+                                                </p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={copySystemInstructionFormat}
+                                                    >
+                                                        <CopyIcon />
+                                                        {t("copySystemInstructionFormat")}
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={copySystemInstructionFormatToField}
+                                                    >
+                                                        <ClipboardPasteIcon />
+                                                        {t("copySystemInstructionFormatToField")}
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                            <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-md bg-background/70 p-3 font-mono text-xs leading-5 text-muted-foreground">
+                                                {systemInstructionFormat}
+                                            </pre>
+                                        </div>
+                                        <Textarea
+                                            id="system-instruction"
+                                            placeholder={t("systemInstructionPlaceholder")}
+                                            disabled={isSubmitting}
+                                            aria-invalid={!!errors.systemInstruction}
+                                            rows={8}
+                                            {...register("systemInstruction")}
+                                        />
+                                        <FieldError errors={[errors.systemInstruction]} />
+                                    </Field>
+                                ) : null}
 
                                 {error && (
                                     <Alert variant="destructive">
