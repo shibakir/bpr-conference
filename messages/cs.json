@@ -121,6 +121,7 @@
         "takingOver": "Přebírám ovládání...",
         "micAccessError": "Mikrofon se nepodařilo použít: {message}",
         "noTabAudio": "Zvuk z karty nebyl sdílen. Při výběru karty zapněte volbu \"Sdílet zvuk karty\".",
+        "tabAudioUnavailableSafari": "Sdílení zvuku z karty není v Safari dostupné. Použijte Chrome nebo Edge.",
         "tabAudioError": "Zvuk z karty se nepodařilo sdílet: {message}"
     },
     "Watch": {

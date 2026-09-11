@@ -16,9 +16,11 @@ const MAX_VOLUME_PERCENT = 200;
 
 export function AudioInputCard({
     title,
+    description,
     enabled,
     volume,
     actionLabel,
+    actionDisabled = false,
     deviceSelectLabel,
     deviceSelectOptions,
     deviceSelectValue,
@@ -29,9 +31,11 @@ export function AudioInputCard({
     onVolumeChange,
 }: {
     title: string;
+    description?: string | undefined;
     enabled: boolean;
     volume: number;
     actionLabel: string;
+    actionDisabled?: boolean;
     deviceSelectLabel?: string;
     deviceSelectOptions?: AudioInputDeviceOption[];
     deviceSelectValue?: string;
@@ -75,17 +79,25 @@ export function AudioInputCard({
     return (
         <div className="grid min-w-0 gap-3 rounded-lg bg-muted/35 p-3">
             <div className="flex min-w-0 flex-col items-stretch gap-3 min-[400px]:flex-row min-[400px]:items-center min-[400px]:justify-between">
-                <div className="flex min-w-0 items-center gap-2 text-base font-medium">
+                <div className="flex min-w-0 items-center gap-2">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                         {icon}
                     </span>
-                    <span className="truncate">{title}</span>
+                    <div className="grid min-w-0 gap-0.5">
+                        <span className="truncate text-base font-medium">{title}</span>
+                        {description ? (
+                            <span className="text-sm leading-snug text-muted-foreground">
+                                {description}
+                            </span>
+                        ) : null}
+                    </div>
                 </div>
                 <Button
                     type="button"
                     variant={enabled ? "destructive" : "default"}
                     size="sm"
                     onClick={onToggle}
+                    disabled={!enabled && actionDisabled}
                     className="w-full min-[400px]:w-auto"
                 >
                     {enabled ? stopLabel : actionLabel}

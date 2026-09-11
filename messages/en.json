@@ -121,6 +121,7 @@
         "takingOver": "Taking over...",
         "micAccessError": "We couldn't use your microphone: {message}",
         "noTabAudio": "No tab sound was shared. When choosing a tab, turn on \"Share tab audio\".",
+        "tabAudioUnavailableSafari": "Tab audio sharing isn’t available in Safari. Use Chrome or Edge.",
         "tabAudioError": "We couldn't share tab sound: {message}"
     },
     "Watch": {

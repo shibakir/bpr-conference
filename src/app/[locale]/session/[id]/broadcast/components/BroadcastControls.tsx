@@ -78,6 +78,7 @@ export function BroadcastControls({
         room,
         noTabAudioMessage: t("noTabAudio"),
         micAccessErrorMessage: (message) => t("micAccessError", { message }),
+        safariTabAudioUnavailableMessage: t("tabAudioUnavailableSafari"),
         tabAudioErrorMessage: (message) => t("tabAudioError", { message }),
     });
     const audioInputDeviceOptions = [
@@ -152,9 +153,15 @@ export function BroadcastControls({
                                 />
                                 <AudioInputCard
                                     title={t("browserTabAudio")}
+                                    description={
+                                        audioMixer.isSafariBrowser
+                                            ? t("tabAudioUnavailableSafari")
+                                            : undefined
+                                    }
                                     enabled={audioMixer.isTabAudioEnabled}
                                     volume={audioMixer.tabVolume}
                                     actionLabel={t("shareTab")}
+                                    actionDisabled={audioMixer.isSafariBrowser}
                                     stopLabel={t("stopSharing")}
                                     icon={
                                         <ScreenShareIcon className="size-4 text-muted-foreground" />

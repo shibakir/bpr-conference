@@ -3,6 +3,10 @@
 import { type LocalTrackPublication, type Room, Track } from "livekit-client";
 import { type MutableRefObject, useCallback, useEffect, useRef, useState } from "react";
 
+import {
+    detectBrowserCapabilities,
+    useBrowserCapabilities,
+} from "@/components/browser-capabilities/browser-capabilities-provider";
 import { clientLogger } from "@/lib/client-logger";
 
 type WindowWithWebkitAudioContext = Window &
@@ -179,14 +183,17 @@ function getMicrophoneAudioConstraints(deviceId: string): boolean | MediaTrackCo
 export function useBroadcastAudioMixer({
     noTabAudioMessage,
     room,
+    safariTabAudioUnavailableMessage,
     tabAudioErrorMessage,
     micAccessErrorMessage,
 }: {
     noTabAudioMessage: string;
     room: Room | undefined;
+    safariTabAudioUnavailableMessage: string;
     tabAudioErrorMessage: (message: string) => string;
     micAccessErrorMessage: (message: string) => string;
 }) {
+    const browserCapabilities = useBrowserCapabilities();
     const [audioInputDevices, setAudioInputDevices] = useState<AudioInputDevice[]>([]);
     const [isMicEnabled, setIsMicEnabled] = useState(false);
     const [isTabAudioEnabled, setIsTabAudioEnabled] = useState(false);
@@ -206,6 +213,7 @@ export function useBroadcastAudioMixer({
     const tabGainNodeRef = useRef<GainNode | null>(null);
     const publishedTrackPubRef = useRef<LocalTrackPublication | null>(null);
     const isMicEnabledRef = useRef(isMicEnabled);
+    const canShareBrowserTabAudioRef = useRef(browserCapabilities.canShareBrowserTabAudio);
     const isTabAudioEnabledRef = useRef(isTabAudioEnabled);
     const microphoneGenerationRef = useRef(0);
     const selectedAudioInputDeviceIdRef = useRef(selectedAudioInputDeviceId);
@@ -241,6 +249,10 @@ export function useBroadcastAudioMixer({
     useEffect(() => {
         isMicEnabledRef.current = isMicEnabled;
     }, [isMicEnabled]);
+
+    useEffect(() => {
+        canShareBrowserTabAudioRef.current = browserCapabilities.canShareBrowserTabAudio;
+    }, [browserCapabilities.canShareBrowserTabAudio]);
 
     useEffect(() => {
         selectedAudioInputDeviceIdRef.current = selectedAudioInputDeviceId;
@@ -498,6 +510,16 @@ export function useBroadcastAudioMixer({
             return;
         }
 
+        const latestBrowserCapabilities = canShareBrowserTabAudioRef.current
+            ? detectBrowserCapabilities()
+            : browserCapabilities;
+        if (!latestBrowserCapabilities.canShareBrowserTabAudio) {
+            canShareBrowserTabAudioRef.current = false;
+            clientLogger.info("Tab audio capture is disabled in Safari.");
+            alert(safariTabAudioUnavailableMessage);
+            return;
+        }
+
         try {
             await ctx.resume();
             const getDisplayMedia = requireMediaCaptureMethod(
@@ -605,6 +627,7 @@ export function useBroadcastAudioMixer({
         mixedAudioAnalyserNodeRef,
         isAudioActive: isMicEnabled || isTabAudioEnabled,
         isMicEnabled,
+        isSafariBrowser: browserCapabilities.isSafariBrowser,
         isTabAudioEnabled,
         micVolume,
         selectedAudioInputDeviceId,

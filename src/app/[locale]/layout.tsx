@@ -7,6 +7,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getTranslations, setRequestLocale } from "next-intl/server";
 
 import { AppHeader } from "@/components/AppHeader";
+import { BrowserCapabilitiesProvider } from "@/components/browser-capabilities/browser-capabilities-provider";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { ThemeScript } from "@/components/theme/theme-script";
 import { isLocale, routing } from "@/i18n/routing";
@@ -70,10 +71,12 @@ export default async function RootLayout({
             </head>
             <body>
                 <ThemeProvider>
-                    <NextIntlClientProvider>
-                        <AppHeader />
-                        {children}
-                    </NextIntlClientProvider>
+                    <BrowserCapabilitiesProvider>
+                        <NextIntlClientProvider>
+                            <AppHeader />
+                            {children}
+                        </NextIntlClientProvider>
+                    </BrowserCapabilitiesProvider>
                 </ThemeProvider>
             </body>
         </html>
