@@ -124,6 +124,15 @@
         "tabAudioUnavailableSafari": "Sdílení zvuku z karty není v Safari dostupné. Použijte Chrome nebo Edge.",
         "tabAudioError": "Zvuk z karty se nepodařilo sdílet: {message}"
     },
+    "AudioTransmissionQuality": {
+        "title": "Kvalita přenosu zvuku",
+        "locked": "Pro změnu kvality vypněte mikrofon a zastavte sdílení zvuku z karty.",
+        "options": {
+            "32000": "Úsporná · 32 kbit/s",
+            "48000": "Standardní · 48 kbit/s (výchozí)",
+            "96000": "Vysoká · 96 kbit/s"
+        }
+    },
     "Watch": {
         "title": "Poslech",
         "original": "Původní zvuk",

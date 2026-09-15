@@ -124,6 +124,15 @@
         "tabAudioUnavailableSafari": "Tab audio sharing isn’t available in Safari. Use Chrome or Edge.",
         "tabAudioError": "We couldn't share tab sound: {message}"
     },
+    "AudioTransmissionQuality": {
+        "title": "Audio transmission quality",
+        "locked": "Turn off the microphone and stop tab audio sharing to change quality.",
+        "options": {
+            "32000": "Economy · 32 kbps",
+            "48000": "Standard · 48 kbps (default)",
+            "96000": "High · 96 kbps"
+        }
+    },
     "Watch": {
         "title": "Listen",
         "original": "Original audio",

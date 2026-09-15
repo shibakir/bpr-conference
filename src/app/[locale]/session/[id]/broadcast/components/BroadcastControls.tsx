@@ -22,6 +22,7 @@ import { useListenerCount } from "../hooks/useListenerCount";
 import { ActiveTranslationsPanel } from "./ActiveTranslationsPanel";
 import { AudioInputCard } from "./AudioInputCard";
 import { AudioSignalMonitor } from "./AudioSignalMonitor";
+import { AudioTransmissionQuality } from "./AudioTransmissionQuality";
 import { BroadcastStatus } from "./BroadcastStatus";
 import { ControlRecoveryPanel } from "./ControlRecoveryPanel";
 import { EndBroadcastControl } from "./EndBroadcastControl";
@@ -136,12 +137,20 @@ export function BroadcastControls({
 
                         <FieldSet className="min-w-0 gap-3 border-t border-border/35 pt-5">
                             <FieldTitle>{t("audioSources")}</FieldTitle>
+                            <AudioTransmissionQuality
+                                bitrate={audioMixer.audioBitrate}
+                                locked={audioMixer.isAudioActive || audioMixer.isStartingAudio}
+                                onChange={audioMixer.handleAudioBitrateChange}
+                            />
                             <div className="grid min-w-0 gap-3">
                                 <AudioInputCard
                                     title={t("microphone")}
                                     enabled={audioMixer.isMicEnabled}
                                     volume={audioMixer.micVolume}
                                     actionLabel={t("enable")}
+                                    actionDisabled={
+                                        !audioMixer.isAudioReady || audioMixer.isStartingAudio
+                                    }
                                     deviceSelectLabel={t("audioInputDevice")}
                                     deviceSelectOptions={audioInputDeviceOptions}
                                     deviceSelectValue={audioMixer.selectedAudioInputDeviceId}
@@ -161,7 +170,11 @@ export function BroadcastControls({
                                     enabled={audioMixer.isTabAudioEnabled}
                                     volume={audioMixer.tabVolume}
                                     actionLabel={t("shareTab")}
-                                    actionDisabled={audioMixer.isSafariBrowser}
+                                    actionDisabled={
+                                        audioMixer.isSafariBrowser ||
+                                        !audioMixer.isAudioReady ||
+                                        audioMixer.isStartingAudio
+                                    }
                                     stopLabel={t("stopSharing")}
                                     icon={
                                         <ScreenShareIcon className="size-4 text-muted-foreground" />
