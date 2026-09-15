@@ -32,7 +32,7 @@ export function AudioTransmissionQuality({
                 value={bitrate ?? DEFAULT_AUDIO_TRANSMISSION_BITRATE}
                 disabled={bitrate === null || locked}
                 onChange={(event) => onChange(Number(event.target.value))}
-                aria-describedby={`${id}-help ${id}-availability`}
+                aria-describedby={locked ? `${id}-locked` : undefined}
                 className="w-full"
             >
                 {AUDIO_TRANSMISSION_BITRATES.map((option) => (
@@ -41,16 +41,11 @@ export function AudioTransmissionQuality({
                     </NativeSelectOption>
                 ))}
             </NativeSelect>
-            <p id={`${id}-help`} className="text-sm text-muted-foreground">
-                {t("description")}
-            </p>
-            <p
-                id={`${id}-availability`}
-                className="text-sm text-muted-foreground"
-                aria-live="polite"
-            >
-                {t(locked ? "locked" : "availability")}
-            </p>
+            {locked && (
+                <p id={`${id}-locked`} className="text-sm text-muted-foreground" aria-live="polite">
+                    {t("locked")}
+                </p>
+            )}
         </div>
     );
 }

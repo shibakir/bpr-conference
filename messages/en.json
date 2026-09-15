@@ -126,8 +126,6 @@
     },
     "AudioTransmissionQuality": {
         "title": "Audio transmission quality",
-        "description": "Applies to microphone and tab audio. Higher quality uses more data and needs a stable connection.",
-        "availability": "Choose before turning on audio. Your preference is saved in this browser.",
         "locked": "Turn off the microphone and stop tab audio sharing to change quality.",
         "options": {
             "32000": "Economy · 32 kbps",

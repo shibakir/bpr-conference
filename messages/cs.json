@@ -126,8 +126,6 @@
     },
     "AudioTransmissionQuality": {
         "title": "Kvalita přenosu zvuku",
-        "description": "Platí pro mikrofon i zvuk z karty. Vyšší kvalita přenáší více dat a vyžaduje stabilní připojení.",
-        "availability": "Vyberte před zapnutím zvuku. Volba se ukládá v tomto prohlížeči.",
         "locked": "Pro změnu kvality vypněte mikrofon a zastavte sdílení zvuku z karty.",
         "options": {
             "32000": "Úsporná · 32 kbit/s",
