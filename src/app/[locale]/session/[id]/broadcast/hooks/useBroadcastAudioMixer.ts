@@ -7,6 +7,12 @@ import {
     detectBrowserCapabilities,
     useBrowserCapabilities,
 } from "@/components/browser-capabilities/browser-capabilities-provider";
+import {
+    AUDIO_TRANSMISSION_STORAGE_KEY,
+    type AudioTransmissionBitrate,
+    DEFAULT_AUDIO_TRANSMISSION_BITRATE,
+    isAudioTransmissionBitrate,
+} from "@/lib/audio-transmission-quality";
 import { clientLogger } from "@/lib/client-logger";
 
 type WindowWithWebkitAudioContext = Window &
@@ -202,6 +208,12 @@ export function useBroadcastAudioMixer({
         DEFAULT_AUDIO_INPUT_DEVICE_ID,
     );
     const [tabVolume, setTabVolume] = useState(100);
+    const [audioBitrate, setAudioBitrate] = useState<AudioTransmissionBitrate | null>(null);
+    const [readyAudioBitrate, setReadyAudioBitrate] = useState<AudioTransmissionBitrate | null>(
+        null,
+    );
+    const [isStartingAudio, setIsStartingAudio] = useState(false);
+    const capturePendingRef = useRef(false);
     const audioContextRef = useRef<AudioContext | null>(null);
     const mixedAudioAnalyserNodeRef = useRef<AnalyserNode | null>(null);
     const destinationNodeRef = useRef<MediaStreamAudioDestinationNode | null>(null);
@@ -217,6 +229,43 @@ export function useBroadcastAudioMixer({
     const isTabAudioEnabledRef = useRef(isTabAudioEnabled);
     const microphoneGenerationRef = useRef(0);
     const selectedAudioInputDeviceIdRef = useRef(selectedAudioInputDeviceId);
+
+    // Load after hydration, before publishing any track. Storage may be unavailable.
+    useEffect(() => {
+        const timeoutId = window.setTimeout(() => {
+            let bitrate = DEFAULT_AUDIO_TRANSMISSION_BITRATE;
+            try {
+                const stored = Number(window.localStorage.getItem(AUDIO_TRANSMISSION_STORAGE_KEY));
+                if (isAudioTransmissionBitrate(stored)) bitrate = stored;
+            } catch (err) {
+                clientLogger.warn("Could not read audio transmission quality:", err);
+            }
+            setAudioBitrate(bitrate);
+        }, 0);
+        return () => window.clearTimeout(timeoutId);
+    }, []);
+
+    const isAudioReady = audioBitrate !== null && readyAudioBitrate === audioBitrate;
+
+    const handleAudioBitrateChange = (bitrate: number) => {
+        // Also guard pending permission dialogs, before React marks an input as active.
+        if (
+            !isAudioTransmissionBitrate(bitrate) ||
+            bitrate === audioBitrate ||
+            micStreamRef.current ||
+            tabStreamRef.current ||
+            capturePendingRef.current
+        ) {
+            return;
+        }
+        setReadyAudioBitrate(null);
+        setAudioBitrate(bitrate);
+        try {
+            window.localStorage.setItem(AUDIO_TRANSMISSION_STORAGE_KEY, String(bitrate));
+        } catch (err) {
+            clientLogger.warn("Could not save audio transmission quality:", err);
+        }
+    };
 
     const refreshAudioInputDevices = useCallback(async () => {
         const mediaDevices = navigator.mediaDevices;
@@ -284,9 +333,10 @@ export function useBroadcastAudioMixer({
     }, [refreshAudioInputDevices]);
 
     useEffect(() => {
-        if (!room || !room.localParticipant) return;
+        if (!room || !room.localParticipant || audioBitrate === null) return;
 
         const localRoom = room;
+        const publicationBitrate = audioBitrate;
         const generation = nextMixerGeneration(localRoom);
         let active = true;
         let localPub: LocalTrackPublication | null = null;
@@ -340,6 +390,7 @@ export function useBroadcastAudioMixer({
                     const pub = await localRoom.localParticipant.publishTrack(mixedTrack, {
                         name: BROADCAST_AUDIO_TRACK_NAME,
                         source: Track.Source.Microphone,
+                        audioPreset: { maxBitrate: publicationBitrate },
                     });
                     localPub = pub;
 
@@ -356,8 +407,11 @@ export function useBroadcastAudioMixer({
                     } else {
                         await pub.mute();
                     }
+                    if (!active || !isCurrentMixerGeneration(localRoom, generation)) return;
                     await unpublishExtraBroadcastAudioPublications(localRoom, pub);
 
+                    if (!active || !isCurrentMixerGeneration(localRoom, generation)) return;
+                    setReadyAudioBitrate(publicationBitrate);
                     clientLogger.info("Published mixed audio track:", pub.trackSid);
                 }
             } catch (err) {
@@ -402,7 +456,7 @@ export function useBroadcastAudioMixer({
                 localMixedTrack?.stop();
             }
         };
-    }, [room]);
+    }, [room, audioBitrate]);
 
     const connectMicrophoneInput = async (deviceId: string) => {
         const ctx = audioContextRef.current;
@@ -486,11 +540,17 @@ export function useBroadcastAudioMixer({
             return;
         }
 
+        if (!isAudioReady || capturePendingRef.current) return;
+        capturePendingRef.current = true;
+        setIsStartingAudio(true);
         try {
             await connectMicrophoneInput(selectedAudioInputDeviceIdRef.current);
         } catch (err) {
             clientLogger.error("Failed to access microphone:", err);
             alert(micAccessErrorMessage((err as Error).message));
+        } finally {
+            capturePendingRef.current = false;
+            setIsStartingAudio(false);
         }
     };
 
@@ -510,6 +570,7 @@ export function useBroadcastAudioMixer({
             return;
         }
 
+        if (!isAudioReady || capturePendingRef.current) return;
         const latestBrowserCapabilities = canShareBrowserTabAudioRef.current
             ? detectBrowserCapabilities()
             : browserCapabilities;
@@ -520,6 +581,8 @@ export function useBroadcastAudioMixer({
             return;
         }
 
+        capturePendingRef.current = true;
+        setIsStartingAudio(true);
         try {
             await ctx.resume();
             const getDisplayMedia = requireMediaCaptureMethod(
@@ -530,6 +593,11 @@ export function useBroadcastAudioMixer({
                 video: { displaySurface: "browser" },
                 audio: true,
             });
+
+            if (audioContextRef.current !== ctx) {
+                stopStream(stream);
+                return;
+            }
 
             const audioTracks = stream.getAudioTracks();
             if (audioTracks.length === 0) {
@@ -576,6 +644,9 @@ export function useBroadcastAudioMixer({
             if ((err as Error).name !== "NotAllowedError") {
                 alert(tabAudioErrorMessage((err as Error).message));
             }
+        } finally {
+            capturePendingRef.current = false;
+            setIsStartingAudio(false);
         }
     };
 
@@ -621,6 +692,10 @@ export function useBroadcastAudioMixer({
     };
 
     return {
+        audioBitrate,
+        handleAudioBitrateChange,
+        isAudioReady,
+        isStartingAudio,
         audioInputDevices,
         handleMicVolumeChange,
         handleTabVolumeChange,
