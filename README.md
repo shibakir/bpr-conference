@@ -238,6 +238,24 @@ gcloud run services update live-translate --region us-central1 --iap
 5. The server spins up a Gemini Live API translation bridge for that language
 6. Subsequent attendees requesting the same language share the existing bridge
 
+## Audio transmission quality
+
+The broadcast controls offer three Opus bitrate limits for the mixed microphone
+and browser-tab track: **32 kbps (Economy)**, **48 kbps (Standard, default)**, and
+**96 kbps (High)**. This controls the organizer's upload to LiveKit; the actual
+bitrate can be lower depending on the audio and network conditions.
+
+Choose quality before enabling audio. To change it during a session, turn off
+both audio sources, select a mode, then enable audio again. Quality is locked
+while an input is active or a capture permission dialog is pending. Only the
+inactive mixed track is republished; changing quality does not end the session.
+The preference is stored in this browser. Missing, invalid, or unreadable storage
+falls back to 48 kbps.
+
+This setting is independent of the translation delay presets. Gemini input stays
+16-bit mono PCM at 16 kHz, and capture noise/echo processing settings are unchanged.
+Higher transmission quality does not guarantee more accurate translation.
+
 ## Project structure
 
 ```
