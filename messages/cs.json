@@ -183,7 +183,9 @@
         "audioDeliveryTitle": "Doručení zvuku na tomto zařízení · měřeno pomocí WebRTC",
         "audioDeliveryMetrics": "Vyrovnávací paměť: {buffer} · Kolísání sítě: {jitter} · Ztráta paketů: {loss}",
         "audioDeliveryExplanation": "Hodnoty popisují příjem na tomto zařízení, nikoli celkové zpoždění vůči řečníkovi. — znamená nedostupné měření.",
-        "captionTimingExplanation": "Titulky se zobrazují ihned po přijetí. Synchronizace se zvukem není dostupná, protože model neposkytuje spolehlivé časové přiřazení textu ke zvuku."
+        "captionTimingExplanation": "Titulky se zobrazují ihned po přijetí. Synchronizace se zvukem není dostupná, protože model neposkytuje spolehlivé časové přiřazení textu ke zvuku.",
+        "translationResetting": "{language}: překlad se restartuje; titulky byly vymazány.",
+        "translationDraining": "{language}: dokončuje se zbývající překlad; nová řeč se dočasně vynechává."
     },
     "LanguageSelector": {
         "voiceLanguage": "Poslouchat v jazyce",
@@ -262,5 +264,27 @@
         "removeLanguage": "Odebrat jazyk: {language}",
         "clear": "Vymazat",
         "selectAll": "Vybrat vše"
+    },
+    "TranslationActions": {
+        "drain": "Dokončit přehrávání",
+        "reset": "Resetovat překlad",
+        "drainLanguage": "Dokončit přehrávání překladu: {language}",
+        "resetLanguage": "Resetovat překlad: {language}",
+        "hint": "Při dokončování přehrávání se nová řeč pro tento jazyk dočasně vynechá. Reset vymaže jeho titulky všem posluchačům.",
+        "drainHint": "Přehrát zbývající překlad a vrátit se k živé řeči. Nová řeč se dočasně vynechá.",
+        "resetHint": "Zahodit čekající překlad, vymazat titulky všem posluchačům tohoto jazyka a překlad restartovat.",
+        "sending": "Odesílání…",
+        "resetting": "Restartování překladu…",
+        "draining": "Dokončování přehrávání… Nová řeč se dočasně vynechává.",
+        "resetCompleted": "Překlad restartován. Titulky vymazány.",
+        "drainCompleted": "Zbývající překlad odeslán. Živý překlad pokračuje.",
+        "failed": "Příkaz se nepodařilo odeslat. Opakováním ověřte jeho výsledek.",
+        "conflict": "Jiná operace právě probíhá. Počkejte prosím.",
+        "rateLimited": "Před dalším pokusem několik sekund počkejte.",
+        "inactive": "Tento překlad již není aktivní.",
+        "forbidden": "Je vyžadován přístup vlastníka vysílání.",
+        "timeout": "Dokončení nebylo včas potvrzeno. Živý vstup pokračuje; titulky zůstaly zachovány.",
+        "incomplete": "Operaci se nepodařilo dokončit. Zkontrolujte stav překladu a zkuste to znovu.",
+        "unconfirmed": "Přehrávání doběhlo a živý vstup pokračuje. Úplnost překladu nebyla potvrzena."
     }
 }

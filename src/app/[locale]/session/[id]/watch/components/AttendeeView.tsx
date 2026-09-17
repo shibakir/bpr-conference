@@ -12,6 +12,7 @@ import { FieldGroup, FieldSet } from "@/components/ui/field";
 import { useWakeLock } from "@/hooks/use-wake-lock";
 import { getLanguageOptions } from "@/lib/language-search";
 import { getLanguageByCode, getLanguageDisplayName, SUPPORTED_LANGUAGES } from "@/lib/languages";
+import { operationIsRunning } from "@/lib/translation-control";
 
 import { useAudioDeliveryStats } from "../hooks/useAudioDeliveryStats";
 import { useFontSizePreference } from "../hooks/useFontSizePreference";
@@ -123,8 +124,9 @@ export function AttendeeView({
         () => new Set(desiredTranslationLanguages),
         [desiredTranslationLanguages],
     );
-    const { transcriptsByLanguage } = useTranslatedTranscripts({
+    const { transcriptsByLanguage, controls: translationControls } = useTranslatedTranscripts({
         room,
+        sessionId,
         enabled: sessionDetails.enableTranscription,
         languages: desiredTranslationLanguages,
     });
@@ -277,6 +279,26 @@ export function AttendeeView({
                             isWakeLockActive={isWakeLockActive}
                             onSessionExpired={onSessionExpired}
                         />
+                        <div
+                            aria-live="polite"
+                            className="grid gap-1 text-sm text-muted-foreground"
+                        >
+                            {desiredTranslationLanguages
+                                .filter((language) =>
+                                    operationIsRunning(translationControls[language]?.operation),
+                                )
+                                .map((language) => (
+                                    <p key={language}>
+                                        {t(
+                                            translationControls[language]?.operation?.action ===
+                                                "reset"
+                                                ? "translationResetting"
+                                                : "translationDraining",
+                                            { language: language.toUpperCase() },
+                                        )}
+                                    </p>
+                                ))}
+                        </div>
 
                         <FieldSet className="gap-4 border-t border-border/35 pt-5">
                             <LanguageSelector

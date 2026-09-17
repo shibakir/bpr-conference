@@ -6,6 +6,7 @@ export type CaptionMessage = {
     text: string;
     final: boolean;
     timestamp: number;
+    historyRevision?: number;
 } & (
     | { protocolVersion?: undefined }
     | {
@@ -42,8 +43,13 @@ type Cursor = {
 export type TranscriptState = {
     entries: Record<string, CaptionEntry[]>;
     streams: Record<string, Cursor>;
+    historyRevisions: Record<string, number>;
 };
-export const EMPTY_TRANSCRIPTS: TranscriptState = { entries: {}, streams: {} };
+export const EMPTY_TRANSCRIPTS: TranscriptState = {
+    entries: {},
+    streams: {},
+    historyRevisions: {},
+};
 const HISTORY_LIMIT = 50;
 
 export function parseCaptionMessage(value: unknown): CaptionMessage | null {
@@ -57,6 +63,13 @@ export function parseCaptionMessage(value: unknown): CaptionMessage | null {
         typeof m["final"] !== "boolean" ||
         typeof m["timestamp"] !== "number" ||
         !Number.isFinite(m["timestamp"])
+    )
+        return null;
+    if (
+        m["historyRevision"] !== undefined &&
+        (typeof m["historyRevision"] !== "number" ||
+            !Number.isSafeInteger(m["historyRevision"]) ||
+            m["historyRevision"] < 0)
     )
         return null;
     if (m["protocolVersion"] === undefined) return value as CaptionMessage;
@@ -75,6 +88,9 @@ export function parseCaptionMessage(value: unknown): CaptionMessage | null {
 
 export function receiveCaption(state: TranscriptState, message: CaptionMessage): TranscriptState {
     const language = message.language;
+    const revision = message.historyRevision ?? 0;
+    if (revision < (state.historyRevisions[language] ?? 0)) return state;
+    state = applyHistoryReset(state, language, revision);
     let entries = state.entries[language] ?? [];
     const current = state.streams[language];
     let stream = current;
@@ -159,6 +175,7 @@ export function receiveCaption(state: TranscriptState, message: CaptionMessage):
         };
     }
     return {
+        historyRevisions: state.historyRevisions,
         entries: { ...state.entries, [language]: entries },
         streams: stream ? { ...state.streams, [language]: stream } : state.streams,
     };
@@ -172,5 +189,22 @@ export function clearCaptions(state: TranscriptState, language?: string): Transc
         const stream = streams[code];
         if (stream) streams[code] = { ...stream, clearBeforeSequence: stream.sequence };
     }
-    return { entries, streams };
+    return { ...state, entries, streams };
+}
+
+export function applyHistoryReset(
+    state: TranscriptState,
+    language: string,
+    revision: number,
+): TranscriptState {
+    if (revision <= (state.historyRevisions[language] ?? 0)) return state;
+    const entries = { ...state.entries };
+    const streams = { ...state.streams };
+    delete entries[language];
+    delete streams[language];
+    return {
+        entries,
+        streams,
+        historyRevisions: { ...state.historyRevisions, [language]: revision },
+    };
 }

@@ -8,6 +8,7 @@ import {
     MIN_SESSION_DURATION_MINUTES,
 } from "./session-duration";
 import { TRANSLATION_OUTPUT_MODES } from "./session-types";
+import { translationControlsSchema } from "./translation-control";
 
 const apiErrorCodes = Object.values(API_ERROR_CODES) as [ApiErrorCode, ...ApiErrorCode[]];
 export const MAX_SYSTEM_INSTRUCTION_LENGTH = 4000;
@@ -117,6 +118,7 @@ export const translationInfoSchema = z.object({
 
 export const activeTranslationsResponseSchema = z.object({
     translations: z.array(translationInfoSchema).optional().default([]),
+    controls: translationControlsSchema.optional().default({}),
 });
 
 export const sessionDetailsResponseSchema = z

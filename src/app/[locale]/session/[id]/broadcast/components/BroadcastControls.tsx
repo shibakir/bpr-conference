@@ -67,7 +67,11 @@ export function BroadcastControls({
     const router = useRouter();
     const room = useRoomContext();
     const listenerCount = useListenerCount(room);
-    const translations = useActiveTranslations(sessionId);
+    const {
+        translations,
+        controls,
+        mutate: refreshTranslations,
+    } = useActiveTranslations(sessionId, room);
     const isWakeLockActive = useWakeLock();
     const join = useJoinUrl(sessionId);
     const recovery = useControlRecoveryUrl(sessionId, organizerKey);
@@ -207,7 +211,15 @@ export function BroadcastControls({
                         </FieldSet>
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">
-                            <ActiveTranslationsPanel translations={translations} />
+                            <ActiveTranslationsPanel
+                                translations={translations}
+                                controls={controls}
+                                sessionId={sessionId}
+                                organizerKey={organizerKey}
+                                onChanged={() => {
+                                    void refreshTranslations();
+                                }}
+                            />
                         </FieldSet>
 
                         <FieldSet className="gap-3 border-t border-border/35 pt-5">

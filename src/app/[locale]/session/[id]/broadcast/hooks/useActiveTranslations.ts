@@ -1,22 +1,9 @@
 "use client";
 
-import useSWR from "swr";
+import type { Room } from "livekit-client";
 
-import { fetchValidatedJson } from "@/lib/api-client";
-import { activeTranslationsResponseSchema } from "@/lib/api-schemas";
+import { useTranslationControlState } from "@/hooks/use-translation-control-state";
 
-import type { TranslationInfo } from "../types";
-
-async function fetchActiveTranslations(url: string) {
-    return fetchValidatedJson(url, undefined, activeTranslationsResponseSchema);
-}
-
-export function useActiveTranslations(sessionId: string) {
-    const { data } = useSWR(
-        `/api/translate/status?sessionId=${encodeURIComponent(sessionId)}`,
-        fetchActiveTranslations,
-        { refreshInterval: 3000 },
-    );
-
-    return (data?.translations ?? []) satisfies TranslationInfo[];
+export function useActiveTranslations(sessionId: string, room?: Room) {
+    return useTranslationControlState(sessionId, room);
 }

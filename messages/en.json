@@ -183,7 +183,9 @@
         "audioDeliveryTitle": "Audio delivery on this device · measured by WebRTC",
         "audioDeliveryMetrics": "Playout buffer: {buffer} · Network jitter: {jitter} · Packet loss: {loss}",
         "audioDeliveryExplanation": "These values describe reception on this device, not the full delay from the speaker. — means unavailable.",
-        "captionTimingExplanation": "Captions appear as soon as they arrive. Audio synchronization is unavailable because the translation model does not provide reliable text-to-audio timing."
+        "captionTimingExplanation": "Captions appear as soon as they arrive. Audio synchronization is unavailable because the translation model does not provide reliable text-to-audio timing.",
+        "translationResetting": "{language}: translation is restarting; captions have been cleared.",
+        "translationDraining": "{language}: finishing the remaining translation; new speech is temporarily skipped."
     },
     "LanguageSelector": {
         "voiceLanguage": "Listen in",
@@ -262,5 +264,27 @@
         "removeLanguage": "Remove {language}",
         "clear": "Clear",
         "selectAll": "Select all"
+    },
+    "TranslationActions": {
+        "drain": "Finish playback",
+        "reset": "Reset translation",
+        "drainLanguage": "Finish translation playback: {language}",
+        "resetLanguage": "Reset translation: {language}",
+        "hint": "Finish playback skips new speech for this language while the remaining translation plays. Reset clears its captions for all listeners.",
+        "drainHint": "Finish the remaining translation, then return to live speech. New speech is skipped temporarily.",
+        "resetHint": "Discard queued translation, clear captions for all listeners of this language and restart translation.",
+        "sending": "Sending…",
+        "resetting": "Restarting translation…",
+        "draining": "Finishing playback… New speech is temporarily skipped.",
+        "resetCompleted": "Translation restarted. Captions cleared.",
+        "drainCompleted": "Remaining translation sent. Live translation resumed.",
+        "failed": "Could not send the command. Retry to check its result.",
+        "conflict": "Another operation is in progress. Please wait.",
+        "rateLimited": "Please wait a few seconds before trying again.",
+        "inactive": "This translation is no longer active.",
+        "forbidden": "Broadcast owner access is required.",
+        "timeout": "Completion was not confirmed in time. Live input has resumed; captions were kept.",
+        "incomplete": "The operation could not finish. Check the translation status and retry.",
+        "unconfirmed": "Playback settled and live input resumed. Completeness of the translation was not confirmed."
     }
 }

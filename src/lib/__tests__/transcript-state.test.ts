@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+    applyHistoryReset,
     type CaptionMessage,
     clearCaptions,
     EMPTY_TRANSCRIPTS,
@@ -30,6 +31,45 @@ function message(overrides: Partial<CaptionMessage> = {}): CaptionMessage {
 }
 
 describe("shared caption state", () => {
+    it("clears a hidden language remotely and rejects delayed pre-reset snapshots", () => {
+        let state = receiveCaption(EMPTY_TRANSCRIPTS, message());
+        state = receiveCaption(state, message({ language: "de" }));
+        state = applyHistoryReset(state, "cs", 1);
+        expect(state.entries["cs"]).toBeUndefined();
+        expect(state.entries["de"]).toHaveLength(1);
+        expect(receiveCaption(state, message({ revision: 99, sequence: 99 }))).toBe(state);
+        state = receiveCaption(
+            state,
+            message({
+                historyRevision: 1,
+                streamId: "new",
+                streamGeneration: 1,
+                segmentId: "new-1",
+            }),
+        );
+        expect(state.entries["cs"]).toHaveLength(1);
+        expect(applyHistoryReset(state, "cs", 1)).toBe(state);
+        expect(applyHistoryReset(state, "cs", 0)).toBe(state);
+    });
+    it("recovers a missed reset from a caption and preserves post-reset history across reconnects", () => {
+        let state = receiveCaption(EMPTY_TRANSCRIPTS, message());
+        state = receiveCaption(
+            state,
+            message({ historyRevision: 2, streamId: "new", streamEpoch: 3, segmentId: "new-1" }),
+        );
+        expect(state.entries["cs"]?.map((e) => e.id)).toEqual(["new-1"]);
+        state = receiveCaption(
+            state,
+            message({
+                historyRevision: 2,
+                streamId: "reconnected",
+                streamEpoch: 4,
+                segmentId: "new-2",
+            }),
+        );
+        expect(state.entries["cs"]).toHaveLength(2);
+        expect(parseCaptionMessage({ ...message(), historyRevision: -1 })).toBeNull();
+    });
     it("replaces snapshots, ignores repeats and never regresses a final segment", () => {
         let state = receiveCaption(EMPTY_TRANSCRIPTS, message());
         state = receiveCaption(

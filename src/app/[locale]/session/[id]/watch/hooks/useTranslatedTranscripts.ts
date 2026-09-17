@@ -1,28 +1,43 @@
 "use client";
 
-import { type Room, RoomEvent } from "livekit-client";
-import { type RefObject, useEffect, useMemo, useState } from "react";
+import { type RemoteParticipant, type Room, RoomEvent } from "livekit-client";
+import { type RefObject, useCallback, useEffect, useMemo, useState } from "react";
 
+import { useTranslationControlState } from "@/hooks/use-translation-control-state";
 import { parseJson } from "@/lib/api-request";
 import {
+    applyHistoryReset,
     clearCaptions,
     EMPTY_TRANSCRIPTS,
     parseCaptionMessage,
     receiveCaption,
 } from "@/lib/transcript-state";
+import type { TranslationControl } from "@/lib/translation-control";
 
 import type { TranscriptEntry } from "../types";
 
 export function useTranslatedTranscripts({
     room,
+    sessionId,
     enabled,
     languages,
 }: {
     room: Room | undefined;
+    sessionId: string;
     enabled: boolean;
     languages: string[];
 }) {
     const [state, setState] = useState(EMPTY_TRANSCRIPTS);
+    const handleControls = useCallback((controls: Record<string, TranslationControl>) => {
+        setState((previous) =>
+            Object.entries(controls).reduce(
+                (next, [language, control]) =>
+                    applyHistoryReset(next, language, control.historyRevision),
+                previous,
+            ),
+        );
+    }, []);
+    const { controls } = useTranslationControlState(sessionId, room, handleControls);
     const languageKey = useMemo(
         () =>
             Array.from(new Set(languages.filter((language) => language !== "original")))
@@ -37,17 +52,17 @@ export function useTranslatedTranscripts({
 
         const handleData = (
             payload: Uint8Array,
-            participant: unknown,
+            participant: RemoteParticipant | undefined,
             kind: unknown,
             topic: string | undefined,
         ) => {
-            void participant;
             void kind;
             if (topic !== "transcription") return;
 
             try {
                 const data = parseCaptionMessage(parseJson(new TextDecoder().decode(payload)));
                 if (!data || !allowedLanguages.has(data.language)) return;
+                if (participant?.identity !== `translator-${data.language}`) return;
                 setState((prev) => receiveCaption(prev, data));
             } catch {
                 // Ignore non-transcription data messages.
@@ -62,6 +77,7 @@ export function useTranslatedTranscripts({
 
     return {
         transcriptsByLanguage: state.entries,
+        controls,
         clearTranscripts: (language?: string) => setState((prev) => clearCaptions(prev, language)),
     };
 }
